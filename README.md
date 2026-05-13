@@ -2,6 +2,10 @@
 
 > 把一段记忆，变成可以对话的人。
 
+[![Version](https://img.shields.io/badge/version-v0.2.0-blue.svg)](CHANGELOG.md)
+[![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
+
 ex-memory 是一个开源的数字镜像系统，通过分析你和前任的聊天记录，生成一个能还原 ta 语气、性格和表达习惯的 AI 对话体。支持微信、QQ 聊天记录导入，内置 RAG 检索增强、三层记忆架构、关系反思分析，以及一个仿微信 Web 界面。
 
 ## 核心特性
@@ -283,6 +287,25 @@ Web API 服务提供以下端点（`http://localhost:8000/api`）：
 - 聊天记录仅用于生成记忆镜像，不会用于其他目的
 - API Key 可存储在 macOS Keychain 中，避免明文写入配置文件
 - 建议将 `exes/` 目录加入 `.gitignore`
+
+## 更新日志
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v0.2.0 (2026-05-13)
+
+- QQ 聊天记录解析器（3 种 TXT 格式 + MHT beta）
+- Session LLM 语义摘要 + ChromaDB 备份/恢复
+- API Token 累计计数（`GET /api/exes/{slug}/usage`）
+- run.py 拆分为 `commands/` 注册表模式（-81%）
+- Gradio 多用户状态 + 流式对话 + 贴纸/Token 显示
+- API 异步化 + 引擎缓存 + 多项 bug 修复
+
+### v0.1.0 (2026-05-12)
+
+- 初始版本：三层记忆架构、RAG 检索增强、微信解析、全自动蒸馏流水线
+- 对话引擎、关系反思、纠正机制、版本管理
+- 微信模拟器 Web 界面 + FastAPI 服务端 + CLI
 
 ## 许可证
 
