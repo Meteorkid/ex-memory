@@ -1,0 +1,289 @@
+# ex-memory — 前任记忆智能体
+
+> 把一段记忆，变成可以对话的人。
+
+ex-memory 是一个开源的数字镜像系统，通过分析你和前任的聊天记录，生成一个能还原 ta 语气、性格和表达习惯的 AI 对话体。支持微信、QQ 聊天记录导入，内置 RAG 检索增强、三层记忆架构、关系反思分析，以及一个仿微信 Web 界面。
+
+## 核心特性
+
+- **语气还原**：原话优先于描述 —— 从聊天记录中提取 ta 的真实表达作为语气锚点
+- **RAG 检索增强**：每轮对话前自动检索向量库，找到 ta 在类似场景下说过的话
+- **三层记忆架构**：潜意识层（向量库原话） > 记忆层（memory.md） > 人格层（persona.md）
+- **关系反思**：7 维度深度分析，生成 reflections.md
+- **纠正机制**：对话中说"ta不会这样"即可即时修正
+- **微信模拟器**：仿微信 Web 界面，支持贴纸、红包、转账、朋友圈
+- **纯 Python CLI**：不依赖 Claude，可独立运行
+
+## 快速开始
+
+### 环境要求
+
+- Python 3.10+
+- macOS / Linux / Windows
+
+### 安装
+
+```bash
+git clone https://github.com/yourname/ex-memory.git
+cd ex-memory
+pip install -r requirements.txt
+```
+
+### 配置 API
+
+复制示例配置并填入你的 API Key：
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env`：
+
+```env
+# LLM（必填）
+LLM_API_KEY=your_api_key_here
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-chat
+
+# Embedding（可选，不配则 RAG 不可用）
+EMBEDDING_API_KEY=your_api_key_here
+EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
+EMBEDDING_MODEL=BAAI/bge-m3
+```
+
+支持任意 OpenAI 兼容端点（硅基流动、DeepSeek、OpenAI 等）。也可将 Key 存入 macOS Keychain：
+
+```bash
+python run.py
+> /keychain set llm sk-xxx
+```
+
+### 启动
+
+**CLI 模式：**
+```bash
+python run.py
+```
+
+**Web API 服务：**
+```bash
+python -m server.app
+```
+默认启动在 `http://localhost:8000`，提供 REST API 和静态 Web 前端。
+
+**Gradio Web 界面：**
+```bash
+python run.py
+> /web
+```
+
+## 使用指南
+
+### 创建镜像
+
+```
+> /create
+```
+
+按提示输入：
+1. 镜像代号（如 `xiaoming`）
+2. 基本信息（在一起多久、分手多久、ta 的职业等）
+3. 选择数据源（微信/QQ 聊天记录、口述、截图）
+
+系统自动完成：解析 → 切片 → 入库 → LLM 生成 persona.md + memory.md → 合并 SKILL.md
+
+### 对话
+
+```
+> /xiaoming
+```
+
+进入对话模式。每轮对话前系统会自动检索向量库，找到 ta 在类似场景下的原话作为语气参考。
+
+### 追加素材
+
+```
+> /update xiaoming
+```
+
+向已有镜像追加新的聊天记录或口述内容，自动增量合并。
+
+### 关系反思
+
+```
+> /reflect xiaoming
+```
+
+从 7 个维度分析这段关系，生成反思报告。
+
+### 版本管理
+
+```
+> /backup xiaoming          # 备份当前版本
+> /rollback xiaoming v1     # 回滚到指定版本
+> /let-go xiaoming          # 删除镜像（不可逆）
+```
+
+## 命令参考
+
+| 命令 | 说明 |
+|------|------|
+| `/create` | 创建新的记忆镜像 |
+| `/{名称}` | 进入已有镜像的对话模式 |
+| `/list` | 列出所有镜像 |
+| `/update {名称}` | 向已有镜像追加新素材 |
+| `/reflect {名称}` | 关系反思分析 |
+| `/backup {名称}` | 备份镜像版本 |
+| `/rollback {名称} {版本}` | 回滚到指定版本 |
+| `/let-go {名称}` | 删除镜像（不可逆） |
+| `/keychain` | 管理 API Key（macOS Keychain） |
+| `/web` | 启动 Gradio Web 界面 |
+| `/help` | 显示帮助 |
+| `/exit` | 退出 |
+
+## 项目结构
+
+```
+ex-memory/
+├── run.py                    # CLI 主入口
+├── config.py                 # 全局配置
+├── requirements.txt
+├── .env.example
+│
+├── core/
+│   ├── engine.py             # ChatEngine：SKILL.md + RAG → API 调用
+│   ├── session.py            # ChatSession：CLI 循环、指令分发
+│   ├── token_counter.py      # Token 统计
+│   ├── sticker_selector.py   # 情绪贴纸选择器
+│   ├── validation.py         # 输入校验 + 注入检测
+│   ├── version_manager.py    # 版本备份/回滚
+│   ├── wallet_manager.py     # 红包/转账系统
+│   └── keychain.py           # macOS Keychain 集成
+│
+├── memory/
+│   ├── vector_store.py       # ChromaDB 封装
+│   ├── chunker.py            # 聊天记录切片
+│   ├── embedder.py           # Embedding API 封装
+│   └── ingest.py             # 数据摄入入口
+│
+├── pipeline/
+│   ├── orchestrator.py       # 创建/更新流程总调度
+│   ├── persona_builder.py    # LLM 生成 persona.md
+│   ├── memory_builder.py     # LLM 生成 memory.md
+│   ├── skill_combiner.py     # 合并 SKILL.md
+│   ├── correction_handler.py # 对话纠正
+│   ├── merger.py             # 增量合并
+│   └── reflector.py          # 关系反思
+│
+├── parsers/
+│   ├── wechat_parser.py      # 微信聊天记录解析
+│   └── qq_parser.py          # QQ 聊天记录解析
+│
+├── commands/                 # CLI 命令模块
+│   ├── create.py / chat.py / update.py / ...
+│   └── __init__.py           # 命令注册表
+│
+├── server/
+│   ├── app.py                # FastAPI 应用
+│   ├── routes.py             # API 路由
+│   ├── auth.py               # 用户认证
+│   └── middleware.py         # 中间件
+│
+├── web/
+│   ├── app.py                # Gradio Web 界面
+│   └── static/               # 微信模拟器 SPA
+│
+├── prompts/                  # LLM prompt 模板
+├── tests/                    # 测试套件
+│
+└── exes/{slug}/              # 运行时数据
+    ├── SKILL.md              # 合并版运行 prompt
+    ├── memory.md             # 记忆层
+    ├── persona.md            # 人格层（含原话语料库）
+    ├── reflections.md        # 关系反思
+    ├── corrections.md        # 纠正记录
+    ├── meta.json             # 元信息
+    ├── chroma_db/            # ChromaDB 持久化
+    ├── sessions/             # 对话归档
+    └── versions/             # 版本快照
+```
+
+## API 端点
+
+Web API 服务提供以下端点（`http://localhost:8000/api`）：
+
+### 认证
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/auth/register` | 注册 |
+| POST | `/auth/login` | 登录 |
+| POST | `/auth/logout` | 登出 |
+
+### 镜像管理
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/exes` | 列出所有镜像 |
+| POST | `/exes` | 创建镜像 |
+| DELETE | `/exes/{slug}` | 删除镜像 |
+| POST | `/exes/{slug}/import` | 导入聊天记录（自动检测微信/QQ） |
+| POST | `/exes/{slug}/update` | 追加素材 |
+| POST | `/exes/{slug}/reflect` | 关系反思 |
+
+### 对话
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/chat` | 普通对话（非流式） |
+| POST | `/chat/stream` | 流式对话（SSE） |
+| GET | `/exes/{slug}/usage` | 获取 token 累计消耗 |
+
+### 钱包 / 红包 / 转账
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/exes/{slug}/wallet` | 钱包信息 |
+| POST | `/exes/{slug}/redpacket/send` | 发红包 |
+| POST | `/exes/{slug}/redpacket/{id}/open` | 开红包 |
+| POST | `/exes/{slug}/transfer/send` | 转账 |
+| POST | `/exes/{slug}/transfer/{id}/confirm` | 确认收款 |
+
+### 朋友圈
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/exes/{slug}/moments` | 朋友圈动态 |
+
+## 配置说明
+
+通过 `.env` 文件配置，支持以下变量：
+
+| 变量 | 必填 | 说明 | 默认值 |
+|------|------|------|--------|
+| `LLM_API_KEY` | 是 | LLM API Key | — |
+| `LLM_BASE_URL` | 否 | API 端点 | `https://api.deepseek.com` |
+| `LLM_MODEL` | 否 | 模型名称 | `deepseek-chat` |
+| `LLM_TEMPERATURE` | 否 | 生成温度 | `0.8` |
+| `EMBEDDING_API_KEY` | 否 | Embedding API Key | — |
+| `EMBEDDING_BASE_URL` | 否 | Embedding 端点 | `https://api.siliconflow.cn/v1` |
+| `EMBEDDING_MODEL` | 否 | Embedding 模型 | `BAAI/bge-m3` |
+
+未配置 Embedding 时 RAG 检索不可用，但对话仍可正常进行（退化为纯文本模式）。
+
+## 支持的聊天记录格式
+
+### 微信
+- WeFlow 导出（JSON / JSONL）
+- WeChatMsg 导出（TXT）
+- 留痕导出（JSON）
+
+### QQ
+- QQ 导出 TXT（时间戳 + 昵称 + QQ 号格式）
+- MHT 格式（beta）
+
+## 隐私说明
+
+- 所有数据存储在本地 `exes/` 目录，不会上传到第三方服务
+- 聊天记录仅用于生成记忆镜像，不会用于其他目的
+- API Key 可存储在 macOS Keychain 中，避免明文写入配置文件
+- 建议将 `exes/` 目录加入 `.gitignore`
+
+## 许可证
+
+MIT License

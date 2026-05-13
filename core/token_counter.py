@@ -1,4 +1,4 @@
-"""Token 使用统计。"""
+"""Token 使用统计（CLI 用户界面输出）。"""
 
 
 class TokenCounter:
@@ -19,6 +19,7 @@ class TokenCounter:
         self.session_turns += 1
 
     def display_summary(self):
+        """向终端输出本次会话的 Token 统计。这是 CLI 交互界面的一部分，用 print 是合理的。"""
         total = self.total_prompt_tokens + self.total_completion_tokens
         print("\n" + "─" * 35)
         print(" Token used")

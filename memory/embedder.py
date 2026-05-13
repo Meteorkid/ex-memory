@@ -17,4 +17,5 @@ class Embedder:
 
     def embed_one(self, text: str) -> list[float]:
         """单条 embedding。"""
-        return self.embed([text])[0]
+        response = self.client.embeddings.create(input=[text], model=self.model)
+        return response.data[0].embedding

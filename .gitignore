@@ -7,3 +7,7 @@ dist/
 build/
 .venv/
 venv/
+data/
+.DS_Store
+*.tmp
+logs/

@@ -1,17 +1,21 @@
 """自动化蒸馏调度：从原始数据到可对话的完整流水线。"""
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from prompt_toolkit import prompt as pt_prompt
 
 from config import get_ex_dir, ensure_ex_dirs, get_embedding_config, get_llm_config, get_collection_name
+from core.file_utils import atomic_write, atomic_write_json
 from memory.embedder import Embedder
 from memory.vector_store import VectorStore
 from memory.chunker import Chunker
 from pipeline.memory_builder import build_memory
 from pipeline.persona_builder import build_persona
 from pipeline.skill_combiner import write_skill
+
+logger = logging.getLogger("ex-memory")
 
 
 def run_create_flow():
@@ -62,7 +66,7 @@ def run_create_flow():
         },
         "pipeline_state": "intake_done",
     }
-    (ex_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(ex_dir / "meta.json", meta)
 
     # ===== Step 2: 数据源导入 =====
     print(f"\n=== 数据源导入 ===")
@@ -110,12 +114,12 @@ def run_create_flow():
 
     print("正在生成 Relationship Memory...")
     memory_content = build_memory(slug, materials_summary)
-    (ex_dir / "memory.md").write_text(memory_content, encoding="utf-8")
+    atomic_write(ex_dir / "memory.md", memory_content)
     print("  memory.md 已生成")
 
     print("正在生成 Persona（含原话样本抽取）...")
     persona_content = build_persona(slug, materials_summary, vector_store, embedder)
-    (ex_dir / "persona.md").write_text(persona_content, encoding="utf-8")
+    atomic_write(ex_dir / "persona.md", persona_content)
     print("  persona.md 已生成")
 
     # ===== Step 4: 生成 SKILL.md =====
@@ -125,7 +129,7 @@ def run_create_flow():
     # 更新 meta.json
     meta["pipeline_state"] = "completed"
     meta["updated_at"] = datetime.now().isoformat()
-    (ex_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(ex_dir / "meta.json", meta)
 
     # 展示摘要
     print(f"\n=== 创建完成！===")
@@ -191,3 +195,66 @@ def _import_oral(ex_dir: Path, slug: str, name: str, vector_store, embedder, chu
     if chunks:
         vector_store.ingest(chunks, embedder)
         print(f"  入库完成：{vector_store.count()} 条记录")
+
+
+def run_create_flow_api(slug: str, name: str, answers: list[str]) -> dict:
+    """API 版创建流程：接收参数而非交互式输入，返回结果字典。"""
+
+    try:
+        basic_info = answers[0] if len(answers) > 0 else ""
+        personality = answers[1] if len(answers) > 1 else ""
+
+        ex_dir = ensure_ex_dirs(slug)
+
+        meta = {
+            "name": name,
+            "slug": slug,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "version": "v1",
+            "profile": {
+                "basic_info": basic_info,
+                "personality": personality,
+            },
+            "pipeline_state": "intake_done",
+        }
+        atomic_write_json(ex_dir / "meta.json", meta)
+
+        materials_summary = f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
+
+        # 初始化向量库（空库，后续 /update 追加数据）
+        emb_cfg = get_embedding_config()
+        if emb_cfg["api_key"]:
+            embedder = Embedder(
+                api_key=emb_cfg["api_key"],
+                base_url=emb_cfg["base_url"],
+                model=emb_cfg["model"],
+            )
+            VectorStore(
+                persist_dir=str(ex_dir / "chroma_db"),
+                collection_name=get_collection_name(slug),
+            )
+
+        # 蒸馏
+        llm_cfg = get_llm_config()
+        if not llm_cfg["api_key"]:
+            return {"error": "未配置 LLM API Key"}
+
+        memory_content = build_memory(slug, materials_summary)
+        atomic_write(ex_dir / "memory.md", memory_content)
+
+        persona_content = build_persona(slug, materials_summary, None, None)
+        atomic_write(ex_dir / "persona.md", persona_content)
+
+        write_skill(slug)
+
+        meta["pipeline_state"] = "completed"
+        meta["updated_at"] = datetime.now().isoformat()
+        atomic_write_json(ex_dir / "meta.json", meta)
+
+        logger.info("API 创建完成: %s", slug)
+        return {"slug": slug, "name": name, "state": "completed"}
+
+    except Exception as e:
+        logger.error("API 创建失败: %s", e, exc_info=True)
+        return {"error": str(e)}

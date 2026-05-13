@@ -1,8 +1,7 @@
 """调用 LLM 生成 memory.md。"""
 
 from pathlib import Path
-from openai import OpenAI
-from config import get_llm_config
+from config import get_llm_config, get_llm_client
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -18,7 +17,7 @@ def build_memory(slug: str, materials_summary: str) -> str:
         memory.md 的完整内容
     """
     cfg = get_llm_config()
-    client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+    client = get_llm_client()
 
     analyzer_prompt = (PROMPTS_DIR / "memory_analyzer.md").read_text(encoding="utf-8")
     builder_prompt = (PROMPTS_DIR / "memory_builder.md").read_text(encoding="utf-8")

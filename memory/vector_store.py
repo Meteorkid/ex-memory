@@ -1,8 +1,12 @@
 """ChromaDB 向量库封装：ingest / search / search_target_only。"""
 
+import hashlib
+import logging
 from typing import Optional
 import chromadb
 from memory.embedder import Embedder
+
+logger = logging.getLogger("ex-memory")
 
 
 class VectorStore:
@@ -45,7 +49,7 @@ class VectorStore:
                 documents=documents,
                 metadatas=metadatas,
             )
-            print(f"  入库进度: {min(i + batch_size, total)}/{total}")
+            logger.info("入库进度: %d/%d", min(i + batch_size, total), total)
 
     def search(
         self,
@@ -94,8 +98,9 @@ class VectorStore:
     def add_session_summary(self, text: str, slug: str, embedder: Embedder):
         """将 session 摘要写入向量库。"""
         embedding = embedder.embed_one(text)
+        stable_id = hashlib.md5(text.encode()).hexdigest()[:16]
         self.collection.add(
-            ids=[f"session_{slug}_{hash(text)}"],
+            ids=[f"session_{slug}_{stable_id}"],
             embeddings=[embedding],
             documents=[text],
             metadatas=[{

@@ -1,8 +1,7 @@
 """调用 LLM 生成 persona.md（含 9 场景原话样本抽取）。"""
 
 from pathlib import Path
-from openai import OpenAI
-from config import get_llm_config, get_ex_dir
+from config import get_llm_config, get_llm_client, get_ex_dir
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -38,7 +37,7 @@ def build_persona(
         persona.md 的完整内容
     """
     cfg = get_llm_config()
-    client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+    client = get_llm_client()
 
     # 读取 prompt 模板
     analyzer_prompt = (PROMPTS_DIR / "persona_analyzer.md").read_text(encoding="utf-8")
@@ -62,9 +61,11 @@ def build_persona(
         for scene_name, query in SPEECH_SCENES:
             results = vector_store.search_target_only(query, embedder, top_k=8)
             picked = []
+            seen = set()
             for r in results:
                 text = r.get("display_text", "").strip()
-                if text and len(text) > 2 and text not in picked:
+                if text and len(text) > 2 and text not in seen:
+                    seen.add(text)
                     picked.append(text)
                 if len(picked) >= 3:
                     break

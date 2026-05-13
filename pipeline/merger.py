@@ -1,11 +1,13 @@
-"""增量合并：将新素材 merge 进现有的 memory.md 和 persona.md。"""
+"""增量合并：将新素材 merge 进现有的 memory.md 和 persona.md，自动备份旧版本。"""
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
-from openai import OpenAI
-from config import get_llm_config, get_ex_dir
+from config import get_llm_config, get_llm_client, get_ex_dir
+from core.file_utils import atomic_write
 
+logger = logging.getLogger("ex-memory")
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
 
@@ -15,6 +17,9 @@ def merge_new_material(
     source_type: str = "oral",
 ) -> dict:
     """将新素材增量合并到现有的 memory.md 和 persona.md。
+
+    策略：追加式合并 —— 保留现有内容，LLM 只产出新增/修订的增量部分，
+    而非重新生成整个文件，避免 LLM 幻觉截断已有记忆。
 
     Args:
         slug: 前任代号
@@ -28,67 +33,57 @@ def merge_new_material(
     if not cfg["api_key"]:
         return {"error": "未配置 LLM API Key"}
 
-    client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+    client = get_llm_client()
     ex_dir = get_ex_dir(slug)
 
     merger_prompt = (PROMPTS_DIR / "merger.md").read_text(encoding="utf-8")
 
-    # 读取现有文件
     memory_path = ex_dir / "memory.md"
     persona_path = ex_dir / "persona.md"
 
     existing_memory = memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
     existing_persona = persona_path.read_text(encoding="utf-8") if persona_path.exists() else ""
 
-    timestamp = datetime.now().strftime("%Y-%m-%d")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # Step 1: 合并 memory.md
-    memory_user_content = f"""## 现有 memory.md
+    # --- 自动备份 ---
+    try:
+        from core.version_manager import backup as do_backup
+        do_backup(slug)
+        logger.info("合并前自动备份完成: %s", slug)
+    except Exception as e:
+        logger.warning("自动备份失败（继续合并）: %s", e)
 
-{existing_memory}
+    def _merge_one(target_path: Path, existing: str, task_hint: str) -> str:
+        """调用 LLM 生成增量并追加到目标文件，返回增量文本。"""
+        user_content = f"""## 现有 {target_path.name}（请完整保留）
 
-## 新增素材（来源：{source_type}，日期：{timestamp}）
-
-{new_materials}
-
-请按照 merger.md 的原则，将新增素材增量合并到现有 memory.md 中。
-输出完整的更新后 memory.md 内容。"""
-
-    memory_response = client.chat.completions.create(
-        model=cfg["model"],
-        messages=[
-            {"role": "system", "content": merger_prompt},
-            {"role": "user", "content": memory_user_content},
-        ],
-        temperature=0.5,
-    )
-    updated_memory = memory_response.choices[0].message.content
-
-    # Step 2: 合并 persona.md
-    persona_user_content = f"""## 现有 persona.md
-
-{existing_persona}
+{existing}
 
 ## 新增素材（来源：{source_type}，日期：{timestamp}）
 
 {new_materials}
 
-请按照 merger.md 的原则，将新增素材增量合并到现有 persona.md 中。
-输出完整的更新后 persona.md 内容。"""
+请输出要追加到 {target_path.name} 末尾的{task_hint}（Markdown 格式），不要重复已有内容。"""
+        response = client.chat.completions.create(
+            model=cfg["model"],
+            messages=[
+                {"role": "system", "content": merger_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.5,
+        )
+        delta = (response.choices[0].message.content or "").strip()
+        if delta:
+            merged = existing.rstrip() + f"\n\n---\n## 更新 — {timestamp}\n{delta}\n"
+            atomic_write(target_path, merged)
+            logger.info("%s 增量更新: %d 字符", target_path.name, len(delta))
+        else:
+            logger.warning("%s 未生成有效增量，跳过写入", target_path.name)
+        return delta
 
-    persona_response = client.chat.completions.create(
-        model=cfg["model"],
-        messages=[
-            {"role": "system", "content": merger_prompt},
-            {"role": "user", "content": persona_user_content},
-        ],
-        temperature=0.5,
-    )
-    updated_persona = persona_response.choices[0].message.content
-
-    # 写入文件
-    memory_path.write_text(updated_memory, encoding="utf-8")
-    persona_path.write_text(updated_persona, encoding="utf-8")
+    memory_delta = _merge_one(memory_path, existing_memory, "新内容")
+    persona_delta = _merge_one(persona_path, existing_persona, "新观察")
 
     # 重新生成 SKILL.md
     from pipeline.skill_combiner import write_skill
@@ -100,10 +95,12 @@ def merge_new_material(
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         meta["updated_at"] = datetime.now().isoformat()
         meta["pipeline_state"] = "merged"
-        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write(meta_path, json.dumps(meta, ensure_ascii=False, indent=2))
 
     return {
-        "memory_updated": True,
-        "persona_updated": True,
+        "memory_updated": bool(memory_delta),
+        "persona_updated": bool(persona_delta),
         "skill_regenerated": True,
+        "memory_delta_len": len(memory_delta),
+        "persona_delta_len": len(persona_delta),
     }

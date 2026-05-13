@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 敏感数据
+.env
+*.key
+*.pem
+
+# 运行时数据
+exes/
+data/
+logs/
+
+# 开发工具
+.pytest_cache/
+htmlcov/
+.coverage
+*.swp
+*.swo
+*.sess
+
+# IDE
+.vscode/
+.idea/
+*.iml
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 文档
+*.md
+!requirements.txt

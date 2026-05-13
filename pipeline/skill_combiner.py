@@ -1,9 +1,12 @@
 """合并 memory.md + persona.md → SKILL.md。"""
 
 import json
+import logging
 from pathlib import Path
 from datetime import datetime
 from config import get_ex_dir
+
+logger = logging.getLogger("ex-memory")
 
 
 def combine(slug: str) -> str:
@@ -80,5 +83,5 @@ def write_skill(slug: str):
     content = combine(slug)
     skill_path = ex_dir / "SKILL.md"
     skill_path.write_text(content, encoding="utf-8")
-    print(f"已生成 {skill_path}")
+    logger.info("已生成 %s", skill_path)
     return content

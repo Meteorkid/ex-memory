@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#EDEDED">
+    <title>ex-memory — 微信模拟器</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ── 登录页 ── -->
+<div id="page-auth">
+    <div class="auth-card">
+        <h1>前任记忆智能体</h1>
+        <p class="subtitle">ta 在微信里等你</p>
+        <div class="tabs">
+            <button id="tab-login-btn" class="tab active">登录</button>
+            <button id="tab-register-btn" class="tab">注册</button>
+        </div>
+
+        <div id="form-login" class="form-box">
+            <input type="text" id="login-username" placeholder="用户名" autocomplete="username">
+            <div class="pwd-wrap">
+                <input type="password" id="login-password" placeholder="密码" autocomplete="current-password">
+                <button class="pwd-toggle" tabindex="-1" data-target="login-password">👁</button>
+            </div>
+            <button id="login-submit" class="btn">登录</button>
+            <p id="login-error" class="err"></p>
+        </div>
+
+        <div id="form-register" class="form-box" style="display:none">
+            <input type="text" id="reg-username" placeholder="用户名（至少2个字符）">
+            <div class="pwd-wrap">
+                <input type="password" id="reg-password" placeholder="密码（至少6个字符）">
+                <button class="pwd-toggle" tabindex="-1" data-target="reg-password">👁</button>
+            </div>
+            <div class="pwd-wrap">
+                <input type="password" id="reg-password2" placeholder="再次输入密码">
+                <button class="pwd-toggle" tabindex="-1" data-target="reg-password2">👁</button>
+            </div>
+            <button id="reg-submit" class="btn">注册</button>
+            <p id="reg-error" class="err"></p>
+        </div>
+    </div>
+</div>
+
+<!-- ── 微信模拟器主界面 ── -->
+<div id="page-main" style="display:none">
+
+    <!-- ═══ 桌面端标题栏（仅桌面端可见） ═══ -->
+    <div class="desktop-titlebar">
+        <div class="titlebar-traffic">
+            <span class="traffic-light red"></span>
+            <span class="traffic-light yellow"></span>
+            <span class="traffic-light green"></span>
+        </div>
+        <span class="titlebar-app-name" id="titlebar-app-name">微信</span>
+        <div class="titlebar-spacer"></div>
+    </div>
+
+    <!-- ═══ 桌面端 + 移动端主体 ═══ -->
+    <div class="app-body">
+
+        <!-- ═══ 桌面端深色侧边栏（仅桌面端可见） ═══ -->
+        <div class="desktop-sidebar">
+            <div class="sidebar-top">
+                <div class="sidebar-icon active" data-desktop-tab="chat" title="聊天">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                </div>
+                <div class="sidebar-icon" data-desktop-tab="contacts" title="通讯录">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div class="sidebar-icon" data-desktop-tab="discover" title="发现">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-13.88 5.66"/></svg>
+                </div>
+            </div>
+            <div class="sidebar-bottom">
+                <div class="sidebar-icon" data-desktop-tab="me" title="我">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 手机框架（移动端全屏 / 桌面端内容区） ═══ -->
+        <div class="phone-frame">
+
+            <!-- 状态栏（仅移动端可见） -->
+            <div class="phone-statusbar">
+                <span class="status-time" id="status-time">12:00</span>
+                <span class="status-icons">📶 🔋 100%</span>
+            </div>
+
+            <!-- 标题栏 -->
+            <div class="phone-navbar" id="phone-navbar">
+                <button class="nav-back" id="nav-back-btn" style="display:none">‹</button>
+                <span class="nav-title" id="nav-title">微信</span>
+                <button class="nav-action" id="nav-action-btn" style="display:none">•••</button>
+            </div>
+
+            <!-- 内容区 -->
+            <div class="phone-content" id="phone-content">
+
+                <!-- ═══ Tab 1: 聊天列表 ═══ -->
+                <div id="tab-chat-list" class="tab-page">
+                    <div class="chat-list-header">
+                        <span>消息</span>
+                    </div>
+                    <div id="contact-list" class="contact-list">
+                        <p class="list-empty">暂无镜像，去「创建」一个吧</p>
+                    </div>
+                </div>
+
+                <!-- ═══ 聊天详情 ═══ -->
+                <div id="tab-chat-detail" class="tab-page" style="display:none">
+                    <div class="chat-empty-hint" id="chat-empty-hint">
+                        <div class="chat-empty-icon">💬</div>
+                        <div class="chat-empty-text">选择一个镜像开始对话</div>
+                    </div>
+                    <div id="chat-msgs" class="chat-msgs" style="display:none"></div>
+                    <div id="chat-loading" class="chat-loading" style="display:none">
+                        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                    </div>
+                    <!-- 表情面板 -->
+                    <div id="sticker-panel" class="sticker-panel" style="display:none">
+                        <div class="sticker-tabs">
+                            <button class="sticker-tab active" data-category="all">全部</button>
+                            <button class="sticker-tab" data-category="happy">😄</button>
+                            <button class="sticker-tab" data-category="cute">🥺</button>
+                            <button class="sticker-tab" data-category="sad">😢</button>
+                            <button class="sticker-tab" data-category="playful">😏</button>
+                            <button class="sticker-tab" data-category="love">❤️</button>
+                        </div>
+                        <div id="sticker-grid" class="sticker-grid"></div>
+                    </div>
+                    <!-- 输入栏 -->
+                    <div class="chat-input-bar">
+                        <button id="voice-toggle-btn" class="input-action" title="语音">🎤</button>
+                        <div id="voice-record-btn" class="voice-record-btn" style="display:none">
+                            <span class="voice-recording-dot"></span>
+                            按住 说话
+                        </div>
+                        <input type="text" id="msg-input" placeholder="" disabled>
+                        <button id="sticker-toggle-btn" class="input-action">😊</button>
+                        <button id="msg-send" class="send-btn" disabled>发送</button>
+                    </div>
+                </div>
+
+                <!-- ═══ Tab 2: 通讯录 ═══ -->
+                <div id="tab-contacts" class="tab-page" style="display:none">
+                    <div class="contacts-header">通讯录</div>
+                    <div id="contact-profile" class="contact-profile">
+                        <p class="list-empty">请先在聊天列表选择镜像</p>
+                    </div>
+                </div>
+
+                <!-- ═══ Tab 3: 发现 ═══ -->
+                <div id="tab-discover" class="tab-page" style="display:none">
+                    <div class="discover-header">发现</div>
+                    <div class="discover-list">
+                        <div class="discover-item" id="moments-entry">
+                            <span class="discover-icon">🎞</span>
+                            <span class="discover-label">朋友圈</span>
+                            <span class="discover-arrow">›</span>
+                        </div>
+                    </div>
+                    <!-- 朋友圈时间线 -->
+                    <div id="moments-timeline" class="moments-timeline" style="display:none">
+                        <div id="moments-list"></div>
+                    </div>
+                </div>
+
+                <!-- ═══ Tab 4: 我 ═══ -->
+                <div id="tab-me" class="tab-page" style="display:none">
+                    <div class="me-header">
+                        <div class="me-avatar">🧑</div>
+                        <div class="me-name" id="me-username">我</div>
+                    </div>
+                    <div class="me-menu">
+                        <div class="me-item" id="wallet-entry">
+                            <span>💰 钱包</span>
+                            <span class="discover-arrow">›</span>
+                        </div>
+                        <div class="me-item" id="create-entry">
+                            <span>➕ 创建新镜像</span>
+                            <span class="discover-arrow">›</span>
+                        </div>
+                        <div class="me-item" id="logout-entry">
+                            <span>🚪 退出登录</span>
+                            <span class="discover-arrow">›</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ 钱包 ═══ -->
+                <div id="tab-wallet" class="tab-page" style="display:none">
+                    <div class="wallet-header">
+                        <div class="wallet-balance-label">零钱</div>
+                        <div class="wallet-balance" id="wallet-balance">¥ 0.00</div>
+                    </div>
+                    <div class="wallet-actions">
+                        <button class="wallet-action-btn" id="wallet-redpacket-btn">🧧 红包记录</button>
+                        <button class="wallet-action-btn" id="wallet-transfer-btn">💸 转账记录</button>
+                    </div>
+                    <div class="wallet-tx-list" id="wallet-tx-list">
+                        <p class="list-empty">暂无交易记录</p>
+                    </div>
+                </div>
+
+                <!-- ═══ 创建镜像 ═══ -->
+                <div id="tab-create" class="tab-page" style="display:none">
+                    <div class="create-container">
+                        <h2>创建新镜像</h2>
+                        <div class="create-form">
+                            <label>代号 *</label>
+                            <input type="text" id="create-name" placeholder="例如：前任名字" autocomplete="off">
+                            <label>基本信息</label>
+                            <textarea id="create-basic" rows="2" placeholder="你们的关系、认识时间、分手时间…"></textarea>
+                            <label>ta 的性格特点</label>
+                            <textarea id="create-personality" rows="2" placeholder="说话风格、口头禅、常用标点…"></textarea>
+                            <label>导入聊天记录（可选）</label>
+                            <div class="file-upload">
+                                <input type="file" id="create-file" accept=".txt,.json,.jsonl,.csv">
+                                <span class="file-name" id="create-file-name">未选择文件</span>
+                            </div>
+                            <p class="file-hint">支持微信导出 txt/json/jsonl/csv 格式</p>
+                            <button id="create-submit" class="btn">创建镜像</button>
+                            <p id="create-result" class="err"></p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 底部导航（仅移动端可见） -->
+            <div class="phone-tabbar">
+                <button class="tabbar-btn active" data-tab="chat-list">
+                    <span class="tabbar-icon">💬</span>
+                    <span class="tabbar-label">聊天</span>
+                </button>
+                <button class="tabbar-btn" data-tab="contacts">
+                    <span class="tabbar-icon">👤</span>
+                    <span class="tabbar-label">通讯录</span>
+                </button>
+                <button class="tabbar-btn" data-tab="discover">
+                    <span class="tabbar-icon">🔍</span>
+                    <span class="tabbar-label">发现</span>
+                </button>
+                <button class="tabbar-btn" data-tab="me">
+                    <span class="tabbar-icon">👤</span>
+                    <span class="tabbar-label">我</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 红包开启动画覆盖层 -->
+    <div id="redpacket-overlay" class="redpacket-overlay" style="display:none">
+        <div class="redpacket-card" id="redpacket-card">
+            <div class="redpacket-top">
+                <div class="redpacket-icon">🧧</div>
+                <div class="redpacket-sender" id="rp-sender">ta</div>
+                <div class="redpacket-note" id="rp-note">给你的</div>
+            </div>
+            <div class="redpacket-bottom" id="redpacket-bottom">
+                <button class="redpacket-open-btn" id="rp-open-btn">開</button>
+            </div>
+            <div class="redpacket-result" id="redpacket-result" style="display:none">
+                <div class="redpacket-amount" id="rp-amount">¥ 0.00</div>
+                <div class="redpacket-done-note" id="rp-done-note"></div>
+                <button class="redpacket-close-btn" id="rp-close-btn">收下</button>
+            </div>
+            <div id="coins-container" class="coins-container"></div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,15 +1,16 @@
 """ChatSession：CLI 主循环、指令分发、轮次计数、归档触发。"""
 
-import os
-import shutil
+import logging
 import sys
-import time
 from datetime import datetime
-from pathlib import Path
 from prompt_toolkit import prompt as pt_prompt
 
-from config import get_ex_dir, ensure_ex_dirs, EXES_DIR, ARCHIVE_THRESHOLD, get_collection_name
+from config import get_ex_dir, ARCHIVE_THRESHOLD
 from core.token_counter import TokenCounter
+from core.factory import create_engine_and_store
+from core.validation import validate_user_input
+
+logger = logging.getLogger("ex-memory")
 
 
 class ChatSession:
@@ -21,20 +22,20 @@ class ChatSession:
         self.running = True
         self.slug = ""
         self.turn_count = 0
-
-        # 指令注册表
         self.commands: dict[str, callable] = {}
 
     def register_command(self, name: str, func: callable, doc: str = ""):
-        """注册一个斜杠指令。"""
         self.commands[name] = func
         func.__doc__ = doc
 
     def _setup(self):
         """初始化对话环境。"""
         self.slug = pt_prompt("请输入镜像名称: ").strip()
-        if not self.slug:
-            print("错误: 镜像名称不能为空")
+        try:
+            from core.validation import validate_slug
+            self.slug = validate_slug(self.slug)
+        except ValueError as e:
+            print(f"错误: {e}")
             sys.exit(1)
 
         ex_dir = get_ex_dir(self.slug)
@@ -42,37 +43,15 @@ class ChatSession:
             print(f"错误: 镜像 [{self.slug}] 不存在。请先用 /create 创建。")
             sys.exit(1)
 
-        # 延迟导入避免循环依赖
-        from core.engine import ChatEngine
-        from memory.vector_store import VectorStore
-        from memory.embedder import Embedder
-        from config import get_embedding_config
-
-        embedder = None
-        vector_store = None
-        chroma_dir = ex_dir / "chroma_db"
-        if chroma_dir.exists() and any(chroma_dir.iterdir()):
-            try:
-                emb_cfg = get_embedding_config()
-                embedder = Embedder(
-                    api_key=emb_cfg["api_key"],
-                    base_url=emb_cfg["base_url"],
-                    model=emb_cfg["model"],
-                )
-                vector_store = VectorStore(
-                    persist_dir=str(chroma_dir),
-                    collection_name=get_collection_name(self.slug),
-                )
-                print(f"--- 向量库已加载 ({vector_store.count()} 条记录) ---")
-            except Exception as e:
-                print(f"--- 向量库加载失败: {e}，将以纯文本模式运行 ---")
-
-        self.engine = ChatEngine(
-            slug=self.slug, vector_store=vector_store, embedder=embedder
-        )
+        self.engine, vector_store, embedder = create_engine_and_store(self.slug)
+        self.vector_store = vector_store
+        self.embedder = embedder
+        if vector_store:
+            print(f"--- 向量库已加载 ({vector_store.count()} 条记录) ---")
+        else:
+            print("--- 纯文本模式（无 RAG 检索） ---")
 
     def _process_command(self, user_input: str):
-        """解析并执行斜杠指令。"""
         parts = user_input[1:].split(maxsplit=1)
         cmd_name = parts[0].lower()
         arg = parts[1] if len(parts) > 1 else ""
@@ -90,7 +69,6 @@ class ChatSession:
             print(f"未知指令: /{cmd_name}。输入 /help 查看列表。")
 
     def do_help(self, _=""):
-        """显示所有可用指令。"""
         print("\n[可用指令]")
         print("  /help    - 显示帮助")
         print("  /clear   - 清空对话上下文")
@@ -102,15 +80,12 @@ class ChatSession:
         print()
 
     def do_exit(self, _=""):
-        """退出程序。"""
-        # 检查是否需要归档
         if self.turn_count > 0:
             self._maybe_archive()
         print("对话已结束")
         self.running = False
 
     def _maybe_archive(self):
-        """询问是否归档本次对话。"""
         if self.turn_count < 5:
             return
         try:
@@ -121,24 +96,87 @@ class ChatSession:
             pass
 
     def _archive_session(self):
-        """将对话历史压缩为摘要并保存。"""
         sessions_dir = get_ex_dir(self.slug) / "sessions"
         sessions_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         session_file = sessions_dir / f"session_{timestamp}.md"
 
-        # 简单保存对话原文（后续可改为 LLM 压缩摘要）
         lines = [f"# 对话记录 — {timestamp}\n"]
         for msg in self.history:
             role = "用户" if msg["role"] == "user" else self.slug
             lines.append(f"**{role}**: {msg['content']}\n")
 
         session_file.write_text("\n".join(lines), encoding="utf-8")
+        logger.info("对话已归档: %s", session_file.name)
         print(f"--- 对话已归档: {session_file.name} ---")
 
+        # 生成 LLM 语义摘要
+        self._generate_summary(sessions_dir, timestamp)
+
+    def _generate_summary(self, sessions_dir: "Path", timestamp: str):
+        """调用 LLM 生成会话语义摘要，用于下次启动时快速恢复上下文。"""
+        from pathlib import Path
+        from config import get_llm_config, get_llm_client
+
+        cfg = get_llm_config()
+        if not cfg["api_key"]:
+            return
+
+        try:
+            prompts_dir = Path(__file__).resolve().parent.parent / "prompts"
+            prompt_template = (prompts_dir / "session_summary.md").read_text(encoding="utf-8")
+
+            # 只取最近 20 轮做摘要（避免上下文超限）
+            recent = self.history[-40:]
+            history_text = "\n".join(
+                f"{'用户' if m['role'] == 'user' else self.slug}: {m['content'][:300]}"
+                for m in recent
+            )
+
+            client = get_llm_client()
+            response = client.chat.completions.create(
+                model=cfg["model"],
+                messages=[
+                    {"role": "system", "content": prompt_template},
+                    {"role": "user", "content": f"请压缩以下对话为摘要：\n\n{history_text}"},
+                ],
+                temperature=0.3,
+            )
+            summary = response.choices[0].message.content
+
+            summary_file = sessions_dir / f"session_{timestamp}_summary.md"
+            summary_file.write_text(summary, encoding="utf-8")
+            logger.info("会话摘要已生成: %s", summary_file.name)
+
+            # 追加到引擎的 session_summaries（当前 session 可能还没结束，但预先加载）
+            if self.engine:
+                self.engine.session_summaries.append(summary)
+                # Token 预算控制：过大的摘要列表弹出旧项
+                from core.validation import estimate_tokens
+                from config import LLM_MAX_CONTEXT_CHARS
+                while (len(self.engine.session_summaries) > 5
+                       and estimate_tokens("\n".join(self.engine.session_summaries)) > LLM_MAX_CONTEXT_CHARS * 0.3):
+                    self.engine.session_summaries.pop(0)
+
+            # 可选：加入向量库
+            if self.vector_store and self.embedder:
+                try:
+                    self.vector_store.add_session_summary(summary, self.slug, self.embedder)
+                except Exception:
+                    logger.debug("摘要写入向量库失败（非关键）")
+
+        except Exception as e:
+            logger.warning("生成会话摘要失败（已降级，原始归档完好）: %s", e)
+
     def _chat(self, user_msg: str):
-        """处理聊天对话。"""
+        try:
+            user_msg = validate_user_input(user_msg)
+        except ValueError as e:
+            print(f"\n[输入错误]: {e}")
+            logger.warning("输入校验失败: %s", e)
+            return
+
         try:
             reply, usage = self.engine.chat(user_msg, self.history)
             print(f"\n{self.slug}: {reply}")
@@ -148,20 +186,18 @@ class ChatSession:
             self.history.append({"role": "assistant", "content": reply})
             self.turn_count += 1
 
-            # 维持对话长度
             if len(self.history) > self.talk_length * 2:
-                self.history = self.history[-(self.talk_length * 2) :]
+                self.history = self.history[-(self.talk_length * 2):]
 
-            # 归档触发
             if self.turn_count >= ARCHIVE_THRESHOLD:
                 self._maybe_archive()
                 self.turn_count = 0
 
         except Exception as e:
+            logger.error("对话出错: %s", e, exc_info=True)
             print(f"\n[错误]: {e}")
 
     def run(self):
-        """主循环。"""
         self._setup()
 
         while self.running:
@@ -180,11 +216,8 @@ class ChatSession:
             except EOFError:
                 self.do_exit()
             except Exception as e:
+                logger.error("运行异常: %s", e, exc_info=True)
                 print(f"运行异常: {e}")
                 break
 
         self.counter.display_summary()
-
-
-def clear_screen():
-    os.system("cls" if os.name == "nt" else "clear")

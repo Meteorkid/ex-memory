@@ -129,9 +129,18 @@ def _normalize_messages(messages_raw: list, target_name: str) -> list[dict]:
             is_me = False
 
         content = msg.get("content", "")
-        # 过滤非文本消息
-        if not content or content in ("[图片]", "[语音]", "[视频]", "[文件]", "[表情]"):
+        # 非文本消息处理：保留标记但转换为可读描述
+        non_text_map = {
+            "[表情]": "发了一个表情",
+            "[图片]": "发了一张图片",
+            "[语音]": "发了一条语音",
+            "[视频]": "发了一段视频",
+            "[文件]": "发了一个文件",
+        }
+        if not content:
             continue
+        if content in non_text_map:
+            content = f"[{non_text_map[content]}]"
 
         normalized.append({
             "timestamp": msg.get("formattedTime", msg.get("timestamp", "")),

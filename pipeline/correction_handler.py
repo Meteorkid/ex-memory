@@ -4,27 +4,23 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from openai import OpenAI
-from config import get_llm_config, get_ex_dir
+from config import get_llm_config, get_llm_client, get_ex_dir
+from core.file_utils import atomic_write
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
-# 触发纠正的关键词模式
+# 触发纠正的关键词模式 —— 必须包含对 ta（前任）的明确指向，避免日常对话误触发
 CORRECTION_TRIGGERS = [
-    r"不对",
-    r"不是这样",
-    r"ta不会这样[说讲]",
-    r"ta应该是",
-    r"ta其实是",
-    r"这不像ta",
-    r"感觉不对",
-    r"太温柔了",
-    r"太冷漠了",
-    r"太正式了",
-    r"ta没这么",
-    r"ta不用这个",
-    r"不像ta",
-    r"不是ta的风格",
+    r"ta(不|没).{0,4}(会|可能|应该|是|这么)",
+    r"(这|那)(不|没).{0,6}(像|是)ta",
+    r"ta.{0,6}(不是|不像|不对|没说|不会)",
+    r"不对.{0,4}ta.{0,4}(是|会说)",
+    r"不是ta的(风格|性格|语气|习惯)",
+    r"ta其实.{0,3}(是|会|喜欢|讨厌|经常)",
+    r"ta.{0,6}应该是",
+    r"ta没(这么|那么|说过|做过)",
+    r"ta.{0,4}不用(这个|这种|那样|这么)",
+    r"(不像|不是|不对).{0,3}ta",
 ]
 
 
@@ -57,7 +53,7 @@ def handle_correction(
     if not cfg["api_key"]:
         return "（未配置 LLM API Key，无法自动处理纠正。请手动编辑 corrections.md。）"
 
-    client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
+    client = get_llm_client()
     ex_dir = get_ex_dir(slug)
 
     # 读取 correction_handler prompt
@@ -83,16 +79,15 @@ def handle_correction(
         ],
         temperature=0.3,
     )
-    correction_content = response.choices[0].message.content
+    correction_content = response.choices[0].message.content or ""
 
-    # 写入 corrections.md
+    # 写入 corrections.md（持续追加，用户纠正记录是人物画像准确性的核心数据）
     corrections_path = ex_dir / "corrections.md"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     existing = ""
     if corrections_path.exists():
         existing = corrections_path.read_text(encoding="utf-8")
-        # 计算已有纠正数量
         count = len(re.findall(r"### Correction #", existing))
     else:
         existing = "# 纠正记录\n\n"
@@ -105,7 +100,7 @@ def handle_correction(
 
 ---
 """
-    corrections_path.write_text(existing + new_correction, encoding="utf-8")
+    atomic_write(corrections_path, existing + new_correction)
 
     # 同时追加到 memory.md 的 Correction 记录节
     _append_to_memory(slug, count + 1, timestamp, user_msg)
@@ -127,17 +122,16 @@ def _append_to_memory(slug: str, correction_num: int, timestamp: str, user_msg: 
 
     content = memory_path.read_text(encoding="utf-8")
 
-    # 如果没有 Correction 记录节，追加
     if "## Correction 记录" not in content:
         content += "\n\n## Correction 记录\n"
 
     correction_entry = f"""
 ### Correction #{correction_num} — {timestamp}
-- 用户原话："{user_msg}"
+- 用户原话：\"{user_msg}\"
 - 详见 corrections.md
 """
     content += correction_entry
-    memory_path.write_text(content, encoding="utf-8")
+    atomic_write(memory_path, content)
 
 
 def _format_history(messages: list[dict]) -> str:
