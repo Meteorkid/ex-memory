@@ -19,7 +19,7 @@
 
 ### 终端运行界面
 
-![ex-memory 终端截图](docs/screenshots/ex-memory-github.png)
+![ex-memory 终端运行截图](docs/screenshots/ex-memory-terminal.png)
 
 ## 技术栈
 
