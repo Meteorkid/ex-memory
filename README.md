@@ -15,6 +15,12 @@
 - **会话管理**：对话自动保存、归档，支持历史回顾
 - **OpenAI 兼容 API**：支持 DeepSeek、硅基流动、OpenAI 等任意兼容端点
 
+## 截图
+
+### 终端运行界面
+
+![ex-memory 终端截图](docs/screenshots/ex-memory-github.png)
+
 ## 技术栈
 
 | 层 | 技术 |
