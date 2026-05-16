@@ -1,15 +1,15 @@
 {
-    "name": "ex-memory 微信模拟器",
+    "name": "ex-memory",
     "short_name": "ex-memory",
-    "description": "前任记忆智能体 — ta 在微信里等你",
+    "description": "把一段记忆，变成可以对话的人",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#EDEDED",
-    "theme_color": "#07C160",
+    "background_color": "#F2F2F7",
+    "theme_color": "#007AFF",
     "orientation": "portrait",
     "icons": [
         {
-            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%2307C160'/><text x='96' y='130' text-anchor='middle' font-size='100'>💬</text></svg>",
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><defs><linearGradient id='g' x1='0' y1='0' x2='192' y2='192'><stop stop-color='%23007AFF'/><stop offset='1' stop-color='%235856D6'/></linearGradient></defs><rect width='192' height='192' rx='40' fill='url(%23g)'/><path d='M56 130V86a6 6 0 016-6h68a6 6 0 016 6v30a6 6 0 01-6 6H88l-18 14v-14H62a6 6 0 01-6-6z' fill='white' fill-opacity='0.9'/><circle cx='80' cy='103' r='5' fill='%23007AFF'/><circle cx='96' cy='103' r='5' fill='%23007AFF'/><circle cx='112' cy='103' r='5' fill='%23007AFF'/></svg>",
             "sizes": "192x192",
             "type": "image/svg+xml",
             "purpose": "any maskable"

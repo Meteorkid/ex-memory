@@ -2,11 +2,18 @@
 
 import hashlib
 import logging
-from typing import Optional
+from typing import Optional, Callable
 import chromadb
 from memory.embedder import Embedder
 
 logger = logging.getLogger("ex-memory")
+
+
+class IngestError(Exception):
+    """入库异常，携带已成功写入的批次数。"""
+    def __init__(self, message: str, batches_completed: int = 0):
+        super().__init__(message)
+        self.batches_completed = batches_completed
 
 
 class VectorStore:
@@ -17,7 +24,13 @@ class VectorStore:
             metadata={"hnsw:space": "cosine"},
         )
 
-    def ingest(self, chunks: list[dict], embedder: Embedder, batch_size: int = 100):
+    def ingest(
+        self,
+        chunks: list[dict],
+        embedder: Embedder,
+        batch_size: int = 100,
+        on_batch: Optional[Callable[[int, int], None]] = None,
+    ):
         """批量写入 chunks。
 
         每个 chunk 应包含:
@@ -25,8 +38,13 @@ class VectorStore:
             - text_for_embedding: 用于向量化的文本
             - display_text: 用于展示的原文
             - metadata: source, chat_id, dominant_speaker, start_ts, end_ts, ...
+
+        on_batch: 每批次成功后的回调 (completed, total)
         """
         total = len(chunks)
+        total_batches = (total + batch_size - 1) // batch_size
+        batches_done = 0
+
         for i in range(0, total, batch_size):
             batch = chunks[i : i + batch_size]
             ids = [c["id"] for c in batch]
@@ -41,15 +59,31 @@ class VectorStore:
                 meta["display_text"] = c.get("display_text", "")
                 metadatas.append(meta)
 
-            embeddings = embedder.embed(documents)
+            try:
+                embeddings = embedder.embed(documents)
+            except Exception as e:
+                raise IngestError(
+                    f"Embedding 失败 (批次 {batches_done + 1}/{total_batches}): {e}",
+                    batches_completed=batches_done,
+                ) from e
 
-            self.collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                documents=documents,
-                metadatas=metadatas,
-            )
+            try:
+                self.collection.add(
+                    ids=ids,
+                    embeddings=embeddings,
+                    documents=documents,
+                    metadatas=metadatas,
+                )
+            except Exception as e:
+                raise IngestError(
+                    f"ChromaDB 写入失败 (批次 {batches_done + 1}/{total_batches}): {e}",
+                    batches_completed=batches_done,
+                ) from e
+
+            batches_done += 1
             logger.info("入库进度: %d/%d", min(i + batch_size, total), total)
+            if on_batch:
+                on_batch(batches_done, total_batches)
 
     def search(
         self,
@@ -115,5 +149,7 @@ class VectorStore:
         return self.collection.count()
 
     def delete_collection(self):
-        """删除整个 collection。"""
-        self.client.delete_collection(self.collection.name)
+        """删除整个 collection，并将内部引用标记为无效。"""
+        name = self.collection.name
+        self.client.delete_collection(name)
+        self.collection = None  # 标记为已删除，防止后续操作 crash

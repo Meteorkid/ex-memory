@@ -5,19 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#EDEDED">
-    <title>ex-memory — 微信模拟器</title>
+    <meta name="theme-color" content="#F2F2F7">
+    <title>ex-memory</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
     <link rel="manifest" href="/static/manifest.json">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
+<!-- 离线横幅 -->
+<div id="offline-banner" class="offline-banner" role="alert">网络连接已断开，请检查网络设置</div>
+
 <!-- ── 登录页 ── -->
-<div id="page-auth">
+<main id="page-auth" role="main">
     <div class="auth-card">
-        <h1>前任记忆智能体</h1>
-        <p class="subtitle">ta 在微信里等你</p>
+        <div class="auth-logo">
+            <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+                <rect width="56" height="56" rx="14" fill="url(#grad)"/>
+                <path d="M18 38V24a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2H26l-6 4v-4h-2a2 2 0 01-2-2z" fill="white" fill-opacity="0.9"/>
+                <circle cx="24" cy="29" r="1.5" fill="#007AFF"/>
+                <circle cx="28" cy="29" r="1.5" fill="#007AFF"/>
+                <circle cx="32" cy="29" r="1.5" fill="#007AFF"/>
+                <defs><linearGradient id="grad" x1="0" y1="0" x2="56" y2="56"><stop stop-color="#007AFF"/><stop offset="1" stop-color="#5856D6"/></linearGradient></defs>
+            </svg>
+        </div>
+        <h1>ex-memory</h1>
+        <p class="subtitle">把一段记忆，变成可以对话的人</p>
         <div class="tabs">
             <button id="tab-login-btn" class="tab active">登录</button>
             <button id="tab-register-btn" class="tab">注册</button>
@@ -27,30 +40,30 @@
             <input type="text" id="login-username" placeholder="用户名" autocomplete="username">
             <div class="pwd-wrap">
                 <input type="password" id="login-password" placeholder="密码" autocomplete="current-password">
-                <button class="pwd-toggle" tabindex="-1" data-target="login-password">👁</button>
+                <button class="pwd-toggle" tabindex="-1" data-target="login-password" aria-label="显示密码">👁</button>
             </div>
             <button id="login-submit" class="btn">登录</button>
-            <p id="login-error" class="err"></p>
+            <p id="login-error" class="err" role="alert"></p>
         </div>
 
         <div id="form-register" class="form-box" style="display:none">
-            <input type="text" id="reg-username" placeholder="用户名（至少2个字符）">
+            <input type="text" id="reg-username" placeholder="用户名（至少2个字符）" autocomplete="username">
             <div class="pwd-wrap">
                 <input type="password" id="reg-password" placeholder="密码（至少6个字符）">
-                <button class="pwd-toggle" tabindex="-1" data-target="reg-password">👁</button>
+                <button class="pwd-toggle" tabindex="-1" data-target="reg-password" aria-label="显示密码">👁</button>
             </div>
             <div class="pwd-wrap">
                 <input type="password" id="reg-password2" placeholder="再次输入密码">
-                <button class="pwd-toggle" tabindex="-1" data-target="reg-password2">👁</button>
+                <button class="pwd-toggle" tabindex="-1" data-target="reg-password2" aria-label="显示密码">👁</button>
             </div>
             <button id="reg-submit" class="btn">注册</button>
             <p id="reg-error" class="err"></p>
         </div>
     </div>
-</div>
+</main>
 
 <!-- ── 微信模拟器主界面 ── -->
-<div id="page-main" style="display:none">
+<div id="page-main" style="display:none" role="application" aria-label="ex-memory 聊天应用">
 
     <!-- ═══ 桌面端标题栏（仅桌面端可见） ═══ -->
     <div class="desktop-titlebar">
@@ -59,7 +72,7 @@
             <span class="traffic-light yellow"></span>
             <span class="traffic-light green"></span>
         </div>
-        <span class="titlebar-app-name" id="titlebar-app-name">微信</span>
+        <span class="titlebar-app-name" id="titlebar-app-name">ex-memory</span>
         <div class="titlebar-spacer"></div>
     </div>
 
@@ -67,24 +80,24 @@
     <div class="app-body">
 
         <!-- ═══ 桌面端深色侧边栏（仅桌面端可见） ═══ -->
-        <div class="desktop-sidebar">
+        <nav class="desktop-sidebar" role="navigation" aria-label="主导航">
             <div class="sidebar-top">
-                <div class="sidebar-icon active" data-desktop-tab="chat" title="聊天">
+                <div class="sidebar-icon active" data-desktop-tab="chat" title="聊天" role="tab" aria-selected="true" tabindex="0">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                 </div>
-                <div class="sidebar-icon" data-desktop-tab="contacts" title="通讯录">
+                <div class="sidebar-icon" data-desktop-tab="contacts" title="通讯录" role="tab" aria-selected="false" tabindex="-1">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
-                <div class="sidebar-icon" data-desktop-tab="discover" title="发现">
+                <div class="sidebar-icon" data-desktop-tab="discover" title="发现" role="tab" aria-selected="false" tabindex="-1">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-13.88 5.66"/></svg>
                 </div>
             </div>
             <div class="sidebar-bottom">
-                <div class="sidebar-icon" data-desktop-tab="me" title="我">
+                <div class="sidebar-icon" data-desktop-tab="me" title="我" role="tab" aria-selected="false" tabindex="-1">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
             </div>
-        </div>
+        </nav>
 
         <!-- ═══ 手机框架（移动端全屏 / 桌面端内容区） ═══ -->
         <div class="phone-frame">
@@ -97,9 +110,11 @@
 
             <!-- 标题栏 -->
             <div class="phone-navbar" id="phone-navbar">
-                <button class="nav-back" id="nav-back-btn" style="display:none">‹</button>
-                <span class="nav-title" id="nav-title">微信</span>
-                <button class="nav-action" id="nav-action-btn" style="display:none">•••</button>
+                <button class="nav-back" id="nav-back-btn" style="display:none" aria-label="返回">
+                    <svg width="12" height="20" viewBox="0 0 12 20" fill="none"><path d="M10 2L2 10l8 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <span class="nav-title" id="nav-title">ex-memory</span>
+                <button class="nav-action" id="nav-action-btn" style="display:none" aria-label="更多操作">•••</button>
             </div>
 
             <!-- 内容区 -->
@@ -109,6 +124,10 @@
                 <div id="tab-chat-list" class="tab-page">
                     <div class="chat-list-header">
                         <span>消息</span>
+                    </div>
+                    <div class="search-bar">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input type="text" id="search-input" placeholder="搜索镜像">
                     </div>
                     <div id="contact-list" class="contact-list">
                         <p class="list-empty">暂无镜像，去「创建」一个吧</p>
@@ -121,7 +140,7 @@
                         <div class="chat-empty-icon">💬</div>
                         <div class="chat-empty-text">选择一个镜像开始对话</div>
                     </div>
-                    <div id="chat-msgs" class="chat-msgs" style="display:none"></div>
+                    <div id="chat-msgs" class="chat-msgs" style="display:none" role="log" aria-live="polite" aria-label="聊天消息"></div>
                     <div id="chat-loading" class="chat-loading" style="display:none">
                         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
                     </div>
@@ -138,15 +157,15 @@
                         <div id="sticker-grid" class="sticker-grid"></div>
                     </div>
                     <!-- 输入栏 -->
-                    <div class="chat-input-bar">
-                        <button id="voice-toggle-btn" class="input-action" title="语音">🎤</button>
+                    <div class="chat-input-bar" role="group" aria-label="消息输入">
+                        <button id="voice-toggle-btn" class="input-action" title="语音" aria-label="语音输入">🎤</button>
                         <div id="voice-record-btn" class="voice-record-btn" style="display:none">
                             <span class="voice-recording-dot"></span>
                             按住 说话
                         </div>
-                        <input type="text" id="msg-input" placeholder="" disabled>
-                        <button id="sticker-toggle-btn" class="input-action">😊</button>
-                        <button id="msg-send" class="send-btn" disabled>发送</button>
+                        <input type="text" id="msg-input" placeholder="" disabled aria-label="输入消息">
+                        <button id="sticker-toggle-btn" class="input-action" aria-label="表情">😊</button>
+                        <button id="msg-send" class="send-btn" disabled aria-label="发送消息">发送</button>
                     </div>
                 </div>
 
@@ -181,6 +200,14 @@
                         <div class="me-name" id="me-username">我</div>
                     </div>
                     <div class="me-menu">
+                        <div class="me-item">
+                            <span>🌓 外观</span>
+                            <select id="theme-select" class="theme-select">
+                                <option value="auto">跟随系统</option>
+                                <option value="light">浅色</option>
+                                <option value="dark">深色</option>
+                            </select>
+                        </div>
                         <div class="me-item" id="wallet-entry">
                             <span>💰 钱包</span>
                             <span class="discover-arrow">›</span>
@@ -237,29 +264,29 @@
             </div>
 
             <!-- 底部导航（仅移动端可见） -->
-            <div class="phone-tabbar">
-                <button class="tabbar-btn active" data-tab="chat-list">
+            <nav class="phone-tabbar" role="tablist" aria-label="底部导航">
+                <button class="tabbar-btn active" data-tab="chat-list" role="tab" aria-selected="true">
                     <span class="tabbar-icon">💬</span>
                     <span class="tabbar-label">聊天</span>
                 </button>
-                <button class="tabbar-btn" data-tab="contacts">
+                <button class="tabbar-btn" data-tab="contacts" role="tab" aria-selected="false">
                     <span class="tabbar-icon">👤</span>
                     <span class="tabbar-label">通讯录</span>
                 </button>
-                <button class="tabbar-btn" data-tab="discover">
+                <button class="tabbar-btn" data-tab="discover" role="tab" aria-selected="false">
                     <span class="tabbar-icon">🔍</span>
                     <span class="tabbar-label">发现</span>
                 </button>
-                <button class="tabbar-btn" data-tab="me">
+                <button class="tabbar-btn" data-tab="me" role="tab" aria-selected="false">
                     <span class="tabbar-icon">👤</span>
                     <span class="tabbar-label">我</span>
                 </button>
-            </div>
+            </nav>
         </div>
     </div>
 
     <!-- 红包开启动画覆盖层 -->
-    <div id="redpacket-overlay" class="redpacket-overlay" style="display:none">
+    <div id="redpacket-overlay" class="redpacket-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="红包">
         <div class="redpacket-card" id="redpacket-card">
             <div class="redpacket-top">
                 <div class="redpacket-icon">🧧</div>

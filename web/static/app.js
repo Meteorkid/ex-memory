@@ -6,8 +6,96 @@ let currentSlug = '';
 let currentName = '';
 let tabHistory = [];
 
+// ── Toast 通知系统 ──
+function ensureToastContainer() {
+    let c = document.querySelector('.toast-container');
+    if (!c) {
+        c = document.createElement('div');
+        c.className = 'toast-container';
+        c.setAttribute('role', 'status');
+        c.setAttribute('aria-live', 'polite');
+        document.body.appendChild(c);
+    }
+    return c;
+}
+
+function showToast(message, type = 'info', duration = 3000) {
+    const container = ensureToastContainer();
+    const icons = { success: '✓', error: '✗', info: 'ℹ', warning: '⚠' };
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span>${message}</span>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('toast-exit');
+        toast.addEventListener('animationend', () => toast.remove());
+    }, duration);
+}
+
+// 全局错误处理
+window.onerror = function(msg, src, line, col, err) {
+    showToast('发生了一个错误，请刷新页面重试', 'error');
+    console.error('[Global Error]', msg, src, line, col, err);
+};
+
+window.addEventListener('unhandledrejection', function(e) {
+    showToast('操作失败，请稍后重试', 'error');
+    console.error('[Unhandled Rejection]', e.reason);
+});
+
+// 离线检测
+window.addEventListener('offline', () => {
+    showToast('网络连接已断开', 'warning', 5000);
+    const banner = $('offline-banner');
+    if (banner) banner.classList.add('visible');
+});
+window.addEventListener('online', () => {
+    showToast('网络已恢复', 'success');
+    const banner = $('offline-banner');
+    if (banner) banner.classList.remove('visible');
+});
+
+// 初始检查离线状态
+if (!navigator.onLine) {
+    const banner = $('offline-banner');
+    if (banner) banner.classList.add('visible');
+}
+
 // ── 快捷引用 ──
 const $ = id => document.getElementById(id);
+
+// ── 主题管理 ──
+function initTheme() {
+    const saved = localStorage.getItem('ex-memory-theme') || 'auto';
+    applyTheme(saved);
+    // 延迟绑定，因为 select 元素可能还未渲染
+    setTimeout(() => {
+        const select = $('theme-select');
+        if (select) {
+            select.value = saved;
+            select.addEventListener('change', () => {
+                const theme = select.value;
+                localStorage.setItem('ex-memory-theme', theme);
+                applyTheme(theme);
+            });
+        }
+    }, 100);
+}
+
+function applyTheme(theme) {
+    const root = document.documentElement;
+    if (theme === 'auto') {
+        root.removeAttribute('data-theme');
+    } else {
+        root.setAttribute('data-theme', theme);
+    }
+    // 更新 theme-color meta 标签
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+        meta.content = theme === 'dark' ? '#000000' : '#F2F2F7';
+    }
+}
 
 // ── 平台检测（响应窗口大小变化）──
 let isDesktop = window.matchMedia('(min-width: 769px)').matches;
@@ -30,12 +118,14 @@ window.matchMedia('(min-width: 769px)').addEventListener('change', e => {
 }); // chat | contacts | discover | me
 
 // ── 初始化 ──
+initTheme();
 if (token) { showMain(); } else { showAuth(); }
 updateStatusTime();
 setInterval(updateStatusTime, 30000);
 initDesktopLayout();
 initDesktopSidebar();
 initVoiceToggle();
+initSearch();
 registerSW();
 
 function updateStatusTime() {
@@ -65,9 +155,9 @@ function setDesktopMode(mode) {
     });
 
     // 更新标题
-    const titles = { chat: '微信', contacts: '通讯录', discover: '发现', me: '我' };
-    $('nav-title').textContent = titles[mode] || '微信';
-    $('titlebar-app-name').textContent = titles[mode] || '微信';
+    const titles = { chat: 'ex-memory', contacts: '通讯录', discover: '发现', me: '我' };
+    $('nav-title').textContent = titles[mode] || 'ex-memory';
+    $('titlebar-app-name').textContent = titles[mode] || 'ex-memory';
     $('nav-back-btn').style.display = 'none';
     $('nav-action-btn').style.display = 'none';
 
@@ -119,13 +209,22 @@ function initDesktopSidebar() {
                 // 聊天保持在后台，切换回来时恢复
             }
         });
+        // 键盘支持：Enter/Space 激活
+        icon.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                icon.click();
+            }
+        });
     });
 }
 
 // ── Service Worker ──
 function registerSW() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+        navigator.serviceWorker.register('/static/sw.js').catch(err => {
+            console.warn('[SW] 注册失败:', err);
+        });
     }
 }
 
@@ -254,6 +353,10 @@ $('reg-password2').onkeydown = e => { if(e.key==='Enter') doRegister(); };
 // ═══════════════════════════════════════
 
 async function api(method, path, body) {
+    if (!navigator.onLine) {
+        showToast('网络连接已断开，请检查网络', 'warning');
+        throw new Error('网络连接已断开');
+    }
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -298,7 +401,9 @@ function switchTab(tab) {
         const mode = modeMap[tab] || 'chat';
         // 更新侧边栏高亮
         document.querySelectorAll('.sidebar-icon').forEach(i => {
-            i.classList.toggle('active', i.dataset.desktopTab === mode);
+            const isActive = i.dataset.desktopTab === mode;
+            i.classList.toggle('active', isActive);
+            i.setAttribute('aria-selected', isActive);
         });
         setDesktopMode(mode);
         // 如果切换到钱包或创建，显示对应页面
@@ -351,7 +456,9 @@ function switchTab(tab) {
                         contacts:'contacts', discover:'discover', me:'me', create:'me', wallet:'me' };
     const activeRoot = rootTabs[tab] || 'chat-list';
     document.querySelectorAll('.tabbar-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.tab === activeRoot);
+        const isActive = b.dataset.tab === activeRoot;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-selected', isActive);
     });
 
     // 更新导航栏
@@ -369,7 +476,7 @@ function updateNavbar(tab) {
     back.style.display = 'none'; action.style.display = 'none';
 
     const titles = {
-        'chat-list': '微信',
+        'chat-list': 'ex-memory',
         'chat-detail': currentName || currentSlug || '聊天',
         'contacts': '通讯录',
         'discover': '发现',
@@ -377,7 +484,7 @@ function updateNavbar(tab) {
         'create': '创建镜像',
         'wallet': '钱包',
     };
-    title.textContent = titles[tab] || '微信';
+    title.textContent = titles[tab] || 'ex-memory';
 
     if (tab === 'chat-detail') {
         back.style.display = 'block';
@@ -438,7 +545,7 @@ function showChatActions() {
         api('DELETE', `/exes/${currentSlug}`, {confirm:true}).then(() => {
             currentSlug = ''; currentName = '';
             switchTab('chat-list');
-        }).catch(e => alert('删除失败: ' + e.message));
+        }).catch(e => showToast('删除失败: ' + e.message, 'error'));
     }
 }
 
@@ -448,6 +555,16 @@ function showChatActions() {
 
 async function loadContactList() {
     const el = $('contact-list');
+    // 加载微光骨架
+    el.innerHTML = Array.from({length:3}, () => `
+        <div class="skeleton-row">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-body">
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line short"></div>
+            </div>
+        </div>
+    `).join('');
     try {
         const exes = await api('GET', '/exes');
         if (!exes.length) {
@@ -488,6 +605,32 @@ async function loadContactList() {
     }
 }
 
+function initSearch() {
+    const input = $('search-input');
+    if (!input) return;
+    input.addEventListener('input', () => {
+        const q = input.value.trim().toLowerCase();
+        document.querySelectorAll('.contact-item').forEach(item => {
+            const name = (item.dataset.name || '').toLowerCase();
+            const slug = (item.dataset.slug || '').toLowerCase();
+            item.style.display = (!q || name.includes(q) || slug.includes(q)) ? '' : 'none';
+        });
+        // 无匹配提示
+        const visible = document.querySelectorAll('.contact-item[style=""]').length;
+        const existing = document.querySelector('.search-no-result');
+        if (!q) {
+            if (existing) existing.remove();
+        } else if (visible === 0 && !existing) {
+            const hint = document.createElement('p');
+            hint.className = 'list-empty search-no-result';
+            hint.textContent = '没有匹配的镜像';
+            $('contact-list').appendChild(hint);
+        } else if (visible > 0 && existing) {
+            existing.remove();
+        }
+    });
+}
+
 function enterChat(slug, name) {
     currentSlug = slug;
     currentName = name;
@@ -499,7 +642,7 @@ function enterChat(slug, name) {
     $('msg-input').disabled = false;
     $('msg-send').disabled = false;
     $('msg-input').value = '';
-    $('msg-input').placeholder = '';
+    $('msg-input').placeholder = '和 ' + name + ' 说点什么...';
 
     if (isDesktop) {
         // 确保在聊天模式
@@ -795,7 +938,7 @@ function showContactProfile() {
             <div class="profile-card">
                 <div class="profile-avatar">${(exe.name || exe.slug)[0]}</div>
                 <div class="profile-name">${escHtml(exe.name)}</div>
-                <div class="profile-id">微信号: ${escHtml(exe.slug)}_wechat</div>
+                <div class="profile-id">ID: ${escHtml(exe.slug)}</div>
                 <div class="profile-signature">${escHtml(exe.state === 'completed' ? '这个人还活在数字世界里' : '构建中...')}</div>
                 <button class="profile-moments-btn" onclick="viewMoments()">朋友圈</button>
             </div>
@@ -865,7 +1008,7 @@ async function loadMoments() {
 // ═══════════════════════════════════════
 
 $('wallet-entry').addEventListener('click', () => {
-    if (!currentSlug) { alert('请先在聊天中选择一个镜像'); return; }
+    if (!currentSlug) { showToast('请先在聊天中选择一个镜像', 'warning'); return; }
     switchTab('wallet');
 });
 
@@ -981,6 +1124,7 @@ function openRedPacketOverlay(rp) {
     $('coins-container').innerHTML = '';
 
     $('redpacket-overlay').style.display = 'flex';
+    $('rp-open-btn').focus();
 }
 
 $('rp-open-btn').addEventListener('click', async function() {
@@ -1017,9 +1161,19 @@ $('rp-open-btn').addEventListener('click', async function() {
     }, 800);
 });
 
-$('rp-close-btn').addEventListener('click', () => {
+$('rp-close-btn').addEventListener('click', closeRedPacketOverlay);
+
+function closeRedPacketOverlay() {
     $('redpacket-overlay').style.display = 'none';
     if (currentSlug) loadWallet();
+    $('msg-input').focus();
+}
+
+// Escape 键关闭红包弹窗
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('redpacket-overlay').style.display !== 'none') {
+        closeRedPacketOverlay();
+    }
 });
 
 function spawnCoins() {
@@ -1064,7 +1218,7 @@ function transferBubble(tx) {
             div.querySelector('.tx-bubble-status').textContent = '已收款';
             div.style.opacity = '0.6';
             loadWallet();
-        } catch(e) { alert('收款失败: ' + e.message); }
+        } catch(e) { showToast('收款失败: ' + e.message, 'error'); }
     });
     return _wrapAssistantMsg(div);
 }

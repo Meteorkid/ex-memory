@@ -8,6 +8,7 @@ from prompt_toolkit import prompt as pt_prompt
 
 from config import get_ex_dir, ensure_ex_dirs, get_embedding_config, get_llm_config, get_collection_name
 from core.file_utils import atomic_write, atomic_write_json
+from core.version_manager import backup as version_backup
 from memory.embedder import Embedder
 from memory.vector_store import VectorStore
 from memory.chunker import Chunker
@@ -18,8 +19,11 @@ from pipeline.skill_combiner import write_skill
 logger = logging.getLogger("ex-memory")
 
 
-def run_create_flow():
-    """执行完整的创建流程。"""
+def run_create_flow(resume_from: str = None):
+    """执行完整的创建流程。
+
+    resume_from: 从指定步骤重试（可选值：'import', 'distill', 'skill'）
+    """
 
     # ===== Step 1: 基础信息录入 =====
     print("\n=== 前任记忆智能体 — 创建向导 ===\n")
@@ -53,7 +57,7 @@ def run_create_flow():
     # 创建目录
     ex_dir = ensure_ex_dirs(slug)
 
-    # 写入 meta.json
+    # 写入初始 meta.json
     meta = {
         "name": name,
         "slug": slug,
@@ -67,6 +71,13 @@ def run_create_flow():
         "pipeline_state": "intake_done",
     }
     atomic_write_json(ex_dir / "meta.json", meta)
+
+    # 事前备份（如果已有版本数据）
+    if resume_from is None:
+        try:
+            version_backup(slug, "pre_create", include_chroma=True)
+        except Exception:
+            pass  # 首次创建没有可备份内容
 
     # ===== Step 2: 数据源导入 =====
     print(f"\n=== 数据源导入 ===")
@@ -86,12 +97,22 @@ def run_create_flow():
     vector_store = VectorStore(persist_dir=chroma_dir, collection_name=collection_name)
     chunker = Chunker()
 
-    if source_choice == "A":
-        _import_wechat(ex_dir, slug, name, vector_store, embedder, chunker)
-    elif source_choice == "B":
-        _import_oral(ex_dir, slug, name, vector_store, embedder, chunker)
-    else:
-        print("跳过数据导入。")
+    try:
+        if source_choice == "A":
+            _import_wechat(ex_dir, slug, name, vector_store, embedder, chunker)
+        elif source_choice == "B":
+            _import_oral(ex_dir, slug, name, vector_store, embedder, chunker)
+        else:
+            print("跳过数据导入。")
+    except Exception as e:
+        logger.error("数据导入失败: %s", e, exc_info=True)
+        meta["pipeline_state"] = "failed"
+        meta["failed_step"] = "import"
+        meta["error"] = str(e)[:500]
+        atomic_write_json(ex_dir / "meta.json", meta)
+        print(f"数据导入失败: {e}")
+        print("请修复问题后使用 /update 命令追加数据，或重新创建。")
+        return
 
     # 构建材料摘要（从已入库的数据中采样）
     try:
@@ -113,21 +134,52 @@ def run_create_flow():
         return
 
     print("正在生成 Relationship Memory...")
-    memory_content = build_memory(slug, materials_summary)
-    atomic_write(ex_dir / "memory.md", memory_content)
-    print("  memory.md 已生成")
+    try:
+        memory_content = build_memory(slug, materials_summary)
+        atomic_write(ex_dir / "memory.md", memory_content)
+        print("  memory.md 已生成")
+    except Exception as e:
+        logger.error("生成 memory.md 失败: %s", e, exc_info=True)
+        meta["pipeline_state"] = "failed"
+        meta["failed_step"] = "distill_memory"
+        meta["error"] = str(e)[:500]
+        atomic_write_json(ex_dir / "meta.json", meta)
+        print(f"生成 memory.md 失败: {e}")
+        print("数据已入库，可稍后执行 /update 继续。")
+        return
 
     print("正在生成 Persona（含原话样本抽取）...")
-    persona_content = build_persona(slug, materials_summary, vector_store, embedder)
-    atomic_write(ex_dir / "persona.md", persona_content)
-    print("  persona.md 已生成")
+    try:
+        persona_content = build_persona(slug, materials_summary, vector_store, embedder)
+        atomic_write(ex_dir / "persona.md", persona_content)
+        print("  persona.md 已生成")
+    except Exception as e:
+        logger.error("生成 persona.md 失败: %s", e, exc_info=True)
+        meta["pipeline_state"] = "failed"
+        meta["failed_step"] = "distill_persona"
+        meta["error"] = str(e)[:500]
+        atomic_write_json(ex_dir / "meta.json", meta)
+        print(f"生成 persona.md 失败: {e}")
+        print("memory.md 已保存，可稍后执行 /update 继续。")
+        return
 
     # ===== Step 4: 生成 SKILL.md =====
     print("正在生成 SKILL.md...")
-    write_skill(slug)
+    try:
+        write_skill(slug)
+    except Exception as e:
+        logger.error("生成 SKILL.md 失败: %s", e, exc_info=True)
+        meta["pipeline_state"] = "failed"
+        meta["failed_step"] = "skill"
+        meta["error"] = str(e)[:500]
+        atomic_write_json(ex_dir / "meta.json", meta)
+        print(f"生成 SKILL.md 失败: {e}")
+        return
 
     # 更新 meta.json
     meta["pipeline_state"] = "completed"
+    meta.pop("failed_step", None)
+    meta.pop("error", None)
     meta["updated_at"] = datetime.now().isoformat()
     atomic_write_json(ex_dir / "meta.json", meta)
 
@@ -220,17 +272,25 @@ def run_create_flow_api(slug: str, name: str, answers: list[str]) -> dict:
         }
         atomic_write_json(ex_dir / "meta.json", meta)
 
+        # 事前备份
+        try:
+            version_backup(slug, "pre_create", include_chroma=True)
+        except Exception:
+            pass
+
         materials_summary = f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
 
-        # 初始化向量库（空库，后续 /update 追加数据）
+        # 初始化向量库和 embedder
         emb_cfg = get_embedding_config()
+        embedder = None
+        vector_store = None
         if emb_cfg["api_key"]:
             embedder = Embedder(
                 api_key=emb_cfg["api_key"],
                 base_url=emb_cfg["base_url"],
                 model=emb_cfg["model"],
             )
-            VectorStore(
+            vector_store = VectorStore(
                 persist_dir=str(ex_dir / "chroma_db"),
                 collection_name=get_collection_name(slug),
             )
@@ -240,15 +300,38 @@ def run_create_flow_api(slug: str, name: str, answers: list[str]) -> dict:
         if not llm_cfg["api_key"]:
             return {"error": "未配置 LLM API Key"}
 
-        memory_content = build_memory(slug, materials_summary)
-        atomic_write(ex_dir / "memory.md", memory_content)
+        try:
+            memory_content = build_memory(slug, materials_summary)
+            atomic_write(ex_dir / "memory.md", memory_content)
+        except Exception as e:
+            meta["pipeline_state"] = "failed"
+            meta["failed_step"] = "distill_memory"
+            meta["error"] = str(e)[:500]
+            atomic_write_json(ex_dir / "meta.json", meta)
+            return {"error": f"生成 memory.md 失败: {e}"}
 
-        persona_content = build_persona(slug, materials_summary, None, None)
-        atomic_write(ex_dir / "persona.md", persona_content)
+        try:
+            persona_content = build_persona(slug, materials_summary, vector_store, embedder)
+            atomic_write(ex_dir / "persona.md", persona_content)
+        except Exception as e:
+            meta["pipeline_state"] = "failed"
+            meta["failed_step"] = "distill_persona"
+            meta["error"] = str(e)[:500]
+            atomic_write_json(ex_dir / "meta.json", meta)
+            return {"error": f"生成 persona.md 失败: {e}"}
 
-        write_skill(slug)
+        try:
+            write_skill(slug)
+        except Exception as e:
+            meta["pipeline_state"] = "failed"
+            meta["failed_step"] = "skill"
+            meta["error"] = str(e)[:500]
+            atomic_write_json(ex_dir / "meta.json", meta)
+            return {"error": f"生成 SKILL.md 失败: {e}"}
 
         meta["pipeline_state"] = "completed"
+        meta.pop("failed_step", None)
+        meta.pop("error", None)
         meta["updated_at"] = datetime.now().isoformat()
         atomic_write_json(ex_dir / "meta.json", meta)
 

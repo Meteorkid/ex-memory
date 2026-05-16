@@ -14,6 +14,7 @@ services:
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8000,http://localhost:7860}
     volumes:
       - ./data:/app/data
       - ./exes:/app/exes
@@ -39,6 +40,7 @@ services:
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
       - GRADIO_SERVER_NAME=0.0.0.0
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8000,http://localhost:7860}
     volumes:
       - ./data:/app/data
       - ./exes:/app/exes

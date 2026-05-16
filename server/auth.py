@@ -32,6 +32,51 @@ def _get_conn():
 
 
 def init_db():
+    """初始化数据库并运行待执行的迁移。"""
+    _run_migrations()
+
+
+def _get_current_version(conn) -> int:
+    """读取当前 schema 版本号。"""
+    conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
+    row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+    return row[0] if row[0] is not None else 0
+
+
+def _run_migrations():
+    """按序执行 migrations/ 目录下的 SQL 文件。"""
+    migrations_dir = Path(__file__).resolve().parent.parent / "migrations"
+    if not migrations_dir.exists():
+        # 兜底：直接建表
+        _bootstrap_tables()
+        return
+
+    with _get_conn() as conn:
+        current_version = _get_current_version(conn)
+
+        for sql_file in sorted(migrations_dir.glob("*.sql")):
+            # 从文件名提取版本号（如 001_init.sql → 1）
+            try:
+                version = int(sql_file.stem.split("_")[0])
+            except ValueError:
+                continue
+
+            if version <= current_version:
+                continue
+
+            logger.info("运行数据库迁移: %s", sql_file.name)
+            sql = sql_file.read_text(encoding="utf-8")
+            conn.executescript(sql)
+
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
+                (version,),
+            )
+            conn.commit()
+
+
+def _bootstrap_tables():
+    """兜底建表（migrations 目录不存在时使用）。"""
     with _get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (

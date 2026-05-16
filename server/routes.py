@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -12,7 +12,8 @@ from config import EXES_DIR, get_ex_dir, get_collection_name
 from core.validation import validate_slug, validate_user_input
 from core.file_utils import atomic_write, atomic_write_json
 from core.token_counter import TokenCounter
-from server.middleware import require_auth
+from core.logging import get_audit_logger
+from server.middleware import require_auth, _get_client_ip
 from server.models import (
     CreateRequest, ChatRequest, UpdateRequest,
     BackupRequest, RollbackRequest, DeleteRequest,
@@ -30,6 +31,39 @@ _counter_lock = threading.Lock()
 # Engine 缓存（避免每次请求重建 SKILL.md / ChromaDB 连接）
 _engine_cache: dict[str, object] = {}
 _engine_cache_lock = threading.Lock()
+
+# 登录限流 + 审计日志
+_login_limiter = None
+_audit_logger = None
+
+
+def _get_login_limiter():
+    global _login_limiter
+    if _login_limiter is None:
+        from server.middleware import LoginRateLimiter
+        _login_limiter = LoginRateLimiter()
+    return _login_limiter
+
+
+def _get_audit():
+    global _audit_logger
+    if _audit_logger is None:
+        _audit_logger = get_audit_logger()
+    return _audit_logger
+
+
+def _audit(event: str, username: str = "", client_ip: str = "", detail: str = ""):
+    """记录审计事件（不会因审计日志写入失败影响主流程）。"""
+    try:
+        import json as _json
+        _get_audit().info(_json.dumps({
+            "event": event,
+            "username": username,
+            "ip": client_ip,
+            "detail": detail,
+        }, ensure_ascii=False))
+    except Exception:
+        pass
 
 
 def _get_engine(slug: str):
@@ -54,22 +88,30 @@ def _invalidate_engine(slug: str):
 # --- 用户认证 ---
 
 @router.post("/auth/register", response_model=StatusResponse)
-def register(req: AuthRequest):
+def register(req: AuthRequest, request: Request = None):
     """注册新用户。"""
+    client_ip = _get_client_ip(request) if request else "unknown"
     from server.auth import register_user
     error = register_user(req.username, req.password)
     if error:
+        _audit("register_failed", username=req.username, client_ip=client_ip, detail=error)
         raise HTTPException(status_code=400, detail=error)
+    _audit("register_success", username=req.username, client_ip=client_ip)
     return StatusResponse(message="注册成功，请登录")
 
 
 @router.post("/auth/login")
-def login(req: AuthRequest):
+def login(req: AuthRequest, request: Request = None):
     """登录获取 token。"""
+    client_ip = _get_client_ip(request) if request else "unknown"
+    _get_login_limiter().check(req.username, client_ip)
+
     from server.auth import login_user
     token = login_user(req.username, req.password)
     if token is None:
+        _audit("login_failed", username=req.username, client_ip=client_ip)
         raise HTTPException(status_code=401, detail="用户名或密码错误")
+    _audit("login_success", username=req.username, client_ip=client_ip)
     return {"token": token, "token_type": "bearer"}
 
 
@@ -142,6 +184,7 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
         raise HTTPException(status_code=404, detail=f"镜像 [{slug}] 不存在")
     import shutil
     shutil.rmtree(ex_dir)
+    _audit("exe_deleted", username=f"user_id={user_id}", detail=f"slug={slug}")
     return StatusResponse(message=f"镜像 [{slug}] 已删除")
 
 

@@ -29,7 +29,9 @@ class ChatEngine:
         self.ex_dir = get_ex_dir(slug)
         self.vector_store = vector_store
         self.embedder = embedder
-        self._rag_healthy = True
+        self._rag_failures = 0
+        self._rag_recovery_interval = 5  # 降级后每隔 N 轮尝试恢复一次
+        self._turn_since_last_rag_attempt = 0
 
         self.skill_content = ""
         self.session_summaries = []
@@ -99,16 +101,39 @@ class ChatEngine:
 
         return prompt
 
+    def _is_rag_degraded(self) -> bool:
+        """连续 3 次失败后进入降级模式。"""
+        return self._rag_failures >= 3
+
     def _rag_search(self, user_input: str) -> list[dict]:
-        if not self.vector_store or not self.embedder or not self._rag_healthy:
+        if not self.vector_store or not self.embedder:
             return []
+
+        # 降级模式下每隔 N 轮尝试一次恢复
+        if self._is_rag_degraded():
+            self._turn_since_last_rag_attempt += 1
+            if self._turn_since_last_rag_attempt < self._rag_recovery_interval:
+                return []
+            self._turn_since_last_rag_attempt = 0
+            logger.info("尝试恢复 RAG 检索 (failures=%d)", self._rag_failures)
+
         try:
-            return self.vector_store.search_target_only(
+            results = self.vector_store.search_target_only(
                 query=user_input, embedder=self.embedder, top_k=DEFAULT_TOP_K
             )
+            # 成功 — 重置失败计数
+            if self._rag_failures > 0:
+                logger.info("RAG 检索已恢复")
+            self._rag_failures = 0
+            self._turn_since_last_rag_attempt = 0
+            return results
         except Exception:
-            logger.warning("RAG 检索失败，降级为纯文本模式", exc_info=True)
-            self._rag_healthy = False
+            self._rag_failures += 1
+            msg = f"RAG 检索失败 ({self._rag_failures}/3)"
+            if self._is_rag_degraded():
+                logger.warning(msg + "，进入降级模式", exc_info=True)
+            else:
+                logger.warning(msg, exc_info=True)
             return []
 
     @retry_api(max_attempts=3, base_delay=1.0)

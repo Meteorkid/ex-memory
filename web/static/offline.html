@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ex-memory - 离线</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #F2F2F7;
+            color: #1C1C1E;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            max-width: 360px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+        .icon { font-size: 48px; margin-bottom: 16px; }
+        h1 { font-size: 20px; margin-bottom: 8px; }
+        p { color: #8E8E93; font-size: 14px; line-height: 1.5; margin-bottom: 24px; }
+        button {
+            background: #007AFF;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 32px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover { background: #0056CC; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">📡</div>
+        <h1>网络连接已断开</h1>
+        <p>请检查你的网络连接后重试。已缓存的对话仍可查看。</p>
+        <button onclick="location.reload()">重新连接</button>
+    </div>
+</body>
+</html>

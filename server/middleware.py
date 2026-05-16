@@ -1,10 +1,13 @@
-"""FastAPI 中间件：CORS、限流、认证。"""
+"""FastAPI 中间件：CORS、限流、认证、请求日志。"""
 
+import os
 import time
+import uuid
 import logging
 from collections import defaultdict
 from fastapi import Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 logger = logging.getLogger("ex-memory")
@@ -12,9 +15,11 @@ security = HTTPBearer(auto_error=False)
 
 
 def setup_cors(app):
+    origins_str = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://localhost:7860")
+    allow_origins = [o.strip() for o in origins_str.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allow_origins,
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -77,7 +82,10 @@ class RateLimiter:
 
         if len(self._store[client_ip]) >= self.max_requests:
             logger.warning("rate limit hit for %s", client_ip)
-            raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "请求过于频繁，请稍后再试"},
+            )
 
         self._store[client_ip].append(now)
         response = await call_next(request)
@@ -92,3 +100,69 @@ class RateLimiter:
             del self._store[ip]
         if stale:
             logger.debug("rate limiter cleaned %d stale IP entries", len(stale))
+
+
+class LoginRateLimiter:
+    """登录接口独立限流：5 次/分钟/用户名，15 次/分钟/IP。"""
+
+    def __init__(self, max_per_user: int = 5, max_per_ip: int = 15, window_seconds: int = 60):
+        self.max_per_user = max_per_user
+        self.max_per_ip = max_per_ip
+        self.window = window_seconds
+        self._user_store: dict[str, list[float]] = defaultdict(list)
+        self._ip_store: dict[str, list[float]] = defaultdict(list)
+        self._last_cleanup = time.time()
+
+    def check(self, username: str, client_ip: str) -> None:
+        now = time.time()
+        if now - self._last_cleanup > 300:
+            self._cleanup(now)
+            self._last_cleanup = now
+
+        window_start = now - self.window
+
+        # 按用户名限流
+        self._user_store[username] = [
+            t for t in self._user_store[username] if t > window_start
+        ]
+        if len(self._user_store[username]) >= self.max_per_user:
+            logger.warning("login rate limit (user) hit for %s", username)
+            raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
+
+        # 按 IP 限流
+        self._ip_store[client_ip] = [
+            t for t in self._ip_store[client_ip] if t > window_start
+        ]
+        if len(self._ip_store[client_ip]) >= self.max_per_ip:
+            logger.warning("login rate limit (IP) hit for %s", client_ip)
+            raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
+
+        self._user_store[username].append(now)
+        self._ip_store[client_ip].append(now)
+
+    def _cleanup(self, now: float):
+        window_start = now - self.window
+        for store in (self._user_store, self._ip_store):
+            stale = [k for k, ts_list in store.items()
+                     if not any(t > window_start for t in ts_list)]
+            for k in stale:
+                del store[k]
+
+
+class RequestLoggingMiddleware:
+    """请求日志中间件：记录 method、path、status、duration_ms、request_id。"""
+
+    async def __call__(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:12])
+        request.state.request_id = request_id
+
+        start = time.time()
+        response = await call_next(request)
+        duration_ms = int((time.time() - start) * 1000)
+
+        logger.info(
+            "request_id=%s method=%s path=%s status=%d duration_ms=%d",
+            request_id, request.method, request.url.path, response.status_code, duration_ms,
+        )
+        response.headers["X-Request-ID"] = request_id
+        return response
