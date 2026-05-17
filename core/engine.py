@@ -1,5 +1,6 @@
 """ChatEngine：SKILL.md + RAG 动态注入 + 重试 + Token 预算。"""
 
+import re
 import logging
 from typing import Optional
 from pathlib import Path
@@ -10,7 +11,7 @@ from config import (
 )
 from core.retry import retry_api
 from core.validation import estimate_tokens
-from core.sticker_selector import select_stickers
+from core.sticker_selector import select_stickers, IMAGE_STICKERS
 
 logger = logging.getLogger("ex-memory")
 
@@ -82,6 +83,12 @@ class ChatEngine:
                 for r in filtered:
                     parts.append(f"- {r.get('display_text', '')}")
                 parts.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
+
+        prompt = "\n".join(parts)
+
+        # 附加图片贴纸使用说明
+        sticker_list = ", ".join(f"{sid}({s['label']})" for sid, s in IMAGE_STICKERS.items())
+        parts.append(f"\n---\n## 可用图片表情包\n你可以在回复中使用图片表情包来表达情绪。在回复文本末尾加上 [sticker:贴纸ID] 标记即可。\n可用贴纸：{sticker_list}\n示例：哈哈哈 [sticker:builtin_happy_laugh]\n")
 
         prompt = "\n".join(parts)
 
@@ -158,13 +165,26 @@ class ChatEngine:
         messages.append({"role": "user", "content": user_input})
         return messages
 
+    @staticmethod
+    def _extract_sticker_tags(text: str) -> tuple[str, list[str]]:
+        """从回复文本中提取 [sticker:xxx] 标记，返回 (清理后文本, 贴纸ID列表)。"""
+        pattern = r'\[sticker:([\w]+)\]'
+        sticker_ids = re.findall(pattern, text)
+        clean_text = re.sub(pattern, '', text).strip()
+        return clean_text, sticker_ids
+
     def chat(self, user_input: str, history: list[dict]) -> tuple[str, list[str], object]:
         messages = self._prepare_messages(user_input, history)
 
         response = self._call_api(messages)
         reply = response.choices[0].message.content
+        # 提取 [sticker:xxx] 标记
+        reply, inline_stickers = self._extract_sticker_tags(reply)
+        # 情绪分析选择的贴纸
         stickers = select_stickers(reply)
-        return reply, stickers, response.usage
+        # 合并：内联贴纸优先
+        all_stickers = inline_stickers + stickers
+        return reply, all_stickers, response.usage
 
     def chat_stream(self, user_input: str, history: list[dict]):
         """流式对话，yield dict: {type: text|sticker, content/id: ...}"""
@@ -186,9 +206,12 @@ class ChatEngine:
                 full_reply += delta.content
                 yield {"type": "text", "content": delta.content}
 
-        # 流式结束后，选择贴纸
+        # 提取 [sticker:xxx] 标记
+        _, inline_stickers = self._extract_sticker_tags(full_reply)
+        # 情绪分析选择的贴纸
         stickers = select_stickers(full_reply)
-        for sid in stickers:
+        # 合并：内联贴纸优先
+        for sid in inline_stickers + stickers:
             yield {"type": "sticker", "id": sid}
 
         # 检测是否触发红包

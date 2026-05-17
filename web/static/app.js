@@ -719,20 +719,116 @@ async function loadStickers() {
 function renderStickerGrid() {
     const grid = $('sticker-grid');
     if (!grid) return;
-    const filtered = stickerCategory === 'all'
-        ? allStickers
-        : allStickers.filter(s => s.emotion === stickerCategory);
-    grid.innerHTML = filtered.map(s => `
-        <div class="sticker-item" data-emoji="${s.emoji}" title="${s.label}">${s.emoji}</div>
-    `).join('');
+    let filtered;
+    if (stickerCategory === 'all') {
+        filtered = allStickers;
+    } else if (stickerCategory === 'emoji') {
+        filtered = allStickers.filter(s => s.type === 'emoji');
+    } else if (stickerCategory === 'image') {
+        filtered = allStickers.filter(s => s.type === 'image' || s.type === 'gif');
+    } else if (stickerCategory === 'custom') {
+        filtered = allStickers.filter(s => s.source === 'custom');
+    } else {
+        filtered = allStickers.filter(s => s.emotion === stickerCategory || s.category === stickerCategory);
+    }
+    grid.innerHTML = filtered.map(s => {
+        if (s.type === 'emoji') {
+            return `<div class="sticker-item" data-id="${s.id}" data-type="emoji" title="${s.label}">${s.emoji}</div>`;
+        }
+        return `<div class="sticker-item" data-id="${s.id}" data-type="${s.type}" title="${s.label}"><img src="${s.url}" alt="${s.label}" class="sticker-thumb" loading="lazy"></div>`;
+    }).join('');
 
     grid.querySelectorAll('.sticker-item').forEach(item => {
         item.addEventListener('click', () => {
-            $('msg-input').value += item.dataset.emoji;
-            $('msg-input').focus();
+            const stickerId = item.dataset.id;
+            sendStickerMessage(stickerId);
         });
     });
 }
+
+async function sendStickerMessage(stickerId) {
+    if (!currentSlug) return;
+    const panel = $('sticker-panel');
+    panel.style.display = 'none';
+    $('chat-msgs').classList.remove('has-panel');
+    $('sticker-toggle-btn').textContent = '😊';
+
+    const msgsEl = $('chat-msgs');
+    if ($('chat-empty-hint').style.display !== 'none') {
+        $('chat-empty-hint').style.display = 'none';
+        msgsEl.style.display = 'flex';
+    }
+
+    // 用户侧显示贴纸
+    const sticker = allStickers.find(s => s.id === stickerId);
+    const userRow = document.createElement('div');
+    userRow.className = 'msg-row user';
+    const userBubble = document.createElement('div');
+    userBubble.className = 'msg sticker';
+    if (sticker && sticker.type === 'emoji') {
+        userBubble.innerHTML = `<span class="sticker-img" style="font-size:60px;line-height:1.2;display:block;">${sticker.emoji}</span>`;
+    } else if (sticker && (sticker.type === 'image' || sticker.type === 'gif')) {
+        userBubble.innerHTML = `<img src="${sticker.url}" alt="${sticker.label}" class="sticker-bubble-img">`;
+    } else {
+        userBubble.textContent = `[贴纸]`;
+    }
+    userRow.appendChild(userBubble);
+    maybeAddTimestamp(msgsEl);
+    msgsEl.appendChild(userRow);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    // 打字指示器
+    const typingRow = typingIndicator();
+    msgsEl.appendChild(typingRow);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    const hist = buildHistory(msgsEl);
+    try {
+        const resp = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ slug: currentSlug, message: '', sticker_id: stickerId, history: hist }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        typingRow.remove();
+        await handleStreamResponse(resp, msgsEl);
+    } catch(e) {
+        typingRow.remove();
+        msgsEl.appendChild(chatBubble('assistant', '消息发送失败，请重试'));
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+}
+
+// 贴纸上传
+$('sticker-upload-btn').addEventListener('click', () => {
+    $('sticker-file-input').click();
+});
+
+$('sticker-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('label', file.name.replace(/\.[^.]+$/, ''));
+    formData.append('category', 'custom');
+    try {
+        const resp = await fetch('/api/stickers/upload', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: formData,
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            showToast(err.detail || '上传失败', 'error');
+            return;
+        }
+        showToast('贴纸上传成功', 'success');
+        await loadStickers();
+    } catch(e) {
+        showToast('上传失败，请检查网络', 'error');
+    }
+    e.target.value = '';
+});
 
 $('sticker-toggle-btn').addEventListener('click', () => {
     const panel = $('sticker-panel');
@@ -943,10 +1039,15 @@ function stickerMsg(stickerId) {
     }
     const div = document.createElement('div');
     div.className = 'msg sticker';
-    const emojiMap = {};
-    allStickers.forEach(s => { emojiMap[s.id] = s.emoji; });
-    const emoji = emojiMap[stickerId] || '😊';
-    div.innerHTML = `<span class="sticker-img" style="font-size:60px;line-height:1.2;display:block;">${emoji}</span>`;
+    const sticker = allStickers.find(s => s.id === stickerId);
+    if (sticker && (sticker.type === 'image' || sticker.type === 'gif')) {
+        div.innerHTML = `<img src="${sticker.url}" alt="${sticker.label}" class="sticker-bubble-img">`;
+    } else {
+        const emojiMap = {};
+        allStickers.forEach(s => { if (s.emoji) emojiMap[s.id] = s.emoji; });
+        const emoji = (sticker && sticker.emoji) || emojiMap[stickerId] || '😊';
+        div.innerHTML = `<span class="sticker-img" style="font-size:60px;line-height:1.2;display:block;">${emoji}</span>`;
+    }
     row.appendChild(div);
     return row;
 }

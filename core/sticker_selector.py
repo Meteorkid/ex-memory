@@ -2,6 +2,7 @@
 
 import random
 import re
+from typing import Optional
 
 # ── 贴纸库 ──
 
@@ -46,6 +47,31 @@ STICKERS = {
     "xin":        {"emoji": "💕", "label": "心心", "emotion": "love"},
 }
 
+# ── 图片贴纸映射（builtin 资源）──
+
+IMAGE_STICKERS = {
+    "builtin_happy_smile":      {"label": "微笑", "emotion": "happy", "type": "image"},
+    "builtin_happy_laugh":      {"label": "大笑", "emotion": "happy", "type": "image"},
+    "builtin_happy_celebrate":  {"label": "庆祝", "emotion": "happy", "type": "image"},
+    "builtin_happy_thumbsup":   {"label": "点赞", "emotion": "happy", "type": "image"},
+    "builtin_sad_cry":          {"label": "大哭", "emotion": "sad", "type": "image"},
+    "builtin_sad_sad":          {"label": "难过", "emotion": "sad", "type": "image"},
+    "builtin_sad_tear":         {"label": "流泪", "emotion": "sad", "type": "image"},
+    "builtin_angry_angry":      {"label": "生气", "emotion": "angry", "type": "image"},
+    "builtin_angry_rage":       {"label": "暴怒", "emotion": "angry", "type": "image"},
+    "builtin_angry_hmph":       {"label": "哼", "emotion": "angry", "type": "image"},
+    "builtin_cute_heart_eyes":  {"label": "爱心眼", "emotion": "cute", "type": "image"},
+    "builtin_cute_blush":       {"label": "害羞", "emotion": "cute", "type": "image"},
+    "builtin_cute_wink":        {"label": "眨眼", "emotion": "cute", "type": "image"},
+    "builtin_cute_puppy_eyes":  {"label": "卖萌", "emotion": "cute", "type": "image"},
+    "builtin_playful_tongue":   {"label": "吐舌", "emotion": "playful", "type": "image"},
+    "builtin_playful_smirk":    {"label": "坏笑", "emotion": "playful", "type": "image"},
+    "builtin_playful_silly":    {"label": "搞怪", "emotion": "playful", "type": "image"},
+    "builtin_love_heart":       {"label": "爱心", "emotion": "love", "type": "image"},
+    "builtin_love_kiss":        {"label": "亲亲", "emotion": "love", "type": "image"},
+    "builtin_love_hug":         {"label": "抱抱", "emotion": "love", "type": "image"},
+}
+
 # ── 情绪关键词映射 ──
 
 EMOTION_PATTERNS = {
@@ -62,7 +88,7 @@ EMOTION_PATTERNS = {
 
 
 def select_stickers(reply_text: str, max_stickers: int = 2) -> list[str]:
-    """根据回复文本选择最匹配的贴纸 ID 列表。"""
+    """根据回复文本选择最匹配的贴纸 ID 列表。优先返回图片贴纸。"""
     if not reply_text.strip():
         return []
 
@@ -82,15 +108,23 @@ def select_stickers(reply_text: str, max_stickers: int = 2) -> list[str]:
     used_labels: set[str] = set()
 
     for emotion, _ in sorted_emotions:
-        # 该情绪下的所有贴纸
-        candidates = [sid for sid, s in STICKERS.items()
-                      if s["emotion"] == emotion and s["label"] not in used_labels]
-        if candidates:
-            chosen = random.choice(candidates)
+        # 优先选图片贴纸
+        image_candidates = [sid for sid, s in IMAGE_STICKERS.items()
+                            if s["emotion"] == emotion and s["label"] not in used_labels]
+        if image_candidates:
+            chosen = random.choice(image_candidates)
             result.append(chosen)
-            used_labels.add(STICKERS[chosen]["label"])
-            if len(result) >= max_stickers:
-                break
+            used_labels.add(IMAGE_STICKERS[chosen]["label"])
+        else:
+            # 降级到 emoji 贴纸
+            emoji_candidates = [sid for sid, s in STICKERS.items()
+                                if s["emotion"] == emotion and s["label"] not in used_labels]
+            if emoji_candidates:
+                chosen = random.choice(emoji_candidates)
+                result.append(chosen)
+                used_labels.add(STICKERS[chosen]["label"])
+        if len(result) >= max_stickers:
+            break
 
     return result
 
@@ -120,14 +154,38 @@ def sticker_svg(sticker_id: str) -> str:
 
 
 def get_all_stickers() -> list[dict]:
-    """返回所有贴纸信息，供前端渲染表情面板。"""
+    """返回所有 emoji 贴纸信息，供前端渲染表情面板。"""
     result = []
     for sid, info in STICKERS.items():
         result.append({
             "id": sid,
+            "type": "emoji",
             "emoji": info["emoji"],
             "label": info["label"],
             "emotion": info["emotion"],
             "svg": sticker_svg(sid),
         })
     return result
+
+
+def get_image_sticker_info(sticker_id: str) -> Optional[dict]:
+    """获取图片贴纸的详细信息（含 URL）。"""
+    if sticker_id not in IMAGE_STICKERS:
+        return None
+    info = IMAGE_STICKERS[sticker_id]
+    # 从 ID 推导 URL：builtin_happy_smile → /static/stickers/builtin/happy/smile.svg
+    parts = sticker_id.replace("builtin_", "").split("_", 1)
+    category = parts[0]
+    name = parts[1] if len(parts) > 1 else ""
+    return {
+        "id": sticker_id,
+        "type": info["type"],
+        "url": f"/static/stickers/builtin/{category}/{name}.svg",
+        "label": info["label"],
+        "category": info["emotion"],
+    }
+
+
+def is_image_sticker(sticker_id: str) -> bool:
+    """判断是否为图片贴纸。"""
+    return sticker_id in IMAGE_STICKERS

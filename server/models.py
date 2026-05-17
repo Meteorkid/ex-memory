@@ -17,7 +17,8 @@ class ResumeRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     slug: str = Field(..., description="镜像名称")
-    message: str = Field(..., min_length=1, max_length=8000)
+    message: str = Field(default="", max_length=8000)
+    sticker_id: Optional[str] = Field(default=None, description="贴纸 ID（发送贴纸消息时使用）")
     history: list[dict] = Field(default_factory=list)
 
 class UpdateRequest(BaseModel):

@@ -709,6 +709,16 @@ body {
 .msg.sticker .sticker-img {
     width: 80px; height: 80px; object-fit: contain;
 }
+/* 图片贴纸气泡 */
+.sticker-bubble-img {
+    max-width: 120px; max-height: 120px;
+    border-radius: var(--radius-sm);
+    object-fit: contain;
+    display: block;
+}
+/* 用户发送的贴纸也居右 */
+.msg-row.user.sticker { justify-content: flex-end; }
+.msg-row.user.sticker .msg { background: transparent !important; }
 
 /* Red Packet bubble */
 .msg-row.redpacket { justify-content: flex-start; }
@@ -874,7 +884,7 @@ body {
 /* Sticker Panel */
 .sticker-panel {
     position: absolute; bottom: 56px; left: 0; right: 0;
-    height: 220px;
+    height: 240px;
     background: var(--glass-thick);
     backdrop-filter: var(--glass-saturate) var(--glass-blur-mid);
     -webkit-backdrop-filter: var(--glass-saturate) var(--glass-blur-mid);
@@ -911,6 +921,32 @@ body {
     background: rgba(0, 0, 0, 0.08);
     transform: scale(0.92);
     transition-duration: 0s;
+}
+/* 图片贴纸缩略图 */
+.sticker-thumb {
+    width: 52px; height: 52px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    pointer-events: none;
+}
+/* 上传按钮 */
+.sticker-upload-btn {
+    position: absolute; bottom: 8px; right: 8px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1.5px dashed var(--text-tertiary);
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 1.2em; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s ease;
+}
+.sticker-upload-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.sticker-upload-btn:active {
+    transform: scale(0.9);
 }
 
 /* Input Bar */

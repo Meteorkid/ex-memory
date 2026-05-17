@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Query
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -281,10 +281,65 @@ async def import_data(slug: str, file: UploadFile = File(...), target_name: str 
 # --- 贴纸 ---
 
 @router.get("/stickers")
-def list_stickers():
-    """返回所有可用贴纸。"""
+def list_all_stickers(category: str = Query("all", description="过滤分类")):
+    """返回所有可用贴纸（emoji + 图片 + GIF）。"""
     from core.sticker_selector import get_all_stickers
-    return {"stickers": get_all_stickers()}
+    from core.sticker_manager import list_stickers as list_image_stickers
+    emoji_stickers = get_all_stickers()
+    image_stickers = list_image_stickers(category=category)
+    # emoji 贴纸始终返回（不过滤分类），图片贴纸按 category 过滤
+    if category in ("all", "emoji"):
+        combined = emoji_stickers + image_stickers
+    elif category == "custom":
+        combined = image_stickers
+    else:
+        combined = [s for s in emoji_stickers if s.get("emotion") == category] + image_stickers
+    return {"stickers": combined}
+
+
+@router.get("/stickers/{sticker_id}")
+def get_sticker(sticker_id: str):
+    """获取单个贴纸信息。"""
+    from core.sticker_selector import STICKERS
+    from core.sticker_manager import get_sticker as get_image_sticker
+    # 先查 emoji
+    if sticker_id in STICKERS:
+        s = STICKERS[sticker_id]
+        return {"id": sticker_id, "type": "emoji", "emoji": s["emoji"], "label": s["label"], "category": s["emotion"]}
+    # 再查图片贴纸
+    sticker = get_image_sticker(sticker_id)
+    if sticker:
+        return sticker
+    raise HTTPException(status_code=404, detail="贴纸不存在")
+
+
+@router.post("/stickers/upload")
+async def upload_sticker(
+    file: UploadFile = File(...),
+    label: str = Form(""),
+    category: str = Form("custom"),
+    user_id: int = Depends(require_auth),
+):
+    """上传自定义贴纸。"""
+    from core.sticker_manager import upload_sticker as _upload, ALLOWED_EXTENSIONS
+    ext = Path(file.filename).suffix.lower() if file.filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"不支持的文件类型: {ext}")
+    content = await file.read()
+    try:
+        result = _upload(content, file.filename, label, category)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
+
+
+@router.delete("/stickers/{sticker_id}", response_model=StatusResponse)
+def delete_custom_sticker(sticker_id: str, user_id: int = Depends(require_auth)):
+    """删除自定义贴纸。"""
+    from core.sticker_manager import delete_sticker
+    if not delete_sticker(sticker_id):
+        raise HTTPException(status_code=404, detail="贴纸不存在或为内置贴纸，不可删除")
+    return StatusResponse(message="贴纸已删除")
 
 
 # --- 钱包 ---
@@ -420,9 +475,22 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
     """单轮对话。"""
     try:
         slug = validate_slug(req.slug)
-        message = validate_user_input(req.message)
+        message = validate_user_input(req.message) if req.message else ""
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # 贴纸消息：无文本时用贴纸标签作为消息
+    if req.sticker_id and not message:
+        from core.sticker_manager import get_sticker
+        from core.sticker_selector import STICKERS
+        if req.sticker_id in STICKERS:
+            message = STICKERS[req.sticker_id]["emoji"]
+        else:
+            sticker = get_sticker(req.sticker_id)
+            message = f"[贴纸: {sticker['label']}]" if sticker else "[贴纸]"
+
+    if not message:
+        raise HTTPException(status_code=400, detail="消息不能为空")
 
     ex_dir = get_ex_dir(slug)
     if not ex_dir.exists():
@@ -464,9 +532,22 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
     """流式对话 (SSE)。"""
     try:
         slug = validate_slug(req.slug)
-        message = validate_user_input(req.message)
+        message = validate_user_input(req.message) if req.message else ""
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # 贴纸消息处理
+    if req.sticker_id and not message:
+        from core.sticker_manager import get_sticker
+        from core.sticker_selector import STICKERS
+        if req.sticker_id in STICKERS:
+            message = STICKERS[req.sticker_id]["emoji"]
+        else:
+            sticker = get_sticker(req.sticker_id)
+            message = f"[贴纸: {sticker['label']}]" if sticker else "[贴纸]"
+
+    if not message:
+        raise HTTPException(status_code=400, detail="消息不能为空")
 
     ex_dir = get_ex_dir(slug)
     if not ex_dir.exists():
