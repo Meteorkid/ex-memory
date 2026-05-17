@@ -536,17 +536,52 @@ document.querySelectorAll('.tabbar-btn').forEach(btn => {
 // 聊天操作菜单
 // ═══════════════════════════════════════
 
+// ── Action Sheet / Confirm 工具函数 ──
+function showActionSheet(options) {
+    // options: [{label, danger?, onClick}]
+    const overlay = $('action-sheet-overlay');
+    const optionsEl = $('action-sheet-options');
+    optionsEl.innerHTML = '';
+    options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'action-sheet-option' + (opt.danger ? ' danger' : '');
+        btn.textContent = opt.label;
+        btn.onclick = () => { overlay.style.display = 'none'; opt.onClick(); };
+        optionsEl.appendChild(btn);
+    });
+    overlay.style.display = 'flex';
+    $('action-sheet-cancel').onclick = () => { overlay.style.display = 'none'; };
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.style.display = 'none'; };
+}
+
+function showConfirm(title, message, onConfirm, danger = false) {
+    $('confirm-title').textContent = title;
+    $('confirm-message').textContent = message;
+    const overlay = $('confirm-overlay');
+    overlay.style.display = 'flex';
+    $('confirm-ok-btn').className = 'confirm-btn' + (danger ? ' danger' : '');
+    $('confirm-ok-btn').onclick = () => { overlay.style.display = 'none'; onConfirm(); };
+    $('confirm-cancel-btn').onclick = () => { overlay.style.display = 'none'; };
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.style.display = 'none'; };
+}
+
 function showChatActions() {
-    const action = prompt('操作: 输入 clear 清空对话, delete 删除镜像, 或 cancel 取消');
-    if (action === 'clear') {
-        $('chat-msgs').innerHTML = '';
-    } else if (action === 'delete') {
-        if (!confirm(`确定删除镜像 [${currentSlug}]？不可恢复。`)) return;
-        api('DELETE', `/exes/${currentSlug}`, {confirm:true}).then(() => {
-            currentSlug = ''; currentName = '';
-            switchTab('chat-list');
-        }).catch(e => showToast('删除失败: ' + e.message, 'error'));
-    }
+    showActionSheet([
+        { label: '清空对话', onClick: () => { $('chat-msgs').innerHTML = ''; } },
+        { label: '删除镜像', danger: true, onClick: () => {
+            showConfirm(
+                '删除镜像',
+                `确定删除 [${currentSlug}]？此操作不可恢复。`,
+                () => {
+                    api('DELETE', `/exes/${currentSlug}`, {confirm:true}).then(() => {
+                        currentSlug = ''; currentName = '';
+                        switchTab('chat-list');
+                    }).catch(e => showToast('删除失败: ' + e.message, 'error'));
+                },
+                true
+            );
+        }},
+    ]);
 }
 
 // ═══════════════════════════════════════
@@ -1325,8 +1360,18 @@ function escHtml(s) {
 // ═══════════════════════════════════════
 
 let isVoiceMode = false;
+let speechRecognition = null;
 
 function initVoiceToggle() {
+    // 检查浏览器是否支持 Web Speech API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        speechRecognition = new SpeechRecognition();
+        speechRecognition.lang = 'zh-CN';
+        speechRecognition.interimResults = false;
+        speechRecognition.maxAlternatives = 1;
+    }
+
     $('voice-toggle-btn').addEventListener('click', () => {
         isVoiceMode = !isVoiceMode;
         if (isVoiceMode) {
@@ -1345,7 +1390,6 @@ function initVoiceToggle() {
 
     voiceBtn.addEventListener('touchstart', startVoiceRecord, {passive: false});
     voiceBtn.addEventListener('mousedown', e => {
-        // 防止触屏设备上 mousedown 在 touchstart 后重复触发
         if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
         startVoiceRecord(e);
     });
@@ -1361,6 +1405,10 @@ function initVoiceToggle() {
         voiceBtn.innerHTML = '<span class="voice-recording-dot"></span> 松开 发送';
         recordDuration = 0;
         recordTimer = setInterval(() => { recordDuration++; }, 1000);
+        // 启动语音识别
+        if (speechRecognition) {
+            try { speechRecognition.start(); } catch(e) {}
+        }
     }
 
     function stopVoiceRecord(e) {
@@ -1370,14 +1418,39 @@ function initVoiceToggle() {
         voiceBtn.classList.remove('recording');
         voiceBtn.innerHTML = '<span class="voice-recording-dot"></span> 按住 说话';
         clearInterval(recordTimer);
+        // 停止语音识别
+        if (speechRecognition) {
+            try { speechRecognition.stop(); } catch(e) {}
+        }
 
         if (recordDuration > 0 && currentSlug) {
             const dur = Math.min(recordDuration, 60);
             const msgsEl = $('chat-msgs');
             msgsEl.appendChild(voiceBubble('user', dur));
             msgsEl.scrollTop = msgsEl.scrollHeight;
-            sendVoiceMessage(dur);
+            // 等待语音识别结果，超时 800ms 后发送
+            const waitAndSend = () => {
+                const sttText = speechRecognition?._lastResult || '';
+                sendVoiceMessage(dur, sttText);
+                if (speechRecognition) speechRecognition._lastResult = '';
+            };
+            if (speechRecognition && speechRecognition._lastResult) {
+                waitAndSend();
+            } else {
+                setTimeout(waitAndSend, 800);
+            }
         }
+    }
+
+    // 缓存语音识别结果
+    if (speechRecognition) {
+        speechRecognition.onresult = (event) => {
+            const result = event.results[event.results.length - 1];
+            if (result.isFinal) {
+                speechRecognition._lastResult = result[0].transcript;
+            }
+        };
+        speechRecognition.onerror = () => {};
     }
 }
 
@@ -1399,7 +1472,7 @@ function voiceBubble(role, duration) {
     return row;
 }
 
-async function sendVoiceMessage(duration) {
+async function sendVoiceMessage(duration, sttText) {
     const msgsEl = $('chat-msgs');
     if ($('chat-empty-hint').style.display !== 'none') {
         $('chat-empty-hint').style.display = 'none';
@@ -1409,6 +1482,9 @@ async function sendVoiceMessage(duration) {
     msgsEl.appendChild(typingRow);
     msgsEl.scrollTop = msgsEl.scrollHeight;
 
+    // 有 STT 结果则发送文字，否则发送语音标记
+    const message = sttText ? sttText : `[语音消息 ${duration}秒]`;
+
     try {
         const hist = buildHistory(msgsEl);
         const headers = {'Content-Type': 'application/json'};
@@ -1416,7 +1492,7 @@ async function sendVoiceMessage(duration) {
 
         const res = await fetch(`${API}/chat/stream`, {
             method: 'POST', headers,
-            body: JSON.stringify({slug: currentSlug, message: `[语音消息 ${duration}秒]`, history: hist.slice(-50)}),
+            body: JSON.stringify({slug: currentSlug, message, history: hist.slice(-50)}),
         });
         if (res.status === 401) { logout(); return; }
 

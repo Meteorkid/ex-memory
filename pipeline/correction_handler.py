@@ -105,6 +105,9 @@ def handle_correction(
     # 同时追加到 memory.md 的 Correction 记录节
     _append_to_memory(slug, count + 1, timestamp, user_msg)
 
+    # 将人格相关纠正合并到 persona.md
+    _patch_persona(slug, correction_content)
+
     # 重新生成 SKILL.md
     from pipeline.skill_combiner import write_skill
     write_skill(slug)
@@ -132,6 +135,26 @@ def _append_to_memory(slug: str, correction_num: int, timestamp: str, user_msg: 
 """
     content += correction_entry
     atomic_write(memory_path, content)
+
+
+def _patch_persona(slug: str, correction_content: str):
+    """将纠正中的人格特征更新到 persona.md。"""
+    ex_dir = get_ex_dir(slug)
+    persona_path = ex_dir / "persona.md"
+    if not persona_path.exists():
+        return
+
+    content = persona_path.read_text(encoding="utf-8")
+
+    # 在 persona.md 末尾添加纠正记录节
+    if "## 用户纠正补充" not in content:
+        content += "\n\n## 用户纠正补充\n"
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    entry = f"\n### {timestamp}\n{correction_content}\n"
+    content += entry
+
+    atomic_write(persona_path, content)
 
 
 def _format_history(messages: list[dict]) -> str:

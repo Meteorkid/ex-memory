@@ -75,14 +75,13 @@ class ChatEngine:
             parts.append(f"\n---\n## 用户纠正记录（优先级最高）\n{self.corrections}\n")
 
         if rag_results:
-            parts.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
-            parts.append("以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n")
-            for r in rag_results:
-                score = r.get("score", 0)
-                text = r.get("display_text", "")
-                if score > RAG_THRESHOLD:
-                    parts.append(f"- {text}")
-            parts.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
+            filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
+            if filtered:
+                parts.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
+                parts.append("以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n")
+                for r in filtered:
+                    parts.append(f"- {r.get('display_text', '')}")
+                parts.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
 
         prompt = "\n".join(parts)
 
@@ -91,8 +90,10 @@ class ChatEngine:
         if tokens > LLM_MAX_CONTEXT_CHARS * 0.5:
             logger.warning("System prompt 过大 (%d tokens)，截断 session 摘要", tokens)
             summaries = list(self.session_summaries)
-            while summaries and estimate_tokens(prompt) > LLM_MAX_CONTEXT_CHARS * 0.5:
-                summaries.pop(0)
+            # 保留策略：首条（初始上下文）+ 最新的 N 条
+            while len(summaries) > 2 and estimate_tokens(prompt) > LLM_MAX_CONTEXT_CHARS * 0.5:
+                # 移除中间的旧摘要，保留首尾
+                summaries.pop(1)
                 prompt = "\n".join([self.skill_content] + [
                     f"\n---\n## 最近对话记忆\n" + "\n".join(
                         f"### 第 {i} 次\n{s}" for i, s in enumerate(summaries, 1)

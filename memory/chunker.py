@@ -1,8 +1,16 @@
 """聊天记录切片：将消息列表切分为 chunks，判定 dominant_speaker。"""
 
+import re
 import hashlib
 from collections import Counter
 from config import CHUNK_TURNS, CHUNK_OVERLAP
+
+
+def _split_sentences(text: str) -> list[str]:
+    """按中英文句子边界切分文本。"""
+    # 匹配中英文句号、问号、感叹号、分号后的断点
+    parts = re.split(r'(?<=[。！？；\.\!\?\;])\s*', text)
+    return [p for p in parts if p.strip()]
 
 
 class Chunker:
@@ -100,34 +108,63 @@ class Chunker:
         chunk_chars: int = 800,
         overlap_chars: int = 80,
     ) -> list[dict]:
-        """纯文本按字符窗口切片。"""
+        """纯文本按句子/段落边界切片，避免截断语义。无边界时回退到字符窗口。"""
         if not text.strip():
             return []
 
+        # 按段落分割，再按句子边界合并
+        paragraphs = text.split("\n")
         chunks = []
-        step = chunk_chars - overlap_chars
-        if step <= 0:
-            step = 1
+        current = ""
 
-        for i in range(0, len(text), step):
-            segment = text[i : i + chunk_chars].strip()
-            if not segment:
-                break
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
 
+            # 如果当前段落本身超过 chunk_chars，按句子切分
+            if len(para) > chunk_chars:
+                if current.strip():
+                    chunks.append(current.strip())
+                    current = ""
+                sentences = _split_sentences(para)
+                # 如果没有句子边界（纯连续文本），回退到字符窗口
+                if len(sentences) <= 1:
+                    for i in range(0, len(para), chunk_chars - overlap_chars):
+                        segment = para[i:i + chunk_chars].strip()
+                        if segment:
+                            chunks.append(segment)
+                    continue
+                for sent in sentences:
+                    if len(current) + len(sent) > chunk_chars and current.strip():
+                        chunks.append(current.strip())
+                        current = current[-overlap_chars:] if overlap_chars else ""
+                    current += sent
+            elif len(current) + len(para) + 1 > chunk_chars:
+                if current.strip():
+                    chunks.append(current.strip())
+                current = current[-overlap_chars:] + "\n" + para if overlap_chars else para
+            else:
+                current += "\n" + para if current else para
+
+        if current.strip():
+            chunks.append(current.strip())
+
+        # 构建标准 chunk 结构
+        result = []
+        for i, segment in enumerate(chunks):
             chunk_id = hashlib.md5(
                 f"{source}_text_{i}_{segment[:50]}".encode()
             ).hexdigest()
-
-            chunks.append({
+            result.append({
                 "id": chunk_id,
                 "text_for_embedding": segment,
                 "display_text": segment,
                 "metadata": {
                     "source": source,
                     "dominant_speaker": "narrative",
-                    "start_pos": i,
-                    "end_pos": min(i + chunk_chars, len(text)),
+                    "chunk_index": i,
                 },
             })
 
-        return chunks
+        return result

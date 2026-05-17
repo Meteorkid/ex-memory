@@ -207,20 +207,57 @@ def _parse_mht(file_path: str, target_name: str) -> list[dict]:
     if not text_parts:
         return []
 
-    # 合并后尝试用 txt 格式解析
+    # 合并后直接用字符串解析，避免临时文件
     merged = "\n".join(text_parts)
-    import tempfile
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as tmp:
-        tmp.write(merged)
-        tmp_path = tmp.name
+    return _parse_merged_text(merged, target_name)
 
-    try:
-        fmt = detect_qq_format(tmp_path)
-        if fmt.startswith("qq_txt"):
-            return parse_qq_txt(tmp_path, target_name, fmt=fmt)
-        return []
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
+
+def _parse_merged_text(text: str, target_name: str) -> list[dict]:
+    """直接解析合并后的文本，不依赖临时文件。"""
+    # 尝试各格式的正则匹配
+    messages = []
+    current_msg = None
+
+    for line in text.splitlines():
+        line = line.rstrip()
+
+        # 尝试格式 C（名字+QQ号+时间戳）
+        m = _MSG_C.match(line)
+        if m:
+            if current_msg:
+                messages.append(current_msg)
+            sender, qq, timestamp = m.groups()
+            current_msg = {"timestamp": timestamp, "sender": sender.strip(), "qq": qq.strip(), "content": ""}
+            continue
+
+        # 尝试格式 A（时间戳+名字+QQ号）
+        m = _MSG_A.match(line)
+        if m:
+            if current_msg:
+                messages.append(current_msg)
+            timestamp, sender, qq = m.groups()
+            current_msg = {"timestamp": timestamp, "sender": sender.strip(), "qq": qq.strip(), "content": ""}
+            continue
+
+        # 尝试格式 B（时间戳+名字）
+        m = _MSG_B.match(line)
+        if m:
+            if current_msg:
+                messages.append(current_msg)
+            timestamp, sender = m.groups()
+            current_msg = {"timestamp": timestamp, "sender": sender.strip(), "content": ""}
+            continue
+
+        # 消息内容行
+        if current_msg and line.strip():
+            if current_msg["content"]:
+                current_msg["content"] += "\n"
+            current_msg["content"] += line
+
+    if current_msg:
+        messages.append(current_msg)
+
+    return _normalize(messages, target_name)
 
 
 def _normalize(messages: list[dict], target_name: str) -> list[dict]:

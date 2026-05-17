@@ -1731,6 +1731,115 @@ button:focus-visible,
     background: rgba(255,255,255,0.08);
 }
 
+/* ── Action Sheet ── */
+.action-sheet-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    animation: fade-in 0.2s ease;
+}
+
+.action-sheet {
+    width: 100%;
+    max-width: 400px;
+    padding: 0 8px 20px;
+    animation: slide-up 0.25s ease;
+}
+
+.action-sheet-options {
+    background: var(--bg-elevated);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.action-sheet-option {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    border: none;
+    background: none;
+    font-size: 17px;
+    color: var(--text-primary);
+    text-align: center;
+    cursor: pointer;
+    border-bottom: 1px solid var(--separator);
+}
+.action-sheet-option:last-child { border-bottom: none; }
+.action-sheet-option.danger { color: var(--red); }
+
+.action-sheet-cancel {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    border: none;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-lg);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+}
+
+/* ── 确认弹窗 ── */
+.confirm-dialog {
+    background: var(--bg-elevated);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin: auto 16px 40px;
+    max-width: 320px;
+    text-align: center;
+    animation: slide-up 0.25s ease;
+}
+
+.confirm-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.confirm-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.confirm-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    cursor: pointer;
+}
+.confirm-btn.cancel {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+.confirm-btn.danger {
+    background: var(--red);
+    color: #fff;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
 /* ── 暗色微光 ── */
 @media (prefers-color-scheme: dark) {
     .skeleton-avatar, .skeleton-line {

@@ -15,7 +15,7 @@ from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
 from server.middleware import require_auth, _get_client_ip
 from server.models import (
-    CreateRequest, ChatRequest, UpdateRequest,
+    CreateRequest, ResumeRequest, ChatRequest, UpdateRequest,
     BackupRequest, RollbackRequest, DeleteRequest,
     ExeInfo, ChatResponse, StatusResponse, ErrorResponse, AuthRequest, LogoutRequest,
     TransferRequest, TransferConfirmRequest,
@@ -168,6 +168,21 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     return StatusResponse(message=f"镜像 [{slug}] 创建成功")
+
+
+@router.post("/exes/{slug}/resume", response_model=StatusResponse)
+def resume_exe(slug: str, req: ResumeRequest, user_id: int = Depends(require_auth)):
+    """从上次失败步骤恢复创建。"""
+    try:
+        slug = validate_slug(slug)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from pipeline.orchestrator import run_create_flow_api
+    result = run_create_flow_api(slug=slug, name=req.name, answers=[], resume=True)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+    return StatusResponse(message=f"镜像 [{slug}] 恢复创建成功")
 
 
 @router.delete("/exes/{slug}", response_model=StatusResponse)

@@ -11,6 +11,10 @@ class CreateRequest(BaseModel):
     slug: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_一-鿿]+$")
     answers: list[str] = Field(default_factory=list, description="intake 三问回答")
 
+class ResumeRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64, description="前任名字")
+    slug: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_一-鿿]+$")
+
 class ChatRequest(BaseModel):
     slug: str = Field(..., description="镜像名称")
     message: str = Field(..., min_length=1, max_length=8000)

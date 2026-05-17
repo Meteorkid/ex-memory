@@ -166,8 +166,31 @@ class ChatSession:
                 except Exception:
                     logger.debug("摘要写入向量库失败（非关键）")
 
+            # 同步更新 SKILL.md 的记忆段
+            self._update_skill_memory(summary)
+
         except Exception as e:
             logger.warning("生成会话摘要失败（已降级，原始归档完好）: %s", e)
+
+    def _update_skill_memory(self, new_summary: str):
+        """将新摘要追加到 SKILL.md 的 PART A 末尾。"""
+        from config import get_ex_dir
+        skill_path = get_ex_dir(self.slug) / "SKILL.md"
+        if not skill_path.exists():
+            return
+
+        try:
+            content = skill_path.read_text(encoding="utf-8")
+            # 在 PART A 的末尾追加摘要
+            marker = "---\n\n## PART B"
+            if marker in content:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+                addition = f"\n\n### 对话摘要 ({timestamp})\n{new_summary}\n"
+                content = content.replace(marker, addition + marker)
+                skill_path.write_text(content, encoding="utf-8")
+                logger.info("SKILL.md 已同步最新摘要")
+        except Exception as e:
+            logger.debug("更新 SKILL.md 摘要失败（非关键）: %s", e)
 
     def _chat(self, user_msg: str):
         try:
