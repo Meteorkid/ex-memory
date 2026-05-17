@@ -24,7 +24,7 @@ function showToast(message, type = 'info', duration = 3000) {
     const icons = { success: '✓', error: '✗', info: 'ℹ', warning: '⚠' };
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span>${message}</span>`;
+    toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span>${escHtml(String(message))}</span>`;
     container.appendChild(toast);
 
     setTimeout(() => {
@@ -64,6 +64,76 @@ if (!navigator.onLine) {
 
 // ── 快捷引用 ──
 const $ = id => document.getElementById(id);
+
+function authHeaders(json = true) {
+    const h = {};
+    if (json) h['Content-Type'] = 'application/json';
+    if (token) h['Authorization'] = `Bearer ${token}`;
+    return h;
+}
+
+function safeStickerUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('/static/')) return url;
+    return '';
+}
+
+async function parseChatStream(res, msgsEl) {
+    if (res.status === 401) { logout(); return null; }
+    if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        const detail = d.detail;
+        const msg = typeof detail === 'string' ? detail : '请求失败';
+        throw new Error(msg);
+    }
+
+    const replyRow = chatBubble('assistant', '');
+    msgsEl.appendChild(replyRow);
+    const assistantDiv = replyRow.querySelector('.msg');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, {stream: true});
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const d = line.slice(6);
+            if (d === '[DONE]') continue;
+            try {
+                const item = JSON.parse(d);
+                if (item.error) {
+                    assistantDiv.textContent = item.error;
+                    replyRow.className = 'msg-row sys';
+                } else if (item.type === 'text' && item.content) {
+                    assistantDiv.textContent += item.content;
+                } else if (item.type === 'sticker' && item.id) {
+                    msgsEl.appendChild(stickerMsg(item.id));
+                } else if (item.type === 'red_packet') {
+                    msgsEl.appendChild(redPacketBubble(item));
+                } else if (item.type === 'transfer') {
+                    msgsEl.appendChild(transferBubble(item));
+                }
+            } catch (e) { /* skip malformed SSE */ }
+        }
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+
+    if (!assistantDiv.textContent.trim() && replyRow.parentNode) {
+        replyRow.remove();
+        return null;
+    }
+    if (currentSlug) {
+        storeLastMessage(currentSlug, assistantDiv.textContent.trim());
+    }
+    return assistantDiv;
+}
 
 // ── 主题管理 ──
 function initTheme() {
@@ -306,6 +376,7 @@ async function doLogin() {
         if (res.ok) {
             token = data.token;
             localStorage.setItem('ex-memory-token', token);
+            localStorage.setItem('ex-memory-username', u);
             showMain();
         } else { err.textContent = data.detail || '登录失败'; }
     } catch(e) { err.textContent = '网络错误'; }
@@ -338,6 +409,7 @@ async function doRegister() {
         if (loginRes.ok) {
             token = loginData.token;
             localStorage.setItem('ex-memory-token', token);
+            localStorage.setItem('ex-memory-username', u);
             showMain();
         } else { err.textContent = '注册成功但自动登录失败'; showLoginForm(); }
     } catch(e) { err.textContent = '网络错误'; }
@@ -733,9 +805,10 @@ function renderStickerGrid() {
     }
     grid.innerHTML = filtered.map(s => {
         if (s.type === 'emoji') {
-            return `<div class="sticker-item" data-id="${s.id}" data-type="emoji" title="${s.label}">${s.emoji}</div>`;
+            return `<div class="sticker-item" data-id="${escHtml(s.id)}" data-type="emoji" title="${escHtml(s.label)}">${s.emoji || ''}</div>`;
         }
-        return `<div class="sticker-item" data-id="${s.id}" data-type="${s.type}" title="${s.label}"><img src="${s.url}" alt="${s.label}" class="sticker-thumb" loading="lazy"></div>`;
+        const url = safeStickerUrl(s.url);
+        return `<div class="sticker-item" data-id="${escHtml(s.id)}" data-type="${escHtml(s.type)}" title="${escHtml(s.label)}"><img src="${escHtml(url)}" alt="${escHtml(s.label)}" class="sticker-thumb" loading="lazy"></div>`;
     }).join('');
 
     grid.querySelectorAll('.sticker-item').forEach(item => {
@@ -766,9 +839,10 @@ async function sendStickerMessage(stickerId) {
     const userBubble = document.createElement('div');
     userBubble.className = 'msg sticker';
     if (sticker && sticker.type === 'emoji') {
-        userBubble.innerHTML = `<span class="sticker-img" style="font-size:60px;line-height:1.2;display:block;">${sticker.emoji}</span>`;
+        userBubble.innerHTML = `<span class="sticker-img" style="font-size:60px;line-height:1.2;display:block;">${sticker.emoji || ''}</span>`;
     } else if (sticker && (sticker.type === 'image' || sticker.type === 'gif')) {
-        userBubble.innerHTML = `<img src="${sticker.url}" alt="${sticker.label}" class="sticker-bubble-img">`;
+        const url = safeStickerUrl(sticker.url);
+        userBubble.innerHTML = `<img src="${escHtml(url)}" alt="${escHtml(sticker.label)}" class="sticker-bubble-img">`;
     } else {
         userBubble.textContent = `[贴纸]`;
     }
@@ -784,14 +858,13 @@ async function sendStickerMessage(stickerId) {
 
     const hist = buildHistory(msgsEl);
     try {
-        const resp = await fetch('/api/chat/stream', {
+        const resp = await fetch(`${API}/chat/stream`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeaders() },
-            body: JSON.stringify({ slug: currentSlug, message: '', sticker_id: stickerId, history: hist }),
+            headers: authHeaders(),
+            body: JSON.stringify({ slug: currentSlug, message: '', sticker_id: stickerId, history: hist.slice(-50) }),
         });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         typingRow.remove();
-        await handleStreamResponse(resp, msgsEl);
+        await parseChatStream(resp, msgsEl);
     } catch(e) {
         typingRow.remove();
         msgsEl.appendChild(chatBubble('assistant', '消息发送失败，请重试'));
@@ -814,7 +887,7 @@ $('sticker-file-input').addEventListener('change', async (e) => {
     try {
         const resp = await fetch('/api/stickers/upload', {
             method: 'POST',
-            headers: authHeaders(),
+            headers: authHeaders(false),
             body: formData,
         });
         if (!resp.ok) {
@@ -878,64 +951,14 @@ async function sendMessage() {
     const hist = buildHistory(msgsEl);
 
     try {
-        const headers = {'Content-Type': 'application/json'};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
         const res = await fetch(`${API}/chat/stream`, {
-            method: 'POST', headers,
+            method: 'POST',
+            headers: authHeaders(),
             body: JSON.stringify({slug: currentSlug, message: msg, history: hist.slice(-50)}),
         });
 
-        if (res.status === 401) { logout(); return; }
-        if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.detail || '请求失败'); }
-
-        // 移除打字指示器
         typingRow.remove();
-
-        const replyRow = chatBubble('assistant', '');
-        msgsEl.appendChild(replyRow);
-        const assistantDiv = replyRow.querySelector('.msg');
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, {stream: true});
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const d = line.slice(6);
-                if (d === '[DONE]') continue;
-                try {
-                    const item = JSON.parse(d);
-                    if (item.error) {
-                        assistantDiv.textContent = item.error;
-                        replyRow.className = 'msg-row sys';
-                    } else if (item.type === 'text' && item.content) {
-                        assistantDiv.textContent += item.content;
-                    } else if (item.type === 'sticker' && item.id) {
-                        msgsEl.appendChild(stickerMsg(item.id));
-                    } else if (item.type === 'red_packet') {
-                        msgsEl.appendChild(redPacketBubble(item));
-                    } else if (item.type === 'transfer') {
-                        msgsEl.appendChild(transferBubble(item));
-                    }
-                } catch(e) {}
-            }
-            msgsEl.scrollTop = msgsEl.scrollHeight;
-        }
-
-        // 清除空回复
-        if (!assistantDiv.textContent.trim() && replyRow.parentNode) {
-            replyRow.remove();
-        } else {
-            storeLastMessage(currentSlug, assistantDiv.textContent.trim());
-        }
+        await parseChatStream(res, msgsEl);
     } catch(e) {
         typingRow.remove();
         msgsEl.appendChild(sysMsg(e.message));
@@ -1041,7 +1064,8 @@ function stickerMsg(stickerId) {
     div.className = 'msg sticker';
     const sticker = allStickers.find(s => s.id === stickerId);
     if (sticker && (sticker.type === 'image' || sticker.type === 'gif')) {
-        div.innerHTML = `<img src="${sticker.url}" alt="${sticker.label}" class="sticker-bubble-img">`;
+        const url = safeStickerUrl(sticker.url);
+        div.innerHTML = `<img src="${escHtml(url)}" alt="${escHtml(sticker.label)}" class="sticker-bubble-img">`;
     } else {
         const emojiMap = {};
         allStickers.forEach(s => { if (s.emoji) emojiMap[s.id] = s.emoji; });

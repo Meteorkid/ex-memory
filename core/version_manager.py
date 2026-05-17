@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from config import get_ex_dir
+from core.path_safety import safe_version_name, resolve_under
 
 
 def backup(slug: str, version_name: str = "", include_chroma: bool = True) -> str:
@@ -27,8 +28,10 @@ def backup(slug: str, version_name: str = "", include_chroma: bool = True) -> st
 
     if not version_name:
         version_name = datetime.now().strftime("v%Y%m%d_%H%M%S")
+    else:
+        version_name = safe_version_name(version_name)
 
-    version_path = versions_dir / version_name
+    version_path = resolve_under(versions_dir, version_name)
     version_path.mkdir(parents=True, exist_ok=True)
 
     # 备份关键文件
@@ -62,7 +65,12 @@ def rollback(slug: str, version_name: str):
     回滚前自动创建安全备份，防止回滚出错后无法恢复。
     """
     ex_dir = get_ex_dir(slug)
-    version_path = ex_dir / "versions" / version_name
+    versions_dir = ex_dir / "versions"
+    try:
+        version_name = safe_version_name(version_name)
+        version_path = resolve_under(versions_dir, version_name)
+    except ValueError as e:
+        raise FileNotFoundError(str(e)) from e
 
     if not version_path.exists():
         raise FileNotFoundError(f"版本不存在: {version_name}")

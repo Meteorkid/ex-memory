@@ -23,7 +23,7 @@ class ChatRequest(BaseModel):
 
 class UpdateRequest(BaseModel):
     slug: str = Field(..., description="镜像名称")
-    content: str = Field(..., min_length=1, description="新素材内容")
+    content: str = Field(..., min_length=1, max_length=500000, description="新素材内容")
     source_type: str = Field(default="oral", pattern=r"^(wechat|oral|photo)$")
 
 class ReflectRequest(BaseModel):

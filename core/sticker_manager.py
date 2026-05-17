@@ -1,24 +1,29 @@
 """图片贴纸管理器：扫描内置/自定义贴纸、上传、删除。"""
 
 import json
+import re
+import threading
 import uuid
 import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
+from core.path_safety import resolve_under, safe_filename
+
 logger = logging.getLogger("ex-memory")
 
-# 贴纸根目录（相对于项目根）
 STICKERS_DIR = Path(__file__).parent.parent / "web" / "static" / "stickers"
 BUILTIN_DIR = STICKERS_DIR / "builtin"
-CUSTOM_DIR = STICKERS_DIR / "custom"
-CUSTOM_META = CUSTOM_DIR / "custom.json"
+CUSTOM_BASE = STICKERS_DIR / "custom"
 
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
+MAX_LABEL_LEN = 32
+_LABEL_RE = re.compile(r"^[\w\u4e00-\u9fff\- ]{1,32}$")
 
-# 内置贴纸分类映射（目录名 → 情绪类别）
+_meta_lock = threading.Lock()
+
 BUILTIN_CATEGORIES = {
     "happy": "happy",
     "sad": "sad",
@@ -29,28 +34,42 @@ BUILTIN_CATEGORIES = {
 }
 
 
-def _load_custom_meta() -> list[dict]:
-    """读取自定义贴纸元数据。"""
-    if not CUSTOM_META.exists():
+def _custom_dir(user_id: Optional[int] = None) -> Path:
+    if user_id is None:
+        return CUSTOM_BASE / "_legacy"
+    return CUSTOM_BASE / f"u{user_id}"
+
+
+def _custom_meta_path(user_id: Optional[int] = None) -> Path:
+    return _custom_dir(user_id) / "custom.json"
+
+
+def _sanitize_label(label: str, fallback: str = "") -> str:
+    label = (label or fallback or "贴纸").strip()[:MAX_LABEL_LEN]
+    if not _LABEL_RE.match(label):
+        raise ValueError("贴纸标签仅允许中英文、数字、空格与连字符")
+    return label
+
+
+def _load_custom_meta(user_id: Optional[int] = None) -> list[dict]:
+    path = _custom_meta_path(user_id)
+    if not path.exists():
         return []
     try:
-        return json.loads(CUSTOM_META.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
         logger.warning("读取 custom.json 失败: %s", e)
         return []
 
 
-def _save_custom_meta(items: list[dict]):
-    """写入自定义贴纸元数据。"""
-    CUSTOM_DIR.mkdir(parents=True, exist_ok=True)
-    CUSTOM_META.write_text(
-        json.dumps(items, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+def _save_custom_meta(items: list[dict], user_id: Optional[int] = None):
+    d = _custom_dir(user_id)
+    d.mkdir(parents=True, exist_ok=True)
+    path = _custom_meta_path(user_id)
+    path.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _scan_builtin() -> list[dict]:
-    """扫描 builtin/ 目录下的图片/GIF 文件。"""
     result = []
     if not BUILTIN_DIR.exists():
         return result
@@ -73,29 +92,45 @@ def _scan_builtin() -> list[dict]:
     return result
 
 
-def _scan_custom() -> list[dict]:
-    """扫描自定义贴纸（元数据 + 文件校验）。"""
-    items = _load_custom_meta()
+def _scan_custom(user_id: Optional[int] = None) -> list[dict]:
+    items = _load_custom_meta(user_id)
+    custom_dir = _custom_dir(user_id)
     result = []
     for item in items:
-        filepath = CUSTOM_DIR / item.get("filename", "")
+        try:
+            filepath = resolve_under(custom_dir, item.get("filename", ""))
+        except ValueError:
+            continue
         if not filepath.exists():
             continue
         sticker_type = "gif" if filepath.suffix.lower() == ".gif" else "image"
         result.append({
             "id": item["id"],
             "type": sticker_type,
-            "url": f"/static/stickers/custom/{item['filename']}",
+            "url": f"/static/stickers/custom/{custom_dir.name}/{item['filename']}",
             "label": item.get("label", ""),
             "category": item.get("category", "custom"),
             "source": "custom",
+            "owner_user_id": item.get("owner_user_id"),
         })
     return result
 
 
-def list_stickers(category: str = "all") -> list[dict]:
-    """返回所有图片贴纸（builtin + custom），支持按分类过滤。"""
-    all_stickers = _scan_builtin() + _scan_custom()
+def list_stickers(category: str = "all", user_id: Optional[int] = None) -> list[dict]:
+    """返回 builtin + 当前用户自定义贴纸。"""
+    all_stickers = _scan_builtin()
+    if user_id is not None:
+        all_stickers += _scan_custom(user_id)
+    else:
+        if CUSTOM_BASE.exists():
+            for user_dir in CUSTOM_BASE.iterdir():
+                if user_dir.is_dir() and user_dir.name.startswith("u"):
+                    try:
+                        uid = int(user_dir.name[1:])
+                        all_stickers += _scan_custom(uid)
+                    except ValueError:
+                        pass
+            all_stickers += _scan_custom(None)
     if category == "all":
         return all_stickers
     if category == "custom":
@@ -103,91 +138,83 @@ def list_stickers(category: str = "all") -> list[dict]:
     return [s for s in all_stickers if s["category"] == category]
 
 
-def get_sticker(sticker_id: str) -> Optional[dict]:
-    """按 ID 获取单个贴纸。"""
-    for s in list_stickers():
+def get_sticker(sticker_id: str, user_id: Optional[int] = None) -> Optional[dict]:
+    for s in list_stickers("all", user_id=user_id):
         if s["id"] == sticker_id:
             return s
     return None
 
 
-def upload_sticker(file_content: bytes, filename: str, label: str, category: str) -> dict:
-    """上传自定义贴纸。
-
-    Args:
-        file_content: 文件二进制内容
-        filename: 原始文件名
-        label: 贴纸标签
-        category: 情绪分类
-
-    Returns:
-        新贴纸信息 dict
-
-    Raises:
-        ValueError: 文件类型/大小不合法
-    """
+def upload_sticker(
+    file_content: bytes,
+    filename: str,
+    label: str,
+    category: str,
+    user_id: int,
+) -> dict:
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise ValueError(f"不支持的文件类型: {ext}，允许: {', '.join(ALLOWED_EXTENSIONS)}")
     if len(file_content) > MAX_FILE_SIZE:
         raise ValueError(f"文件过大，最大 {MAX_FILE_SIZE // 1024 // 1024}MB")
 
-    CUSTOM_DIR.mkdir(parents=True, exist_ok=True)
+    label = _sanitize_label(label, Path(filename).stem)
+    custom_dir = _custom_dir(user_id)
+    custom_dir.mkdir(parents=True, exist_ok=True)
 
     sticker_id = f"custom_{uuid.uuid4().hex[:12]}"
     save_name = f"{sticker_id}{ext}"
-    save_path = CUSTOM_DIR / save_name
-
+    save_path = custom_dir / save_name
     save_path.write_bytes(file_content)
 
     meta = {
         "id": sticker_id,
         "filename": save_name,
-        "label": label or Path(filename).stem,
+        "label": label,
         "category": category or "custom",
         "created_at": datetime.now().isoformat(),
+        "owner_user_id": user_id,
     }
 
-    items = _load_custom_meta()
-    items.append(meta)
-    _save_custom_meta(items)
+    with _meta_lock:
+        items = _load_custom_meta(user_id)
+        items.append(meta)
+        _save_custom_meta(items, user_id)
 
     sticker_type = "gif" if ext == ".gif" else "image"
     return {
         "id": sticker_id,
         "type": sticker_type,
-        "url": f"/static/stickers/custom/{save_name}",
+        "url": f"/static/stickers/custom/{custom_dir.name}/{save_name}",
         "label": meta["label"],
         "category": meta["category"],
         "source": "custom",
     }
 
 
-def delete_sticker(sticker_id: str) -> bool:
-    """删除自定义贴纸。builtin 贴纸不可删除。
-
-    Returns:
-        True 删除成功，False 未找到或为 builtin
-    """
+def delete_sticker(sticker_id: str, user_id: int) -> bool:
     if sticker_id.startswith("builtin_"):
         return False
 
-    items = _load_custom_meta()
-    target = None
-    for item in items:
-        if item["id"] == sticker_id:
-            target = item
-            break
+    with _meta_lock:
+        items = _load_custom_meta(user_id)
+        target = None
+        for item in items:
+            if item["id"] == sticker_id:
+                target = item
+                break
+        if not target:
+            return False
+        if target.get("owner_user_id") not in (None, user_id):
+            return False
 
-    if not target:
-        return False
+        try:
+            filepath = resolve_under(_custom_dir(user_id), target["filename"])
+        except ValueError:
+            return False
+        if filepath.exists():
+            filepath.unlink()
 
-    # 删除文件
-    filepath = CUSTOM_DIR / target["filename"]
-    if filepath.exists():
-        filepath.unlink()
-
-    # 更新元数据
-    items = [i for i in items if i["id"] != sticker_id]
-    _save_custom_meta(items)
+        items = [i for i in items if i["id"] != sticker_id]
+        _save_custom_meta(items, user_id)
     return True

@@ -10,7 +10,7 @@ from config import (
     RAG_THRESHOLD, LLM_MAX_CONTEXT_CHARS,
 )
 from core.retry import retry_api
-from core.validation import estimate_tokens
+from core.validation import estimate_tokens, sanitize_chat_history
 from core.sticker_selector import select_stickers, IMAGE_STICKERS
 
 logger = logging.getLogger("ex-memory")
@@ -65,49 +65,44 @@ class ChatEngine:
         logger.info("已连接 %s 的数字镜像 (model=%s)", self.slug, self.model)
 
     def _build_system_prompt(self, rag_results: Optional[list[dict]] = None) -> str:
-        parts = [self.skill_content]
-
-        if self.session_summaries:
-            parts.append("\n---\n## 最近对话记忆\n")
-            for i, summary in enumerate(self.session_summaries, 1):
-                parts.append(f"### 第 {i} 次\n{summary}\n")
-
-        if self.corrections.strip():
-            parts.append(f"\n---\n## 用户纠正记录（优先级最高）\n{self.corrections}\n")
-
-        if rag_results:
-            filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
-            if filtered:
-                parts.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
-                parts.append("以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n")
-                for r in filtered:
-                    parts.append(f"- {r.get('display_text', '')}")
-                parts.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
-
-        prompt = "\n".join(parts)
-
-        # 附加图片贴纸使用说明
         sticker_list = ", ".join(f"{sid}({s['label']})" for sid, s in IMAGE_STICKERS.items())
-        parts.append(f"\n---\n## 可用图片表情包\n你可以在回复中使用图片表情包来表达情绪。在回复文本末尾加上 [sticker:贴纸ID] 标记即可。\n可用贴纸：{sticker_list}\n示例：哈哈哈 [sticker:builtin_happy_laugh]\n")
 
-        prompt = "\n".join(parts)
+        # Token 预算：仅截断 session 摘要副本
+        summaries = list(self.session_summaries)
+        budget = int(LLM_MAX_CONTEXT_CHARS * 0.5)
 
-        # Token 预算控制（操作副本，不破坏 self.session_summaries）
-        tokens = estimate_tokens(prompt)
-        if tokens > LLM_MAX_CONTEXT_CHARS * 0.5:
-            logger.warning("System prompt 过大 (%d tokens)，截断 session 摘要", tokens)
-            summaries = list(self.session_summaries)
-            # 保留策略：首条（初始上下文）+ 最新的 N 条
-            while len(summaries) > 2 and estimate_tokens(prompt) > LLM_MAX_CONTEXT_CHARS * 0.5:
-                # 移除中间的旧摘要，保留首尾
+        def _assemble(sums: list[str]) -> str:
+            p = [self.skill_content]
+            if sums:
+                p.append("\n---\n## 最近对话记忆\n")
+                for i, summary in enumerate(sums, 1):
+                    p.append(f"### 第 {i} 次\n{summary}\n")
+            if self.corrections.strip():
+                p.append(f"\n---\n## 用户纠正记录（优先级最高）\n{self.corrections}\n")
+            if rag_results:
+                filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
+                if filtered:
+                    p.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
+                    p.append("以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n")
+                    for r in filtered:
+                        p.append(f"- {r.get('display_text', '')}")
+                    p.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
+            p.append(
+                f"\n---\n## 可用图片表情包\n你可以在回复中使用图片表情包来表达情绪。"
+                f"在回复文本末尾加上 [sticker:贴纸ID] 标记即可。\n可用贴纸：{sticker_list}\n"
+                f"示例：哈哈哈 [sticker:builtin_happy_laugh]\n"
+            )
+            return "\n".join(p)
+
+        while len(summaries) > 1 and estimate_tokens(_assemble(summaries)) > budget:
+            logger.warning("System prompt 过大，截断 session 摘要")
+            if len(summaries) > 2:
                 summaries.pop(1)
-                prompt = "\n".join([self.skill_content] + [
-                    f"\n---\n## 最近对话记忆\n" + "\n".join(
-                        f"### 第 {i} 次\n{s}" for i, s in enumerate(summaries, 1)
-                    )
-                ])
+            else:
+                summaries = summaries[-1:]
+                break
 
-        return prompt
+        return _assemble(summaries)
 
     def _is_rag_degraded(self) -> bool:
         """连续 3 次失败后进入降级模式。"""
@@ -161,14 +156,14 @@ class ChatEngine:
         rag_results = self._rag_search(user_input)
         system_prompt = self._build_system_prompt(rag_results)
         messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(history[-100:])
+        messages.extend(sanitize_chat_history(history))
         messages.append({"role": "user", "content": user_input})
         return messages
 
     @staticmethod
     def _extract_sticker_tags(text: str) -> tuple[str, list[str]]:
         """从回复文本中提取 [sticker:xxx] 标记，返回 (清理后文本, 贴纸ID列表)。"""
-        pattern = r'\[sticker:([\w]+)\]'
+        pattern = r'\[sticker:([a-zA-Z0-9_-]+)\]'
         sticker_ids = re.findall(pattern, text)
         clean_text = re.sub(pattern, '', text).strip()
         return clean_text, sticker_ids
@@ -177,13 +172,16 @@ class ChatEngine:
         messages = self._prepare_messages(user_input, history)
 
         response = self._call_api(messages)
-        reply = response.choices[0].message.content
-        # 提取 [sticker:xxx] 标记
+        reply = response.choices[0].message.content or ""
         reply, inline_stickers = self._extract_sticker_tags(reply)
         # 情绪分析选择的贴纸
         stickers = select_stickers(reply)
-        # 合并：内联贴纸优先
-        all_stickers = inline_stickers + stickers
+        seen = set()
+        all_stickers = []
+        for sid in inline_stickers + stickers:
+            if sid not in seen:
+                seen.add(sid)
+                all_stickers.append(sid)
         return reply, all_stickers, response.usage
 
     def chat_stream(self, user_input: str, history: list[dict]):
@@ -206,12 +204,13 @@ class ChatEngine:
                 full_reply += delta.content
                 yield {"type": "text", "content": delta.content}
 
-        # 提取 [sticker:xxx] 标记
-        _, inline_stickers = self._extract_sticker_tags(full_reply)
-        # 情绪分析选择的贴纸
-        stickers = select_stickers(full_reply)
-        # 合并：内联贴纸优先
+        clean_reply, inline_stickers = self._extract_sticker_tags(full_reply)
+        stickers = select_stickers(clean_reply)
+        seen = set()
         for sid in inline_stickers + stickers:
+            if sid in seen:
+                continue
+            seen.add(sid)
             yield {"type": "sticker", "id": sid}
 
         # 检测是否触发红包

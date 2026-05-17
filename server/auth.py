@@ -127,6 +127,10 @@ def register_user(username: str, password: str) -> Optional[str]:
             return "用户名已存在"
 
 
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 def login_user(username: str, password: str) -> Optional[str]:
     """验证登录，返回 token 或 None。"""
     with _get_conn() as conn:
@@ -147,7 +151,7 @@ def login_user(username: str, password: str) -> Optional[str]:
         expires = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() + TOKEN_EXPIRY_SECONDS))
         conn.execute(
             "INSERT INTO tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
-            (token, row["id"], expires),
+            (_token_hash(token), row["id"], expires),
         )
         conn.commit()
         return token
@@ -156,17 +160,24 @@ def login_user(username: str, password: str) -> Optional[str]:
 def validate_token(token: str) -> Optional[int]:
     """验证 token，返回 user_id 或 None。"""
     with _get_conn() as conn:
+        token_key = _token_hash(token)
         row = conn.execute(
             "SELECT user_id, expires_at FROM tokens WHERE token = ?",
-            (token,),
+            (token_key,),
         ).fetchone()
+
+        if not row:
+            row = conn.execute(
+                "SELECT user_id, expires_at FROM tokens WHERE token = ?",
+                (token,),
+            ).fetchone()
 
         if not row:
             return None
 
         expires = row["expires_at"]
         if expires and expires < time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()):
-            conn.execute("DELETE FROM tokens WHERE token = ?", (token,))
+            conn.execute("DELETE FROM tokens WHERE token IN (?, ?)", (token_key, token))
             conn.commit()
             return None
 
@@ -175,7 +186,10 @@ def validate_token(token: str) -> Optional[int]:
 
 def revoke_token(token: str):
     with _get_conn() as conn:
-        conn.execute("DELETE FROM tokens WHERE token = ?", (token,))
+        conn.execute(
+            "DELETE FROM tokens WHERE token IN (?, ?)",
+            (_token_hash(token), token),
+        )
         conn.commit()
 
 

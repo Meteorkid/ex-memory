@@ -47,10 +47,12 @@ def optional_auth(credentials: HTTPAuthorizationCredentials = Depends(security))
 
 
 def _get_client_ip(request: Request) -> str:
-    """获取客户端真实 IP，优先从 X-Forwarded-For 取。"""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """获取客户端 IP；仅在 TRUSTED_PROXY 时信任 X-Forwarded-For。"""
+    from config import TRUSTED_PROXY
+    if TRUSTED_PROXY:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     if request.client:
         return request.client.host
     return "unknown"

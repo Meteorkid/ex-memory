@@ -42,7 +42,7 @@ def cmd_chat(slug: str):
             return
 
         try:
-            reply, usage = session.engine.chat(user_msg, session.history)
+            reply, _stickers, usage = session.engine.chat(user_msg, session.history)
             print(f"\n{session.slug}: {reply}")
 
             session.counter.update(usage)

@@ -201,7 +201,7 @@ class ChatSession:
             return
 
         try:
-            reply, usage = self.engine.chat(user_msg, self.history)
+            reply, _stickers, usage = self.engine.chat(user_msg, self.history)
             print(f"\n{self.slug}: {reply}")
 
             self.counter.update(usage)

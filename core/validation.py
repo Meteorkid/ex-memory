@@ -52,6 +52,30 @@ def validate_slug(slug: str) -> str:
     return slug
 
 
+MAX_HISTORY_CONTENT = 4000
+
+
+def sanitize_chat_history(history: list[dict], max_turns: int = MAX_HISTORY_TURNS) -> list[dict]:
+    """仅保留 user/assistant 消息，并限制内容与条数。"""
+    cleaned: list[dict] = []
+    for item in history or []:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        content = item.get("content")
+        if content is None:
+            continue
+        content = str(content).strip()
+        if not content:
+            continue
+        if len(content) > MAX_HISTORY_CONTENT:
+            content = content[:MAX_HISTORY_CONTENT]
+        cleaned.append({"role": role, "content": content})
+    return cleaned[-max_turns:]
+
+
 def estimate_tokens(text: str) -> int:
     """粗略估算 token 数（中文 ~1.5 字/token，英文 ~0.75 词/token）。"""
     chinese_chars = len(re.findall(r"[一-鿿]", text))

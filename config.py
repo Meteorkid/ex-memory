@@ -60,6 +60,11 @@ CHUNK_OVERLAP = 1
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_DIR = PROJECT_DIR / "logs"
 
+# 部署模式
+SINGLE_USER_MODE = os.getenv("SINGLE_USER_MODE", "false").lower() in ("1", "true", "yes")
+DISABLE_REGISTRATION = os.getenv("DISABLE_REGISTRATION", "false").lower() in ("1", "true", "yes")
+TRUSTED_PROXY = os.getenv("TRUSTED_PROXY", "false").lower() in ("1", "true", "yes")
+
 # 隐私确认标记
 _privacy_confirmed = False
 

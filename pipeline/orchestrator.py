@@ -292,7 +292,13 @@ def _import_oral(ex_dir: Path, slug: str, name: str, vector_store, embedder, chu
         print(f"  入库完成：{vector_store.count()} 条记录")
 
 
-def run_create_flow_api(slug: str, name: str, answers: list[str], resume: bool = False) -> dict:
+def run_create_flow_api(
+    slug: str,
+    name: str,
+    answers: list[str],
+    resume: bool = False,
+    owner_user_id=None,
+) -> dict:
     """API 版创建流程：接收参数而非交互式输入，返回结果字典。
 
     resume: 为 True 时从上次失败步骤继续（需已有 meta.json）
@@ -331,6 +337,8 @@ def run_create_flow_api(slug: str, name: str, answers: list[str], resume: bool =
                 },
                 "pipeline_state": "intake_done",
             }
+            if owner_user_id is not None:
+                meta["owner_user_id"] = owner_user_id
             atomic_write_json(ex_dir / "meta.json", meta)
 
             # 事前备份

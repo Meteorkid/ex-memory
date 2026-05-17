@@ -18,7 +18,8 @@ def make_app():
 
 
 class TestGetClientIP:
-    def test_x_forwarded_for(self):
+    def test_x_forwarded_for(self, monkeypatch):
+        monkeypatch.setattr("config.TRUSTED_PROXY", True)
         from server.middleware import _get_client_ip
         from fastapi import Request as FR
 

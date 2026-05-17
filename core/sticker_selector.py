@@ -47,30 +47,32 @@ STICKERS = {
     "xin":        {"emoji": "💕", "label": "心心", "emotion": "love"},
 }
 
-# ── 图片贴纸映射（builtin 资源）──
+# ── 图片贴纸映射（与 sticker_manager 扫描 ID 一致）──
 
-IMAGE_STICKERS = {
-    "builtin_happy_smile":      {"label": "微笑", "emotion": "happy", "type": "image"},
-    "builtin_happy_laugh":      {"label": "大笑", "emotion": "happy", "type": "image"},
-    "builtin_happy_celebrate":  {"label": "庆祝", "emotion": "happy", "type": "image"},
-    "builtin_happy_thumbsup":   {"label": "点赞", "emotion": "happy", "type": "image"},
-    "builtin_sad_cry":          {"label": "大哭", "emotion": "sad", "type": "image"},
-    "builtin_sad_sad":          {"label": "难过", "emotion": "sad", "type": "image"},
-    "builtin_sad_tear":         {"label": "流泪", "emotion": "sad", "type": "image"},
-    "builtin_angry_angry":      {"label": "生气", "emotion": "angry", "type": "image"},
-    "builtin_angry_rage":       {"label": "暴怒", "emotion": "angry", "type": "image"},
-    "builtin_angry_hmph":       {"label": "哼", "emotion": "angry", "type": "image"},
-    "builtin_cute_heart_eyes":  {"label": "爱心眼", "emotion": "cute", "type": "image"},
-    "builtin_cute_blush":       {"label": "害羞", "emotion": "cute", "type": "image"},
-    "builtin_cute_wink":        {"label": "眨眼", "emotion": "cute", "type": "image"},
-    "builtin_cute_puppy_eyes":  {"label": "卖萌", "emotion": "cute", "type": "image"},
-    "builtin_playful_tongue":   {"label": "吐舌", "emotion": "playful", "type": "image"},
-    "builtin_playful_smirk":    {"label": "坏笑", "emotion": "playful", "type": "image"},
-    "builtin_playful_silly":    {"label": "搞怪", "emotion": "playful", "type": "image"},
-    "builtin_love_heart":       {"label": "爱心", "emotion": "love", "type": "image"},
-    "builtin_love_kiss":        {"label": "亲亲", "emotion": "love", "type": "image"},
-    "builtin_love_hug":         {"label": "抱抱", "emotion": "love", "type": "image"},
+_BUILTIN_LABELS = {
+    "smile": "微笑", "laugh": "大笑", "celebrate": "庆祝", "thumbsup": "点赞",
+    "cry": "大哭", "sad": "难过", "tear": "流泪",
+    "angry": "生气", "rage": "暴怒", "hmph": "哼",
+    "heart-eyes": "爱心眼", "blush": "害羞", "wink": "眨眼", "puppy-eyes": "卖萌",
+    "tongue": "吐舌", "smirk": "坏笑", "silly": "搞怪",
+    "heart": "爱心", "kiss": "亲亲", "hug": "抱抱",
 }
+
+
+def _build_image_stickers() -> dict:
+    from core.sticker_manager import _scan_builtin
+    result = {}
+    for s in _scan_builtin():
+        stem = s["id"].split("_", 2)[-1] if s["id"].startswith("builtin_") else s.get("label", "")
+        result[s["id"]] = {
+            "label": _BUILTIN_LABELS.get(stem, stem.replace("-", " ")),
+            "emotion": s.get("category", "happy"),
+            "type": s.get("type", "image"),
+        }
+    return result
+
+
+IMAGE_STICKERS: dict = _build_image_stickers()
 
 # ── 情绪关键词映射 ──
 
@@ -170,20 +172,18 @@ def get_all_stickers() -> list[dict]:
 
 def get_image_sticker_info(sticker_id: str) -> Optional[dict]:
     """获取图片贴纸的详细信息（含 URL）。"""
-    if sticker_id not in IMAGE_STICKERS:
-        return None
-    info = IMAGE_STICKERS[sticker_id]
-    # 从 ID 推导 URL：builtin_happy_smile → /static/stickers/builtin/happy/smile.svg
-    parts = sticker_id.replace("builtin_", "").split("_", 1)
-    category = parts[0]
-    name = parts[1] if len(parts) > 1 else ""
-    return {
-        "id": sticker_id,
-        "type": info["type"],
-        "url": f"/static/stickers/builtin/{category}/{name}.svg",
-        "label": info["label"],
-        "category": info["emotion"],
-    }
+    from core.sticker_manager import get_sticker
+    sticker = get_sticker(sticker_id)
+    if sticker and sticker.get("source") == "builtin":
+        info = IMAGE_STICKERS.get(sticker_id, {})
+        return {
+            "id": sticker_id,
+            "type": sticker.get("type", info.get("type", "image")),
+            "url": sticker["url"],
+            "label": info.get("label", sticker.get("label", "")),
+            "category": info.get("emotion", sticker.get("category", "")),
+        }
+    return None
 
 
 def is_image_sticker(sticker_id: str) -> bool:
