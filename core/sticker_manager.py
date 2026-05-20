@@ -2,27 +2,25 @@
 
 import json
 import re
-import threading
 import uuid
 import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from core.path_safety import resolve_under, safe_filename
+from core.file_utils import atomic_write_json, locked_update_json
+from core.path_safety import resolve_under
 
 logger = logging.getLogger("ex-memory")
 
 STICKERS_DIR = Path(__file__).parent.parent / "web" / "static" / "stickers"
 BUILTIN_DIR = STICKERS_DIR / "builtin"
-CUSTOM_BASE = STICKERS_DIR / "custom"
+CUSTOM_BASE = Path(__file__).parent.parent / "data" / "stickers" / "custom"
 
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
 MAX_LABEL_LEN = 32
 _LABEL_RE = re.compile(r"^[\w\u4e00-\u9fff\- ]{1,32}$")
-
-_meta_lock = threading.Lock()
 
 BUILTIN_CATEGORIES = {
     "happy": "happy",
@@ -66,7 +64,7 @@ def _save_custom_meta(items: list[dict], user_id: Optional[int] = None):
     d = _custom_dir(user_id)
     d.mkdir(parents=True, exist_ok=True)
     path = _custom_meta_path(user_id)
-    path.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(path, items)
 
 
 def _scan_builtin() -> list[dict]:
@@ -107,7 +105,7 @@ def _scan_custom(user_id: Optional[int] = None) -> list[dict]:
         result.append({
             "id": item["id"],
             "type": sticker_type,
-            "url": f"/static/stickers/custom/{custom_dir.name}/{item['filename']}",
+            "url": f"/api/stickers/{item['id']}/content",
             "label": item.get("label", ""),
             "category": item.get("category", "custom"),
             "source": "custom",
@@ -176,16 +174,21 @@ def upload_sticker(
         "owner_user_id": user_id,
     }
 
-    with _meta_lock:
-        items = _load_custom_meta(user_id)
+    def update(items: list[dict]) -> dict:
         items.append(meta)
-        _save_custom_meta(items, user_id)
+        return dict(meta)
+
+    try:
+        locked_update_json(_custom_meta_path(user_id), list, update)
+    except Exception:
+        save_path.unlink(missing_ok=True)
+        raise
 
     sticker_type = "gif" if ext == ".gif" else "image"
     return {
         "id": sticker_id,
         "type": sticker_type,
-        "url": f"/static/stickers/custom/{custom_dir.name}/{save_name}",
+        "url": f"/api/stickers/{sticker_id}/content",
         "label": meta["label"],
         "category": meta["category"],
         "source": "custom",
@@ -196,8 +199,7 @@ def delete_sticker(sticker_id: str, user_id: int) -> bool:
     if sticker_id.startswith("builtin_"):
         return False
 
-    with _meta_lock:
-        items = _load_custom_meta(user_id)
+    def update(items: list[dict]) -> bool:
         target = None
         for item in items:
             if item["id"] == sticker_id:
@@ -215,6 +217,26 @@ def delete_sticker(sticker_id: str, user_id: int) -> bool:
         if filepath.exists():
             filepath.unlink()
 
-        items = [i for i in items if i["id"] != sticker_id]
-        _save_custom_meta(items, user_id)
-    return True
+        items[:] = [i for i in items if i["id"] != sticker_id]
+        return True
+
+    return bool(locked_update_json(_custom_meta_path(user_id), list, update))
+
+
+def get_custom_sticker_path(sticker_id: str, user_id: int) -> Optional[Path]:
+    """返回当前用户自定义贴纸文件路径。内置贴纸不走该接口。"""
+    if sticker_id.startswith("builtin_"):
+        return None
+
+    for item in _load_custom_meta(user_id):
+        if item.get("id") != sticker_id:
+            continue
+        if item.get("owner_user_id") not in (None, user_id):
+            return None
+        try:
+            filepath = resolve_under(_custom_dir(user_id), item["filename"])
+        except (KeyError, ValueError):
+            return None
+        if filepath.exists():
+            return filepath
+    return None

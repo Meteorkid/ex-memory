@@ -1,8 +1,6 @@
 """数据摄入工具：解析文件 → 切片 → 入库，消除 run.py 与 routes.py 中的重复逻辑。"""
 
 import logging
-from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger("ex-memory")
 

@@ -1,6 +1,5 @@
 """对话 history 清洗测试。"""
 
-import pytest
 from core.validation import sanitize_chat_history
 
 

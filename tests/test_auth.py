@@ -1,9 +1,7 @@
 """server/auth.py 测试：注册、登录、Token 验证、过期、吊销。"""
 
 import os
-import time
 import pytest
-from pathlib import Path
 
 # 隔离测试数据库
 os.environ["EX_MEMORY_TEST"] = "1"

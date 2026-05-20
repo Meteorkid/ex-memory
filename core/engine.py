@@ -3,7 +3,6 @@
 import re
 import logging
 from typing import Optional
-from pathlib import Path
 
 from config import (
     get_llm_config, get_llm_client, get_ex_dir, RECENT_SESSIONS, DEFAULT_TOP_K,

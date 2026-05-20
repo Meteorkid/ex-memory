@@ -1,7 +1,4 @@
 """QQ 解析器测试。"""
-import tempfile
-from pathlib import Path
-import pytest
 
 from parsers.qq_parser import parse, detect_qq_format, _normalize
 

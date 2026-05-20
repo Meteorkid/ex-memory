@@ -2,7 +2,6 @@
 
 import subprocess
 import logging
-import sys
 from typing import Optional
 
 logger = logging.getLogger("ex-memory")

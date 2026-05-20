@@ -4,6 +4,7 @@ import os
 import time
 import uuid
 import logging
+import threading
 from collections import defaultdict
 from fastapi import Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,30 +67,33 @@ class RateLimiter:
         self.window = window_seconds
         self._store: dict[str, list[float]] = defaultdict(list)
         self._last_cleanup = time.time()
+        self._lock = threading.Lock()
 
     async def __call__(self, request: Request, call_next):
         client_ip = _get_client_ip(request)
         now = time.time()
 
-        # 定期清理过期 IP 条目，防止 _store 无限增长
-        if now - self._last_cleanup > 300:  # 每 5 分钟
-            self._cleanup(now)
-            self._last_cleanup = now
+        with self._lock:
+            # 定期清理过期 IP 条目，防止 _store 无限增长
+            if now - self._last_cleanup > 300:  # 每 5 分钟
+                self._cleanup(now)
+                self._last_cleanup = now
 
-        # 清理该 IP 的过期记录
-        window_start = now - self.window
-        self._store[client_ip] = [
-            t for t in self._store[client_ip] if t > window_start
-        ]
+            # 清理该 IP 的过期记录
+            window_start = now - self.window
+            self._store[client_ip] = [
+                t for t in self._store[client_ip] if t > window_start
+            ]
 
-        if len(self._store[client_ip]) >= self.max_requests:
-            logger.warning("rate limit hit for %s", client_ip)
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "请求过于频繁，请稍后再试"},
-            )
+            if len(self._store[client_ip]) >= self.max_requests:
+                logger.warning("rate limit hit for %s", client_ip)
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "请求过于频繁，请稍后再试"},
+                )
 
-        self._store[client_ip].append(now)
+            self._store[client_ip].append(now)
+
         response = await call_next(request)
         return response
 
@@ -114,33 +118,35 @@ class LoginRateLimiter:
         self._user_store: dict[str, list[float]] = defaultdict(list)
         self._ip_store: dict[str, list[float]] = defaultdict(list)
         self._last_cleanup = time.time()
+        self._lock = threading.Lock()
 
     def check(self, username: str, client_ip: str) -> None:
         now = time.time()
-        if now - self._last_cleanup > 300:
-            self._cleanup(now)
-            self._last_cleanup = now
+        with self._lock:
+            if now - self._last_cleanup > 300:
+                self._cleanup(now)
+                self._last_cleanup = now
 
-        window_start = now - self.window
+            window_start = now - self.window
 
-        # 按用户名限流
-        self._user_store[username] = [
-            t for t in self._user_store[username] if t > window_start
-        ]
-        if len(self._user_store[username]) >= self.max_per_user:
-            logger.warning("login rate limit (user) hit for %s", username)
-            raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
+            # 按用户名限流
+            self._user_store[username] = [
+                t for t in self._user_store[username] if t > window_start
+            ]
+            if len(self._user_store[username]) >= self.max_per_user:
+                logger.warning("login rate limit (user) hit for %s", username)
+                raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
 
-        # 按 IP 限流
-        self._ip_store[client_ip] = [
-            t for t in self._ip_store[client_ip] if t > window_start
-        ]
-        if len(self._ip_store[client_ip]) >= self.max_per_ip:
-            logger.warning("login rate limit (IP) hit for %s", client_ip)
-            raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
+            # 按 IP 限流
+            self._ip_store[client_ip] = [
+                t for t in self._ip_store[client_ip] if t > window_start
+            ]
+            if len(self._ip_store[client_ip]) >= self.max_per_ip:
+                logger.warning("login rate limit (IP) hit for %s", client_ip)
+                raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
 
-        self._user_store[username].append(now)
-        self._ip_store[client_ip].append(now)
+            self._user_store[username].append(now)
+            self._ip_store[client_ip].append(now)
 
     def _cleanup(self, now: float):
         window_start = now - self.window
@@ -167,4 +173,20 @@ class RequestLoggingMiddleware:
             request_id, request.method, request.url.path, response.status_code, duration_ms,
         )
         response.headers["X-Request-ID"] = request_id
+        return response
+
+
+class SecurityHeadersMiddleware:
+    """为 API 和 Web 客户端补齐基础安全响应头。"""
+
+    async def __call__(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
+
+        if request.url.path.startswith("/api/"):
+            response.headers.setdefault("Cache-Control", "no-store")
+
         return response

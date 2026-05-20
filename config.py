@@ -1,7 +1,6 @@
 """全局配置：从 .env 加载，启动校验，隐私提示。"""
 
 import os
-import re
 import sys
 from pathlib import Path
 from dotenv import load_dotenv

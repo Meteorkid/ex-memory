@@ -1,6 +1,5 @@
 """纠正检测 — 测试。"""
 
-import pytest
 from pipeline.correction_handler import detect_correction
 
 

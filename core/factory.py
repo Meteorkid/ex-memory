@@ -1,6 +1,5 @@
 """统一工厂：VectorStore + Embedder + ChatEngine 初始化。"""
 
-from pathlib import Path
 from config import get_ex_dir, get_collection_name, get_embedding_config
 
 

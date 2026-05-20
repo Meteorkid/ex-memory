@@ -2,8 +2,6 @@
 
 import json
 import logging
-from pathlib import Path
-from datetime import datetime
 from config import get_ex_dir
 
 logger = logging.getLogger("ex-memory")

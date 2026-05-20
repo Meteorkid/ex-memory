@@ -31,7 +31,7 @@ services:
     container_name: ex-memory-web
     command: python -m web.app
     ports:
-      - "7860:7860"
+      - "127.0.0.1:7860:7860"
     environment:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com}

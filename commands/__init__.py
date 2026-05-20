@@ -13,7 +13,7 @@ def register(name: str, func: callable):
 
 
 # 导入所有命令模块以触发注册
-from commands import (
+from commands import (  # noqa: E402,F401
     create, list_cmd, help_cmd, update, reflect,
     backup, rollback, let_go, keychain, web,
 )

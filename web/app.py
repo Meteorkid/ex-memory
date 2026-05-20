@@ -260,9 +260,13 @@ def _dispatch_chat(message: str, history: list[list], use_stream: bool, session:
 def delete_exe(slug: str):
     if not slug.strip():
         return "请输入镜像名称"
+    try:
+        slug = validate_slug(slug.strip())
+    except ValueError as e:
+        return f"[错误] {e}"
     import shutil
     from config import get_ex_dir
-    ex_dir = get_ex_dir(slug.strip())
+    ex_dir = get_ex_dir(slug)
     if not ex_dir.exists():
         return f"镜像 [{slug}] 不存在"
     shutil.rmtree(ex_dir)
@@ -272,8 +276,12 @@ def delete_exe(slug: str):
 def backup_exe(slug: str):
     if not slug.strip():
         return "请输入镜像名称"
+    try:
+        slug = validate_slug(slug.strip())
+    except ValueError as e:
+        return f"[错误] {e}"
     from core.version_manager import backup
-    version = backup(slug.strip())
+    version = backup(slug)
     return f"备份成功: {version}"
 
 

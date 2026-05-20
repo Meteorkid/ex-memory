@@ -1,6 +1,5 @@
 """聊天记录切片器 — 测试。"""
 
-import pytest
 from memory.chunker import Chunker
 
 

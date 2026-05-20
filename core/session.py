@@ -3,6 +3,7 @@
 import logging
 import sys
 from datetime import datetime
+from pathlib import Path
 from prompt_toolkit import prompt as pt_prompt
 
 from config import get_ex_dir, ARCHIVE_THRESHOLD
@@ -114,9 +115,8 @@ class ChatSession:
         # 生成 LLM 语义摘要
         self._generate_summary(sessions_dir, timestamp)
 
-    def _generate_summary(self, sessions_dir: "Path", timestamp: str):
+    def _generate_summary(self, sessions_dir: Path, timestamp: str):
         """调用 LLM 生成会话语义摘要，用于下次启动时快速恢复上下文。"""
-        from pathlib import Path
         from config import get_llm_config, get_llm_client
 
         cfg = get_llm_config()

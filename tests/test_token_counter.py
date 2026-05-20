@@ -1,6 +1,5 @@
 """Token 计数器 — 测试。"""
 
-import pytest
 from core.token_counter import TokenCounter
 
 

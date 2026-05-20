@@ -1,7 +1,7 @@
 """调用 LLM 生成 persona.md（含 9 场景原话样本抽取）。"""
 
 from pathlib import Path
-from config import get_llm_config, get_llm_client, get_ex_dir
+from config import get_llm_config, get_llm_client
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 

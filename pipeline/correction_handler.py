@@ -1,6 +1,5 @@
 """对话纠正检测与处理：识别用户纠正，更新 memory/persona/SKILL。"""
 
-import json
 import re
 from datetime import datetime
 from pathlib import Path

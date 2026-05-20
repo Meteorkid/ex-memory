@@ -5,6 +5,11 @@ let token = localStorage.getItem('ex-memory-token') || '';
 let currentSlug = '';
 let currentName = '';
 let tabHistory = [];
+let isVoiceMode = false;
+let speechRecognition = null;
+
+// ── 快捷引用 ──
+const $ = id => document.getElementById(id);
 
 // ── Toast 通知系统 ──
 function ensureToastContainer() {
@@ -62,9 +67,6 @@ if (!navigator.onLine) {
     if (banner) banner.classList.add('visible');
 }
 
-// ── 快捷引用 ──
-const $ = id => document.getElementById(id);
-
 function authHeaders(json = true) {
     const h = {};
     if (json) h['Content-Type'] = 'application/json';
@@ -74,7 +76,7 @@ function authHeaders(json = true) {
 
 function safeStickerUrl(url) {
     if (!url || typeof url !== 'string') return '';
-    if (url.startsWith('/static/')) return url;
+    if (url.startsWith('/static/') || url.startsWith('/api/stickers/') || url.startsWith('blob:')) return url;
     return '';
 }
 
@@ -449,10 +451,13 @@ function logout() {
             body: JSON.stringify({token}),
         }).catch(()=>{});
     }
+    clearStickerObjectUrls();
     token = ''; currentSlug = ''; currentName = '';
     localStorage.removeItem('ex-memory-token');
     showAuth();
 }
+
+window.addEventListener('beforeunload', clearStickerObjectUrls);
 
 // ═══════════════════════════════════════
 // 移动端 Tab 导航
@@ -779,11 +784,38 @@ function enterChat(slug, name) {
 
 let allStickers = [];
 let stickerCategory = 'all';
+let stickerObjectUrls = new Map();
+
+function clearStickerObjectUrls() {
+    stickerObjectUrls.forEach(url => URL.revokeObjectURL(url));
+    stickerObjectUrls.clear();
+}
+
+async function hydratePrivateStickerUrls(stickers) {
+    await Promise.all(stickers.map(async s => {
+        if (s.source !== 'custom' || !s.url || !s.url.startsWith('/api/stickers/')) return;
+        if (stickerObjectUrls.has(s.id)) {
+            s.display_url = stickerObjectUrls.get(s.id);
+            return;
+        }
+        try {
+            const resp = await fetch(s.url, { headers: authHeaders(false) });
+            if (!resp.ok) return;
+            const blob = await resp.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            stickerObjectUrls.set(s.id, objectUrl);
+            s.display_url = objectUrl;
+        } catch(e) {
+            s.display_url = '';
+        }
+    }));
+}
 
 async function loadStickers() {
     try {
         const data = await api('GET', '/stickers');
         allStickers = data.stickers || [];
+        await hydratePrivateStickerUrls(allStickers);
         renderStickerGrid();
     } catch(e) { /* 静默失败 */ }
 }
@@ -807,7 +839,7 @@ function renderStickerGrid() {
         if (s.type === 'emoji') {
             return `<div class="sticker-item" data-id="${escHtml(s.id)}" data-type="emoji" title="${escHtml(s.label)}">${s.emoji || ''}</div>`;
         }
-        const url = safeStickerUrl(s.url);
+        const url = safeStickerUrl(s.display_url || s.url);
         return `<div class="sticker-item" data-id="${escHtml(s.id)}" data-type="${escHtml(s.type)}" title="${escHtml(s.label)}"><img src="${escHtml(url)}" alt="${escHtml(s.label)}" class="sticker-thumb" loading="lazy"></div>`;
     }).join('');
 
@@ -841,7 +873,7 @@ async function sendStickerMessage(stickerId) {
     if (sticker && sticker.type === 'emoji') {
         userBubble.innerHTML = `<span class="sticker-img" style="font-size:60px;line-height:1.2;display:block;">${sticker.emoji || ''}</span>`;
     } else if (sticker && (sticker.type === 'image' || sticker.type === 'gif')) {
-        const url = safeStickerUrl(sticker.url);
+        const url = safeStickerUrl(sticker.display_url || sticker.url);
         userBubble.innerHTML = `<img src="${escHtml(url)}" alt="${escHtml(sticker.label)}" class="sticker-bubble-img">`;
     } else {
         userBubble.textContent = `[贴纸]`;
@@ -1064,7 +1096,7 @@ function stickerMsg(stickerId) {
     div.className = 'msg sticker';
     const sticker = allStickers.find(s => s.id === stickerId);
     if (sticker && (sticker.type === 'image' || sticker.type === 'gif')) {
-        const url = safeStickerUrl(sticker.url);
+        const url = safeStickerUrl(sticker.display_url || sticker.url);
         div.innerHTML = `<img src="${escHtml(url)}" alt="${escHtml(sticker.label)}" class="sticker-bubble-img">`;
     } else {
         const emojiMap = {};
@@ -1483,9 +1515,6 @@ function escHtml(s) {
 // ═══════════════════════════════════════
 // 语音消息
 // ═══════════════════════════════════════
-
-let isVoiceMode = false;
-let speechRecognition = null;
 
 function initVoiceToggle() {
     // 检查浏览器是否支持 Web Speech API
