@@ -228,7 +228,9 @@ Web API 服务提供以下端点（`http://localhost:8000/api`）：
 |------|------|------|
 | GET | `/exes` | 列出所有镜像 |
 | POST | `/exes` | 创建镜像 |
-| DELETE | `/exes/{slug}` | 删除镜像 |
+| GET | `/exes/{slug}/export` | 导出镜像数据 zip |
+| DELETE | `/exes/{slug}` | 彻底删除镜像数据 |
+| GET | `/exes/{slug}/conversations/export?format=html` | 导出 ex-memory 对话记录（html/md/json/txt） |
 | POST | `/exes/{slug}/import` | 导入聊天记录（自动检测微信/QQ） |
 | POST | `/exes/{slug}/update` | 追加素材 |
 | POST | `/exes/{slug}/reflect` | 关系反思 |
@@ -254,6 +256,15 @@ Web API 服务提供以下端点（`http://localhost:8000/api`）：
 |------|------|------|
 | GET | `/exes/{slug}/moments` | 朋友圈动态 |
 
+### 本机微信导出
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/wechat-export/status` | 查看本机微信导出环境 |
+| GET | `/wechat-export/backups` | 扫描固定 iTunes/iOS 备份目录 |
+| POST | `/wechat-export/tasks` | 创建 WechatExporter 后台导出任务 |
+| GET | `/wechat-export/tasks/{task_id}` | 查询导出任务状态 |
+| GET | `/wechat-export/tasks/{task_id}/files/{path}` | 下载任务输出文件 |
+
 ## 配置说明
 
 通过 `.env` 文件配置，支持以下变量：
@@ -267,6 +278,10 @@ Web API 服务提供以下端点（`http://localhost:8000/api`）：
 | `EMBEDDING_API_KEY` | 否 | Embedding API Key | — |
 | `EMBEDDING_BASE_URL` | 否 | Embedding 端点 | `https://api.siliconflow.cn/v1` |
 | `EMBEDDING_MODEL` | 否 | Embedding 模型 | `BAAI/bge-m3` |
+| `WECHAT_EXPORTER_BIN` | 否 | 外部 WechatExporter 二进制路径，用于 `/export-wechat` | — |
+| `LOCAL_WECHAT_EXPORT_ENABLED` | 否 | 启用网页本机微信导出向导 | `false` |
+| `WECHAT_EXPORT_BACKUP_ROOT` | 否 | iTunes/iOS 备份扫描根目录 | `~/Library/Application Support/MobileSync/Backup` |
+| `WECHAT_EXPORT_OUTPUT_DIR` | 否 | 微信导出任务输出目录 | `data/wechat_exports` |
 
 未配置 Embedding 时 RAG 检索不可用，但对话仍可正常进行（退化为纯文本模式）。
 
@@ -281,12 +296,35 @@ Web API 服务提供以下端点（`http://localhost:8000/api`）：
 - QQ 导出 TXT（时间戳 + 昵称 + QQ 号格式）
 - MHT 格式（beta）
 
+### WechatExporter 外部导出
+
+WechatExporter 源码以 git submodule 形式记录在 `third_party/WechatExporter`，授权为 GPL-2.0-or-later，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。运行时仍通过独立二进制调用，不和 `ex-memory` 主服务链接或混合分发。首次拉取源码可执行：
+
+```bash
+git submodule update --init --recursive
+```
+
+可选配置 `WECHAT_EXPORTER_BIN` 后，可通过 CLI 调用外部 WechatExporter 从未加密 iTunes/iOS 备份导出微信聊天 HTML：
+
+```bash
+export WECHAT_EXPORTER_BIN=/path/to/WechatExporter
+python run.py
+> /export-wechat ~/Library/Application\ Support/MobileSync/Backup/xxx ~/Desktop/wx-export wxid_xxx 好友名
+```
+
+该能力适合本机 CLI 使用，不建议在远程 Web 服务中开放任意本机路径读取。`WECHAT_EXPORTER_BIN` 必须指向已存在且可执行的 WechatExporter 二进制。
+
+网页端提供“发现 → 微信聊天导出”本机向导。该入口还需要 `LOCAL_WECHAT_EXPORT_ENABLED=true`，且仅允许从 localhost 访问；页面只能选择固定根目录下扫描到的 iTunes/iOS 备份，输出固定写入 `data/wechat_exports/{task_id}/`。
+
 ## 隐私说明
 
-- 所有数据存储在本地 `exes/` 目录，不会上传到第三方服务
+- 镜像数据存储在本地 `exes/` 目录，自定义贴纸存储在 `data/stickers/custom/`
 - 聊天记录仅用于生成记忆镜像，不会用于其他目的
+- 用户可通过 `GET /api/exes/{slug}/export` 导出单个镜像数据，通过 `DELETE /api/exes/{slug}` 彻底删除镜像目录
+- Web/API 对话会归档到 `exes/{slug}/conversations/conversation.jsonl`，可通过对话导出接口生成 HTML/Markdown/JSON/TXT
+- 微信导出任务输出存放在 `data/wechat_exports/`，只通过鉴权和本机限制的 API 下载
 - API Key 可存储在 macOS Keychain 中，避免明文写入配置文件
-- 建议将 `exes/` 目录加入 `.gitignore`
+- 建议将 `exes/`、`data/`、`.coverage` 等运行时数据加入 `.gitignore`
 
 ## 更新日志
 

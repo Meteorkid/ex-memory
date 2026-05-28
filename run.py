@@ -19,6 +19,7 @@ def print_banner():
     print("  /create   创建新的记忆镜像")
     print("  /{名称}   进入已有镜像对话")
     print("  /list     列出所有镜像")
+    print("  /export   导出 ex-memory 对话记录")
     print("  /web      启动 Gradio Web 界面")
     print("  /help     帮助")
     print("  /exit     退出")

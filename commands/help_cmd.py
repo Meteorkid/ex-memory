@@ -13,6 +13,8 @@ def cmd_help(_=""):
   /backup {名称}   备份镜像版本
   /rollback {名称} {版本}  回滚到指定版本
   /let-go {名称}   删除镜像（不可逆）
+  /export {名称} [html|md|json|txt]  导出 ex-memory 对话记录
+  /export-wechat {备份目录} {输出目录} {账号} [会话名...]  调用外部 WechatExporter
   /keychain        管理 API Key（macOS Keychain）
   /web             启动 Web 界面（Gradio）
   /help            显示帮助

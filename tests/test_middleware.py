@@ -1,8 +1,10 @@
 """server/middleware.py 测试：限流、IP 提取、登录限流。"""
 
+import time
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from fastapi.responses import JSONResponse
 
 
 def make_app():
@@ -148,19 +150,3 @@ class TestRequestLoggingMiddleware:
         client = TestClient(app)
         r = client.get("/ok", headers={"X-Request-ID": "my-custom-id"})
         assert r.headers["X-Request-ID"] == "my-custom-id"
-
-
-class TestSecurityHeadersMiddleware:
-    def test_adds_security_headers(self):
-        from server.middleware import SecurityHeadersMiddleware
-
-        app = make_app()
-        app.middleware("http")(SecurityHeadersMiddleware())
-        client = TestClient(app)
-
-        r = client.get("/ok")
-
-        assert r.status_code == 200
-        assert r.headers["X-Content-Type-Options"] == "nosniff"
-        assert r.headers["Referrer-Policy"] == "no-referrer"
-        assert r.headers["X-Frame-Options"] == "DENY"

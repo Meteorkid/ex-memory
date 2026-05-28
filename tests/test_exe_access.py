@@ -2,8 +2,10 @@
 
 import json
 import pytest
+from pathlib import Path
+from unittest.mock import patch
 
-from core.exe_access import assert_exe_access, user_owns_exe
+from core.exe_access import set_owner_user_id, assert_exe_access, user_owns_exe
 
 
 @pytest.fixture

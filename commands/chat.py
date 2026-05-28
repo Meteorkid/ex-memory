@@ -2,6 +2,7 @@
 import logging
 from config import get_ex_dir, ARCHIVE_THRESHOLD
 from core.validation import validate_slug, validate_user_input
+from commands import register
 
 logger = logging.getLogger("ex-memory")
 
@@ -30,6 +31,8 @@ def cmd_chat(slug: str):
 
     session.register_command("backup", lambda _: _do_backup(slug), "备份当前镜像版本")
     session.register_command("reflect", lambda _: _do_reflect(slug), "关系反思分析")
+
+    original_chat = session._chat
 
     def _chat_with_correction(user_msg: str):
         try:

@@ -83,6 +83,7 @@ ex-memory/
 ├── memory/            # 向量数据库层
 │   ├── vector_store.py  # ChromaDB 封装
 │   ├── embedder.py    # Embedding API 封装
+│   ├── importer.py    # 聊天记录导入编排
 │   └── chunker.py     # 聊天记录切片
 │
 ├── pipeline/          # 自动化蒸馏管线
@@ -131,3 +132,16 @@ ex-memory/
 | 限流 | 全局 120/min, 登录 5/min/用户名 |
 | 审计 | JSON Line 格式审计日志 (login/register/delete) |
 | CORS | 环境变量可配来源 |
+
+## 数据生命周期
+
+- **导入**：API 层只负责认证、文件名消毒、大小限制和临时文件落盘；`memory/importer.py` 负责根据文件类型选择解析器、创建 Embedding/VectorStore，并执行入库。
+- **导出**：`GET /api/exes/{slug}/export` 打包当前用户拥有的 `exes/{slug}/`，包含 `export_manifest.json`，跳过 `.lock`、临时文件和符号链接。
+- **对话记录导出**：Web/API 聊天会写入 `exes/{slug}/conversations/conversation.jsonl`；`GET /api/exes/{slug}/conversations/export?format=html|md|json|txt` 可导出服务端归档和 CLI session 归档。
+- **本机微信导出**：`core/wechat_export/` 负责扫描固定 iTunes/iOS 备份根目录、创建后台任务、写入 `data/wechat_exports/{task_id}/` 并提供受限下载；API 层只做认证、本机模式和 localhost 边界校验。
+- **彻底删除**：`DELETE /api/exes/{slug}` 删除整个镜像目录，包括 `sessions/`、`versions/`、钱包文件和 `chroma_db/`，同时清理服务端内存中的 engine 缓存与 session token 计数。
+- **私有资源**：自定义贴纸存储在 `data/stickers/custom/u{user_id}/`，只能通过鉴权 API 读取，不挂载到公开静态目录。
+
+## 外部导出器
+
+WechatExporter 源码以 git submodule 形式记录在 `third_party/WechatExporter`，授权边界见 `THIRD_PARTY_NOTICES.md`。运行时通过 `core/exporters/wechat_adapter.py` 以外部二进制方式接入，本机 CLI 可通过 `/export-wechat` 调用用户配置的 `WECHAT_EXPORTER_BIN`，用于从未加密 iTunes/iOS 备份导出微信 HTML 记录。
