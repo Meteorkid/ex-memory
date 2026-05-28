@@ -2,6 +2,7 @@
 
 import json
 import random
+import uuid
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -113,7 +114,7 @@ def create_redpacket(slug: str, trigger: str = "random_cute") -> Optional[dict]:
         note = random.choice(cfg["notes"])
 
         rp = {
-            "id": f"rp_{len(packets)+1}_{int(datetime.now().timestamp())}",
+            "id": f"rp_{uuid.uuid4().hex[:12]}",
             "type": "normal",
             "amount": amount,
             "note": note,
@@ -184,7 +185,7 @@ def create_transfer(slug: str, amount: float, note: str = "",
     """创建转账。"""
     def update(transfers: list[dict]) -> dict:
         tx = {
-            "id": f"tx_{len(transfers)+1}_{int(datetime.now().timestamp())}",
+            "id": f"tx_{uuid.uuid4().hex[:12]}",
             "amount": round(amount, 2),
             "note": note,
             "direction": direction,  # ta_to_me 或 me_to_ta

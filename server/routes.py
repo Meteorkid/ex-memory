@@ -2,19 +2,17 @@
 
 import json
 import logging
-import mimetypes
 import threading
-from queue import Queue
 from pathlib import Path
-from typing import Callable, Iterable
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from config import get_ex_dir, DISABLE_REGISTRATION
+from config import EXES_DIR, get_ex_dir, get_collection_name, DISABLE_REGISTRATION
 from core.validation import validate_slug, validate_user_input, sanitize_chat_history
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
+from core.file_utils import atomic_write, atomic_write_json
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
 from server.middleware import require_auth, _get_client_ip, security
@@ -22,7 +20,8 @@ from fastapi.security import HTTPAuthorizationCredentials
 from server.models import (
     CreateRequest, ResumeRequest, ChatRequest, UpdateRequest,
     BackupRequest, RollbackRequest, DeleteRequest,
-    ExeInfo, ChatResponse, StatusResponse, AuthRequest, TransferRequest, TransferConfirmRequest,
+    ExeInfo, ChatResponse, StatusResponse, ErrorResponse, AuthRequest, LogoutRequest,
+    TransferRequest, TransferConfirmRequest,
 )
 
 logger = logging.getLogger("ex-memory")
@@ -60,8 +59,7 @@ def _get_audit():
 def _audit(event: str, username: str = "", client_ip: str = "", detail: str = ""):
     """记录审计事件（不会因审计日志写入失败影响主流程）。"""
     try:
-        import json as _json
-        _get_audit().info(_json.dumps({
+        _get_audit().info(json.dumps({
             "event": event,
             "username": username,
             "ip": client_ip,
@@ -111,55 +109,10 @@ def _copy_upload_limited(src, dest, max_bytes: int) -> int:
     return total
 
 
-async def _read_upload_limited(file: UploadFile, max_bytes: int) -> bytes:
-    """按块读取上传内容，避免超大文件一次性进入内存。"""
-    chunks = []
-    total = 0
-    while True:
-        chunk = await file.read(1024 * 1024)
-        if not chunk:
-            break
-        total += len(chunk)
-        if total > max_bytes:
-            raise HTTPException(
-                status_code=413,
-                detail=f"文件过大，最大支持 {max_bytes // (1024 * 1024)}MB",
-            )
-        chunks.append(chunk)
-    return b"".join(chunks)
-
-
 def _invalidate_engine(slug: str):
     """使缓存的 engine 失效（纠正/更新 SKILL.md 后调用）。"""
     with _engine_cache_lock:
         _engine_cache.pop(slug, None)
-
-
-_STREAM_DONE = object()
-
-
-async def _iterate_sync_stream(factory: Callable[[], Iterable[dict]]):
-    """把同步生成器桥接成异步生成器，避免阻塞 FastAPI 事件循环。"""
-    queue: Queue = Queue(maxsize=16)
-
-    def worker():
-        try:
-            for item in factory():
-                queue.put(item)
-        except Exception as exc:
-            queue.put(exc)
-        finally:
-            queue.put(_STREAM_DONE)
-
-    threading.Thread(target=worker, daemon=True).start()
-
-    while True:
-        item = await run_in_threadpool(queue.get)
-        if item is _STREAM_DONE:
-            break
-        if isinstance(item, Exception):
-            raise item
-        yield item
 
 
 # --- 用户认证 ---
@@ -379,22 +332,6 @@ def list_all_stickers(
     return {"stickers": combined}
 
 
-@router.get("/stickers/{sticker_id}/content")
-def get_custom_sticker_content(sticker_id: str, user_id: int = Depends(require_auth)):
-    """鉴权读取当前用户的自定义贴纸文件。"""
-    from core.sticker_manager import get_custom_sticker_path
-
-    path = get_custom_sticker_path(sticker_id, user_id)
-    if path is None:
-        raise HTTPException(status_code=404, detail="贴纸不存在")
-    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    return FileResponse(
-        path,
-        media_type=media_type,
-        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
-    )
-
-
 @router.get("/stickers/{sticker_id}")
 def get_sticker_route(sticker_id: str, user_id: int = Depends(require_auth)):
     """获取单个贴纸信息。"""
@@ -421,7 +358,7 @@ async def upload_sticker(
     ext = Path(file.filename).suffix.lower() if file.filename else ""
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"不支持的文件类型: {ext}")
-    content = await _read_upload_limited(file, 2 * 1024 * 1024)
+    content = await file.read()
     try:
         result = _upload(content, file.filename, label, category, user_id)
     except ValueError as e:
@@ -487,7 +424,7 @@ def send_transfer(slug: str, req: TransferRequest, user_id: int = Depends(requir
     """发起转账。"""
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import create_transfer
-    create_transfer(slug, req.amount, req.note, req.direction)
+    tx = create_transfer(slug, req.amount, req.note, req.direction)
     return StatusResponse(message=f"转账已发起: {req.note} (¥{req.amount})")
 
 
@@ -617,7 +554,7 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
         full_reply = ""
         try:
             engine = _get_engine(slug)
-            async for item in _iterate_sync_stream(lambda: engine.chat_stream(message, history)):
+            for item in engine.chat_stream(message, history):
                 if item.get("type") == "text":
                     full_reply += item.get("content", "")
                 yield f"data: {json.dumps(item)}\n\n"
@@ -641,16 +578,12 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
                     _session_counters[key] = counter
                 counter.update(approx_usage)
 
-            yield "data: [DONE]\n\n"
+            yield f"data: [DONE]\n\n"
         except Exception as e:
             logger.error("流式对话失败: %s", e, exc_info=True)
             yield f"data: {json.dumps({'error': _INTERNAL_ERROR})}\n\n"
 
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 # --- 更新 ---

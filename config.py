@@ -1,6 +1,7 @@
 """全局配置：从 .env 加载，启动校验，隐私提示。"""
 
 import os
+import re
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -63,6 +64,8 @@ LOG_DIR = PROJECT_DIR / "logs"
 SINGLE_USER_MODE = os.getenv("SINGLE_USER_MODE", "false").lower() in ("1", "true", "yes")
 DISABLE_REGISTRATION = os.getenv("DISABLE_REGISTRATION", "false").lower() in ("1", "true", "yes")
 TRUSTED_PROXY = os.getenv("TRUSTED_PROXY", "false").lower() in ("1", "true", "yes")
+_trusted_ips_str = os.getenv("TRUSTED_PROXY_IPS", "")
+TRUSTED_PROXY_IPS = {ip.strip() for ip in _trusted_ips_str.split(",") if ip.strip()} if _trusted_ips_str else set()
 
 # 隐私确认标记
 _privacy_confirmed = False

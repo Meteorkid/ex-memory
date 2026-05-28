@@ -77,7 +77,10 @@ def locked_update_json(path: Path, default: Union[Any, Callable[[], Any]], updat
             data = json.loads(path.read_text(encoding="utf-8"))
         else:
             data = default() if callable(default) else default
-        result = updater(data)
+        try:
+            result = updater(data)
+        except Exception:
+            raise  # 异常时不写入，保持原状
         atomic_write_json(path, data)
         return result
 

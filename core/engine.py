@@ -3,6 +3,7 @@
 import re
 import logging
 from typing import Optional
+from pathlib import Path
 
 from config import (
     get_llm_config, get_llm_client, get_ex_dir, RECENT_SESSIONS, DEFAULT_TOP_K,
@@ -95,11 +96,7 @@ class ChatEngine:
 
         while len(summaries) > 1 and estimate_tokens(_assemble(summaries)) > budget:
             logger.warning("System prompt 过大，截断 session 摘要")
-            if len(summaries) > 2:
-                summaries.pop(1)
-            else:
-                summaries = summaries[-1:]
-                break
+            summaries = summaries[:-1]  # 保留最新的，从最旧的开始删
 
         return _assemble(summaries)
 
@@ -183,12 +180,9 @@ class ChatEngine:
                 all_stickers.append(sid)
         return reply, all_stickers, response.usage
 
-    def chat_stream(self, user_input: str, history: list[dict]):
-        """流式对话，yield dict: {type: text|sticker, content/id: ...}"""
-        messages = self._prepare_messages(user_input, history)
-
-        full_reply = ""
-        stream = self.client.chat.completions.create(
+    @retry_api(max_attempts=3, base_delay=1.0)
+    def _call_stream(self, messages):
+        return self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             temperature=self.temperature,
@@ -197,6 +191,13 @@ class ChatEngine:
             max_tokens=self.max_tokens,
             stream=True,
         )
+
+    def chat_stream(self, user_input: str, history: list[dict]):
+        """流式对话，yield dict: {type: text|sticker, content/id: ...}"""
+        messages = self._prepare_messages(user_input, history)
+
+        full_reply = ""
+        stream = self._call_stream(messages)
         for chunk in stream:
             delta = chunk.choices[0].delta
             if delta.content:

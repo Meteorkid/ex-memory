@@ -2,11 +2,13 @@
 
 import hashlib
 import hmac
+import os
 import secrets
 import sqlite3
 import time
 import logging
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Optional
 from pathlib import Path
 
@@ -165,17 +167,11 @@ def validate_token(token: str) -> Optional[int]:
         ).fetchone()
 
         if not row:
-            row = conn.execute(
-                "SELECT user_id, expires_at FROM tokens WHERE token = ?",
-                (token,),
-            ).fetchone()
-
-        if not row:
             return None
 
         expires = row["expires_at"]
         if expires and expires < time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()):
-            conn.execute("DELETE FROM tokens WHERE token IN (?, ?)", (token_key, token))
+            conn.execute("DELETE FROM tokens WHERE token = ?", (token_key,))
             conn.commit()
             return None
 
@@ -184,10 +180,8 @@ def validate_token(token: str) -> Optional[int]:
 
 def revoke_token(token: str):
     with _get_conn() as conn:
-        conn.execute(
-            "DELETE FROM tokens WHERE token IN (?, ?)",
-            (_token_hash(token), token),
-        )
+        token_key = _token_hash(token)
+        conn.execute("DELETE FROM tokens WHERE token = ?", (token_key,))
         conn.commit()
 
 
@@ -197,7 +191,3 @@ def clean_expired_tokens():
             "DELETE FROM tokens WHERE expires_at < datetime('now')"
         )
         conn.commit()
-
-
-# 初始化数据库
-init_db()
