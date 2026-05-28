@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#F2F2F7">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
     <title>ex-memory</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
     <link rel="manifest" href="/static/manifest.json">
@@ -21,13 +21,15 @@
 <main id="page-auth" role="main">
     <div class="auth-card">
         <div class="auth-logo">
-            <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-                <rect width="56" height="56" rx="14" fill="url(#grad)"/>
-                <path d="M18 38V24a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2H26l-6 4v-4h-2a2 2 0 01-2-2z" fill="white" fill-opacity="0.9"/>
-                <circle cx="24" cy="29" r="1.5" fill="#007AFF"/>
-                <circle cx="28" cy="29" r="1.5" fill="#007AFF"/>
-                <circle cx="32" cy="29" r="1.5" fill="#007AFF"/>
-                <defs><linearGradient id="grad" x1="0" y1="0" x2="56" y2="56"><stop stop-color="#007AFF"/><stop offset="1" stop-color="#5856D6"/></linearGradient></defs>
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                <path d="M26 16C18.268 16 12 21.373 12 28c0 3.866 2.064 7.308 5.312 9.68L16 42l5.2-2.8c1.8.6 3.8.94 5.8.94.68 0 1.36-.04 2.02-.12A9.5 9.5 0 0026 44c7.732 0 14-5.373 14-12S33.732 16 26 16z" fill="rgba(124,108,255,0.35)"/>
+                <circle cx="21" cy="28" r="1.8" fill="#e8e4f0"/>
+                <circle cx="26" cy="28" r="1.8" fill="#e8e4f0"/>
+                <circle cx="31" cy="28" r="1.8" fill="#e8e4f0"/>
+                <path d="M40 24c-6.627 0-12 4.477-12 10s5.373 10 12 10c1.68 0 3.28-.28 4.74-.8L52 46l-1.4-3.8C53.06 40.2 54 38.2 54 36c0-5.523-5.373-10-12-10h-2z" fill="rgba(124,108,255,0.6)"/>
+                <circle cx="36.5" cy="34" r="1.5" fill="#e8e4f0"/>
+                <circle cx="41" cy="34" r="1.5" fill="#e8e4f0"/>
+                <circle cx="45.5" cy="34" r="1.5" fill="#e8e4f0"/>
             </svg>
         </div>
         <h1>ex-memory</h1>
