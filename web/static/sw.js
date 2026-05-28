@@ -1,6 +1,6 @@
 /* ex-memory PWA Service Worker — Stale-While-Revalidate + 离线降级 */
 
-const CACHE_NAME = 'ex-memory-v2';
+const CACHE_NAME = 'ex-memory-v5';
 const STATIC_FILES = [
     '/',
     '/static/style.css',
