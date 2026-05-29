@@ -258,12 +258,38 @@ function showMindfulReminder() {
 }
 
 async function fetchHealthTip() {
+    // 深夜个性化提示
+    const hour = new Date().getHours();
+    const tips = {
+        lateNight: [
+            '这么晚了还在想 ta 吗？早点休息 🌙',
+            '夜深了，放下手机，闭上眼睛休息吧',
+            '深夜的情绪总是特别浓，但明天会更好',
+            '又失眠了？深呼吸三次，感受当下的平静',
+        ],
+        earlyMorning: [
+            '新的一天，好好生活 🌅',
+            '早安，今天也要加油哦',
+            '新的一天开始了，做点让自己开心的事',
+        ],
+        daytime: [
+            '适当休息一下，看看窗外的风景',
+            '深呼吸三次，感受当下的平静',
+            '和真实的朋友聊聊天，感受真实的温暖',
+            '运动 10 分钟，让身体和心情都好起来',
+        ],
+    };
+
+    let pool = tips.daytime;
+    if (hour >= 0 && hour < 6) pool = tips.lateNight;
+    else if (hour >= 6 && hour < 9) pool = tips.earlyMorning;
+
     try {
         const data = await api('GET', '/user/health/check');
-        return data.health_tip || '深呼吸三次，感受当下的平静。';
-    } catch(e) {
-        return '深呼吸三次，感受当下的平静。';
-    }
+        if (data.health_tip) return data.health_tip;
+    } catch(e) {}
+
+    return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // ── 正念引导：退出时的温暖告别 ──
@@ -840,9 +866,13 @@ async function loadContactList() {
         }
         el.innerHTML = exes.map(e => {
             const lastMsg = getLastMessage(e.slug);
+            const isOnline = Math.random() > 0.6; // 模拟在线状态
             return `
             <div class="contact-item" data-slug="${escHtml(e.slug)}" data-name="${escHtml(e.name)}">
-                <div class="contact-avatar" style="background:${avatarColor(e.slug)}">${(e.name || e.slug)[0]}</div>
+                <div class="contact-avatar" style="background:${avatarColor(e.slug)}">
+                    ${(e.name || e.slug)[0]}
+                    <span class="online-dot ${isOnline ? 'online' : ''}"></span>
+                </div>
                 <div class="contact-info">
                     <div class="contact-name">${escHtml(e.name)}</div>
                     <div class="contact-preview">
@@ -1112,10 +1142,10 @@ async function sendMessage() {
     msgsEl.appendChild(userRow);
     storeLastMessage(currentSlug, msg);
 
-    // 添加已读标记
+    // 添加已读标记（初始为已发送）
     const readStatus = document.createElement('div');
     readStatus.className = 'msg-read-status';
-    readStatus.textContent = '已读';
+    readStatus.textContent = '已发送';
     userRow.appendChild(readStatus);
 
     // 离线时排队消息
@@ -1133,6 +1163,16 @@ async function sendMessage() {
     msgsEl.appendChild(typingRow);
     msgsEl.scrollTop = msgsEl.scrollHeight;
 
+    // 导航栏显示「对方正在输入...」
+    const navTitle = $('nav-title');
+    const origTitle = navTitle ? navTitle.textContent : '';
+    if (navTitle) navTitle.textContent = '对方正在输入...';
+
+    // 1秒后更新为「已送达」
+    setTimeout(() => {
+        readStatus.textContent = '已送达';
+    }, 1000);
+
     // 构建历史
     const hist = buildHistory(msgsEl);
 
@@ -1146,12 +1186,18 @@ async function sendMessage() {
         // 模拟对方"看到消息后思考"的延迟（1-3秒）
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
         typingRow.remove();
+        if (navTitle) navTitle.textContent = origTitle;
         await parseChatStream(res, msgsEl);
+
+        // 更新已读状态
+        readStatus.textContent = '已读';
+        readStatus.classList.add('read');
 
         // 添加重新生成按钮到最后一条助手消息
         addRegenerateButton(msgsEl);
     } catch(e) {
         typingRow.remove();
+        if (navTitle) navTitle.textContent = origTitle;
         msgsEl.appendChild(sysMsg(e.message));
     }
 
@@ -1230,6 +1276,7 @@ function addRegenerateButton(msgsEl) {
 function chatBubble(role, text) {
     const row = document.createElement('div');
     row.className = 'msg-row ' + role;
+    row.dataset.timestamp = Date.now();
 
     if (role === 'assistant' && currentName) {
         const avatar = document.createElement('div');
@@ -1243,7 +1290,96 @@ function chatBubble(role, text) {
     div.className = 'msg ' + role;
     div.textContent = text;
     row.appendChild(div);
+
+    // 长按/右键菜单
+    div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showMsgMenu(row, e);
+    });
+    // 移动端长按
+    let longPressTimer;
+    div.addEventListener('touchstart', (e) => {
+        longPressTimer = setTimeout(() => {
+            showMsgMenu(row, e.touches[0]);
+        }, 500);
+    }, {passive: true});
+    div.addEventListener('touchend', () => clearTimeout(longPressTimer));
+    div.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
     return row;
+}
+
+// ── 消息操作菜单 ──
+let currentMenuRow = null;
+let quoteMode = false;
+
+function showMsgMenu(row, e) {
+    currentMenuRow = row;
+    const isUser = row.classList.contains('user');
+    const isSys = row.classList.contains('sys');
+    if (isSys) return;
+
+    const msgEl = row.querySelector('.msg');
+    const text = msgEl ? msgEl.textContent : '';
+
+    // 创建菜单
+    let menu = $('msg-action-menu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'msg-action-menu';
+        menu.className = 'msg-action-menu';
+        menu.style.display = 'none';
+        document.body.appendChild(menu);
+    }
+
+    const options = [
+        {label: '复制', action: () => { navigator.clipboard.writeText(text); showToast('已复制', 'success'); }},
+        {label: '引用', action: () => startQuote(text) },
+    ];
+    if (isUser) {
+        const age = Date.now() - parseInt(row.dataset.timestamp || '0');
+        if (age < 2 * 60 * 1000) { // 2 分钟内可撤回
+            options.push({label: '撤回', action: () => recallMessage(row), danger: true});
+        }
+    }
+
+    menu.innerHTML = options.map(o =>
+        `<button class="msg-menu-item${o.danger ? ' danger' : ''}">${o.label}</button>`
+    ).join('');
+    menu.querySelectorAll('.msg-menu-item').forEach((btn, i) => {
+        btn.onclick = () => { menu.style.display = 'none'; options[i].action(); };
+    });
+
+    // 定位菜单
+    const x = Math.min(e.clientX || 100, window.innerWidth - 140);
+    const y = Math.min(e.clientY || 100, window.innerHeight - 160);
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.style.display = 'flex';
+}
+
+// 点击其他地方关闭菜单
+document.addEventListener('click', () => {
+    const menu = $('msg-action-menu');
+    if (menu) menu.style.display = 'none';
+});
+
+function startQuote(text) {
+    const input = $('msg-input');
+    const preview = text.replace(/\n/g, ' ').slice(0, 50);
+    input.value = `> ${preview}${text.length > 50 ? '...' : ''}\n`;
+    input.focus();
+    quoteMode = true;
+}
+
+function recallMessage(row) {
+    const msgEl = row.querySelector('.msg');
+    if (msgEl) {
+        msgEl.textContent = '你撤回了一条消息';
+        msgEl.className = 'msg sys recalled-msg';
+        row.className = 'msg-row sys';
+    }
+    showToast('消息已撤回', 'info');
 }
 
 function typingIndicator() {
