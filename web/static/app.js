@@ -1401,6 +1401,59 @@ $('logout-entry').addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════
+// 关系阶段管理
+// ═══════════════════════════════════════
+
+const STAGE_LABELS = {
+    dating: '热恋期 💕',
+    conflicted: '磨合期 ⚡',
+    broken: '分手期 💔',
+    healing: '治愈期 🌱',
+};
+
+async function loadStage() {
+    if (!currentSlug) return;
+    try {
+        const data = await api('GET', `/exes/${currentSlug}/stage`);
+        updateStageUI(data.stage);
+    } catch(e) { /* ignore */ }
+}
+
+function updateStageUI(stage) {
+    const el = $('stage-indicator');
+    if (el) el.textContent = STAGE_LABELS[stage] || stage;
+}
+
+async function setStage(stage) {
+    if (!currentSlug) return;
+    try {
+        await api('PUT', `/exes/${currentSlug}/stage?stage=${stage}`);
+        updateStageUI(stage);
+        showToast(`关系阶段已切换为「${STAGE_LABELS[stage]}」`, 'success');
+    } catch(e) {
+        showToast('切换失败: ' + e.message, 'error');
+    }
+}
+
+async function checkStageSuggestion() {
+    if (!currentSlug) return;
+    try {
+        const data = await api('GET', `/exes/${currentSlug}/stage/suggest`);
+        if (data.suggestion && data.suggestion !== data.current_stage) {
+            // 在聊天中显示建议
+            const msgsEl = $('chat-msgs');
+            if (msgsEl && msgsEl.style.display !== 'none') {
+                const row = document.createElement('div');
+                row.className = 'msg-row sys';
+                row.innerHTML = `<div class="msg stage-suggestion">💡 ${escHtml(data.reason)}，要切换到「${STAGE_LABELS[data.suggestion]}」吗？ <button class="stage-accept-btn" onclick="setStage('${data.suggestion}')">切换</button></div>`;
+                msgsEl.appendChild(row);
+                msgsEl.scrollTop = msgsEl.scrollHeight;
+            }
+        }
+    } catch(e) { /* ignore */ }
+}
+
+// ═══════════════════════════════════════
 // 对话搜索
 // ═══════════════════════════════════════
 

@@ -862,3 +862,91 @@ def list_groups(user_id: int = Depends(require_auth)):
             pass
 
     return {"groups": groups}
+
+
+# --- 关系阶段管理 ---
+
+@router.get("/exes/{slug}/stage")
+def get_stage(slug: str, user_id: int = Depends(require_auth)):
+    """获取当前关系阶段。"""
+    slug = _check_exe_access(slug, user_id)
+    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    if not meta_file.exists():
+        raise HTTPException(status_code=404, detail="镜像不存在")
+    import json
+    with open(meta_file, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+    return {"stage": meta.get("stage", "dating")}
+
+
+@router.put("/exes/{slug}/stage")
+def set_stage(slug: str, stage: str = Query(...), user_id: int = Depends(require_auth)):
+    """设置关系阶段。"""
+    slug = _check_exe_access(slug, user_id)
+    valid_stages = ["dating", "conflicted", "broken", "healing"]
+    if stage not in valid_stages:
+        raise HTTPException(status_code=400, detail=f"无效阶段，可选: {valid_stages}")
+    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    if not meta_file.exists():
+        raise HTTPException(status_code=404, detail="镜像不存在")
+    import json
+    with open(meta_file, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+    meta["stage"] = stage
+    with open(meta_file, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "slug": slug, "stage": stage}
+
+
+@router.get("/exes/{slug}/stage/suggest")
+def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
+    """根据对话情感趋势建议阶段变化。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.conversation_store import load_jsonl_messages
+    from core.emotion_tracker import analyze_history
+
+    messages = load_jsonl_messages(slug)
+    if len(messages) < 10:
+        return {"suggestion": None, "reason": "对话记录不足"}
+
+    # 分析最近 20 条消息的情感
+    recent = messages[-20:]
+    history = [{"role": m.get("role", ""), "content": m.get("content", "")} for m in recent]
+    analysis = analyze_history(history)
+
+    overall = analysis["overall"]["score"]
+    user_score = analysis["user_sentiment"]["score"]
+
+    # 读取当前阶段
+    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    current_stage = "dating"
+    if meta_file.exists():
+        import json
+        with open(meta_file, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        current_stage = meta.get("stage", "dating")
+
+    # 根据情感趋势建议阶段
+    suggestion = None
+    reason = ""
+
+    if current_stage == "dating" and overall < -0.3:
+        suggestion = "conflicted"
+        reason = "近期对话情感偏负面，可能进入磨合期"
+    elif current_stage == "conflicted" and overall < -0.5:
+        suggestion = "broken"
+        reason = "情感持续恶化，可能已分手"
+    elif current_stage == "broken" and overall > 0.2:
+        suggestion = "healing"
+        reason = "情感开始好转，可能在治愈中"
+    elif current_stage == "healing" and overall > 0.4:
+        suggestion = "dating"
+        reason = "情感恢复正面，可能重新开始"
+
+    return {
+        "current_stage": current_stage,
+        "suggestion": suggestion,
+        "reason": reason,
+        "overall_score": overall,
+        "user_score": user_score,
+    }

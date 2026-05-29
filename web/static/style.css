@@ -2170,3 +2170,33 @@ button:focus-visible, .nav-tab:focus-visible {
     border-radius: var(--radius-md);
     border-left: 2px solid rgba(124, 108, 255, 0.2);
 }
+
+/* ═══════════════════════════════════════
+   关系阶段建议
+   ═══════════════════════════════════════ */
+
+.stage-suggestion {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    padding: 10px 16px;
+    background: rgba(124, 108, 255, 0.06);
+    border-radius: var(--radius-md);
+    border-left: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.stage-accept-btn {
+    padding: 4px 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-pill);
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.stage-accept-btn:hover {
+    background: var(--accent-hover);
+}
