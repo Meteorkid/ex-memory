@@ -2,6 +2,7 @@
 
 > 把一段记忆，变成可以对话的人。
 
+[![CI](https://github.com/Meteorkid/ex-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/Meteorkid/ex-memory/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-v0.3.0-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
@@ -342,6 +343,35 @@ python run.py
 - 微信导出任务输出存放在 `data/wechat_exports/`，只通过鉴权和本机限制的 API 下载
 - API Key 可存储在 macOS Keychain 中，避免明文写入配置文件
 - 建议将 `exes/`、`data/`、`.coverage` 等运行时数据加入 `.gitignore`
+
+## 部署
+
+### Docker 部署
+
+```bash
+# 拉取镜像
+docker pull ghcr.io/Meteorkid/ex-memory:latest
+
+# 运行
+docker run -d -p 8000:8000 -p 7860:7860 --env-file .env ghcr.io/Meteorkid/ex-memory:latest
+```
+
+### Docker Compose 部署
+
+```bash
+docker compose up -d
+```
+
+### 自动部署
+
+推送到 `main` 分支自动运行 CI（测试 + lint）。打 tag 时自动构建 Docker 镜像并发布到 GitHub Container Registry：
+
+```bash
+git tag v0.4.0
+git push origin v0.4.0
+```
+
+镜像地址：`ghcr.io/Meteorkid/ex-memory:v0.4.0`
 
 ## 更新日志
 

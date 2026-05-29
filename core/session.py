@@ -1,8 +1,10 @@
 """ChatSession：CLI 主循环、指令分发、轮次计数、归档触发。"""
 
+import json
 import logging
 import sys
 from datetime import datetime
+from pathlib import Path
 from prompt_toolkit import prompt as pt_prompt
 
 from config import get_ex_dir, ARCHIVE_THRESHOLD
@@ -11,6 +13,14 @@ from core.factory import create_engine_and_store
 from core.validation import validate_user_input
 
 logger = logging.getLogger("ex-memory")
+
+# 关系阶段定义
+RELATIONSHIP_STAGES = {
+    "dating": "热恋期",
+    "conflicted": "磨合期",
+    "broken": "分手期",
+    "healing": "治愈期",
+}
 
 
 class ChatSession:
@@ -23,6 +33,7 @@ class ChatSession:
         self.slug = ""
         self.turn_count = 0
         self.commands: dict[str, callable] = {}
+        self.relationship_stage = "dating"  # 默认热恋期
 
     def register_command(self, name: str, func: callable, doc: str = ""):
         self.commands[name] = func
@@ -51,6 +62,71 @@ class ChatSession:
         else:
             print("--- 纯文本模式（无 RAG 检索） ---")
 
+        # 加载关系阶段
+        self._load_stage()
+        stage_label = RELATIONSHIP_STAGES.get(self.relationship_stage, "未知")
+        print(f"--- 关系阶段: {stage_label} ({self.relationship_stage}) ---")
+
+    def _load_stage(self):
+        """从 meta.json 加载关系阶段。"""
+        meta_path = get_ex_dir(self.slug) / "meta.json"
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                stage = meta.get("relationship_stage", "dating")
+                if stage in RELATIONSHIP_STAGES:
+                    self.relationship_stage = stage
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("加载 meta.json 失败: %s", e)
+
+    def _save_stage(self):
+        """保存关系阶段到 meta.json。"""
+        meta_path = get_ex_dir(self.slug) / "meta.json"
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                meta = {}
+        else:
+            meta = {}
+
+        meta["relationship_stage"] = self.relationship_stage
+        meta["updated_at"] = datetime.now().isoformat()
+
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def do_stage(self, arg: str):
+        """设置关系阶段。用法: /stage {dating|conflicted|broken|healing}"""
+        stage = arg.strip().lower()
+        if not stage:
+            current_label = RELATIONSHIP_STAGES.get(self.relationship_stage, "未知")
+            print(f"\n当前关系阶段: {current_label} ({self.relationship_stage})")
+            print("可用阶段:")
+            for key, label in RELATIONSHIP_STAGES.items():
+                marker = " ← 当前" if key == self.relationship_stage else ""
+                print(f"  {key} - {label}{marker}")
+            return
+
+        if stage not in RELATIONSHIP_STAGES:
+            print(f"未知阶段: {stage}")
+            print("可用阶段: " + ", ".join(RELATIONSHIP_STAGES.keys()))
+            return
+
+        old_stage = self.relationship_stage
+        self.relationship_stage = stage
+        self._save_stage()
+
+        # 同步更新引擎的阶段
+        if self.engine:
+            self.engine.relationship_stage = stage
+
+        stage_label = RELATIONSHIP_STAGES[stage]
+        print(f"--- 关系阶段已切换: {RELATIONSHIP_STAGES[old_stage]} → {stage_label} ---")
+
     def _process_command(self, user_input: str):
         parts = user_input[1:].split(maxsplit=1)
         cmd_name = parts[0].lower()
@@ -63,6 +139,8 @@ class ChatSession:
         elif cmd_name == "clear":
             self.history = []
             print("--- 对话历史已清空 ---")
+        elif cmd_name == "stage":
+            self.do_stage(arg)
         elif cmd_name == "help":
             self.do_help()
         else:
@@ -73,6 +151,7 @@ class ChatSession:
         print("  /help    - 显示帮助")
         print("  /clear   - 清空对话上下文")
         print("  /status  - 查看 Token 使用情况")
+        print("  /stage   - 查看/设置关系阶段")
         print("  /exit    - 退出对话")
         for name, func in self.commands.items():
             doc = func.__doc__ or "无描述"

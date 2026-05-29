@@ -55,6 +55,7 @@ window.addEventListener('online', () => {
     showToast('网络已恢复', 'success');
     const banner = $('offline-banner');
     if (banner) banner.classList.remove('visible');
+    flushOfflineQueue();
 });
 
 // 初始检查离线状态
@@ -131,7 +132,10 @@ async function parseChatStream(res, msgsEl) {
         return null;
     }
     if (currentSlug) {
-        storeLastMessage(currentSlug, assistantDiv.textContent.trim());
+        const text = assistantDiv.textContent.trim();
+        storeLastMessage(currentSlug, text);
+        // 桌面通知
+        showDesktopNotification(currentName || currentSlug, text.slice(0, 60), currentSlug);
     }
     return assistantDiv;
 }
@@ -198,6 +202,7 @@ initDesktopSidebar();
 try { initVoiceToggle(); } catch(e) { console.warn('Voice init skipped:', e.message); }
 initSearch();
 registerSW();
+requestNotificationPermission();
 
 function updateStatusTime() {
     const now = new Date();
@@ -290,13 +295,79 @@ function initDesktopSidebar() {
     });
 }
 
+// ── 离线消息队列 ──
+const OFFLINE_QUEUE_KEY = 'ex-memory-offline-queue';
+
+function getOfflineQueue() {
+    try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function saveOfflineQueue(queue) {
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function enqueueOfflineMessage(slug, message, stickerId) {
+    const queue = getOfflineQueue();
+    queue.push({ slug, message, stickerId, timestamp: Date.now() });
+    saveOfflineQueue(queue);
+    showToast('消息已离线保存，恢复网络后自动发送', 'info', 3000);
+}
+
+async function flushOfflineQueue() {
+    const queue = getOfflineQueue();
+    if (!queue.length) return;
+    saveOfflineQueue([]);
+    showToast(`正在发送 ${queue.length} 条离线消息…`, 'info', 3000);
+    for (const item of queue) {
+        try {
+            await fetch(`${API}/chat/stream`, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({ slug: item.slug, message: item.message || '', sticker_id: item.stickerId, history: [] }),
+            });
+        } catch { /* 单条失败不阻塞后续 */ }
+    }
+    showToast('离线消息发送完成', 'success');
+}
+
 // ── Service Worker ──
 function registerSW() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js').catch(err => {
+        navigator.serviceWorker.register('/static/sw.js').then(reg => {
+            // 检查更新
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                if (newWorker) {
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'activated') {
+                            showToast('应用已更新，刷新页面获取最新版本', 'info', 5000);
+                        }
+                    });
+                }
+            });
+        }).catch(err => {
             console.warn('[SW] 注册失败:', err);
         });
     }
+}
+
+// ── 推送通知 ──
+function requestNotificationPermission() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function showDesktopNotification(title, body, slug) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const notif = new Notification(title, { body, icon: '/static/icon-192.svg', tag: slug || 'ex-memory' });
+    notif.onclick = () => {
+        window.focus();
+        if (slug) enterChat(slug, slug);
+        notif.close();
+    };
 }
 
 // ═══════════════════════════════════════
@@ -948,6 +1019,16 @@ async function sendMessage() {
     maybeAddTimestamp(msgsEl);
     msgsEl.appendChild(chatBubble('user', msg));
     storeLastMessage(currentSlug, msg);
+
+    // 离线时排队消息
+    if (!navigator.onLine) {
+        enqueueOfflineMessage(currentSlug, msg);
+        msgsEl.appendChild(sysMsg('消息已保存，将在恢复网络后发送'));
+        input.disabled = false; btn.disabled = false;
+        input.focus();
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+        return;
+    }
 
     // 打字指示器
     const typingRow = typingIndicator();

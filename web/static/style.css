@@ -1787,7 +1787,8 @@ body::after {
 }
 
 /* ── 离线横幅 ── */
-.offline-banner {
+.offline-banner,
+.offline-mode-banner {
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 9999;
@@ -1799,8 +1800,16 @@ body::after {
     font-weight: 500;
     transform: translateY(-100%);
     transition: transform 0.3s ease;
+    pointer-events: none;
 }
-.offline-banner.visible { transform: translateY(0); }
+.offline-banner.visible,
+.offline-mode-banner.visible {
+    transform: translateY(0);
+    pointer-events: auto;
+}
+@media (min-width: 769px) {
+    .offline-banner, .offline-mode-banner { top: 52px; }
+}
 
 /* ── Focus Visible ── */
 :focus-visible {
