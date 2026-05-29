@@ -676,7 +676,13 @@ async function loadContactList() {
     try {
         const exes = await api('GET', '/exes');
         if (!exes.length) {
-            el.innerHTML = '<p class="list-empty">暂无镜像，去「我」→「创建新镜像」吧</p>';
+            el.innerHTML = `
+                <div class="onboarding-card">
+                    <div class="onboarding-icon">💬</div>
+                    <h3 class="onboarding-title">创建你的第一个镜像</h3>
+                    <p class="onboarding-desc">导入聊天记录，让 TA 重新和你对话</p>
+                    <button class="btn onboarding-btn" onclick="switchTab('create')">立即创建</button>
+                </div>`;
             return;
         }
         el.innerHTML = exes.map(e => {
@@ -960,6 +966,9 @@ async function sendMessage() {
 
         typingRow.remove();
         await parseChatStream(res, msgsEl);
+
+        // 添加重新生成按钮到最后一条助手消息
+        addRegenerateButton(msgsEl);
     } catch(e) {
         typingRow.remove();
         msgsEl.appendChild(sysMsg(e.message));
@@ -1006,6 +1015,35 @@ function storeLastMessage(slug, text) {
 
 function getLastMessage(slug) {
     return localStorage.getItem('ex-lastmsg-' + slug) || '';
+}
+
+function addRegenerateButton(msgsEl) {
+    // 移除旧的重新生成按钮
+    const oldBtn = msgsEl.querySelector('.regenerate-btn');
+    if (oldBtn) oldBtn.remove();
+
+    // 找到最后一条助手消息
+    const rows = msgsEl.querySelectorAll('.msg-row.assistant');
+    if (rows.length === 0) return;
+    const lastRow = rows[rows.length - 1];
+
+    const btn = document.createElement('button');
+    btn.className = 'regenerate-btn';
+    btn.textContent = '🔄 重新生成';
+    btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = '生成中…';
+        // 删除最后一条助手消息
+        lastRow.remove();
+        // 重新发送最后一条用户消息
+        const userRows = msgsEl.querySelectorAll('.msg-row.user');
+        if (userRows.length > 0) {
+            const lastUserMsg = userRows[userRows.length - 1].querySelector('.msg').textContent;
+            $('msg-input').value = lastUserMsg;
+            await sendMessage();
+        }
+    };
+    lastRow.appendChild(btn);
 }
 
 function chatBubble(role, text) {
@@ -1180,6 +1218,67 @@ $('create-entry').addEventListener('click', () => {
 $('logout-entry').addEventListener('click', () => {
     if (confirm('确定退出登录？')) logout();
 });
+
+// ═══════════════════════════════════════
+// 对话搜索
+// ═══════════════════════════════════════
+
+async function searchMessages(query) {
+    if (!currentSlug || !query.trim()) return [];
+    try {
+        const data = await api('GET', `/exes/${currentSlug}/messages/search?q=${encodeURIComponent(query)}`);
+        return data.results || [];
+    } catch(e) {
+        return [];
+    }
+}
+
+// ═══════════════════════════════════════
+// 对话统计
+// ═══════════════════════════════════════
+
+async function loadStats() {
+    if (!currentSlug) {
+        showToast('请先选择一个镜像', 'warning');
+        return;
+    }
+    try {
+        const stats = await api('GET', `/exes/${currentSlug}/stats`);
+        const el = $('chat-msgs');
+        el.style.display = 'block';
+        el.innerHTML = `
+            <div class="stats-container">
+                <h3 class="stats-title">对话统计</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.total_messages}</div>
+                        <div class="stat-label">总消息数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.user_messages}</div>
+                        <div class="stat-label">你发送的</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.assistant_messages}</div>
+                        <div class="stat-label">TA 回复的</div>
+                    </div>
+                </div>
+                <h4 class="stats-subtitle">活跃时段</h4>
+                <div class="stats-periods">
+                    ${Object.entries(stats.time_periods || {}).map(([period, count]) => `
+                        <div class="period-bar">
+                            <span class="period-label">${period}</span>
+                            <div class="period-fill" style="width: ${Math.min(count * 5, 100)}%"></div>
+                            <span class="period-count">${count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        $('chat-empty-hint').style.display = 'none';
+    } catch(e) {
+        showToast('加载统计失败: ' + e.message, 'error');
+    }
+}
 
 // ═══════════════════════════════════════
 // 创建镜像

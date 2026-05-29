@@ -2,6 +2,7 @@
 
 import re
 import logging
+from datetime import datetime
 from typing import Optional
 from pathlib import Path
 
@@ -67,12 +68,28 @@ class ChatEngine:
     def _build_system_prompt(self, rag_results: Optional[list[dict]] = None) -> str:
         sticker_list = ", ".join(f"{sid}({s['label']})" for sid, s in IMAGE_STICKERS.items())
 
+        # 时间感知：让 AI 感知对话发生的时间背景
+        now = datetime.now()
+        time_context = (
+            f"\n---\n## 时间感知\n"
+            f"当前时间：{now.strftime('%Y年%m月%d日 %H:%M')}，"
+            f"星期{['一','二','三','四','五','六','日'][now.weekday()]}。\n"
+            f"请根据时间背景自然调整回复：\n"
+            f"- 早上说早安、问吃早餐了吗\n"
+            f"- 午饭时间问吃了什么\n"
+            f"- 晚上问今天累不累\n"
+            f"- 深夜（23点后）说还没睡呀、早点休息\n"
+            f"- 周末可以提休息、出去玩\n"
+            f"但不要每次都刻意提起时间，自然融入对话即可。\n"
+        )
+
         # Token 预算：仅截断 session 摘要副本
         summaries = list(self.session_summaries)
         budget = int(LLM_MAX_CONTEXT_CHARS * 0.5)
 
         def _assemble(sums: list[str]) -> str:
             p = [self.skill_content]
+            p.append(time_context)
             if sums:
                 p.append("\n---\n## 最近对话记忆\n")
                 for i, summary in enumerate(sums, 1):

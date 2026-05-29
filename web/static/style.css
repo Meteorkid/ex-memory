@@ -1909,3 +1909,183 @@ button:focus-visible, .nav-tab:focus-visible {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
 }
+
+/* ═══════════════════════════════════════
+   首次使用引导卡片
+   ═══════════════════════════════════════ */
+
+.onboarding-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    text-align: center;
+    animation: authFadeIn 0.6s ease;
+}
+.onboarding-icon {
+    font-size: 4em;
+    margin-bottom: 20px;
+    opacity: 0.6;
+}
+.onboarding-title {
+    font-size: 1.2em;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+.onboarding-desc {
+    font-size: 0.88em;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+.onboarding-btn {
+    padding: 12px 32px;
+    font-size: 0.92em;
+}
+
+/* ═══════════════════════════════════════
+   情感健康提醒
+   ═══════════════════════════════════════ */
+
+.mindful-reminder {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--glass-thick);
+    backdrop-filter: var(--glass-blur-mid);
+    -webkit-backdrop-filter: var(--glass-blur-mid);
+    border: 1px solid rgba(124, 108, 255, 0.1);
+    border-radius: var(--radius-lg);
+    padding: 16px 24px;
+    max-width: 320px;
+    text-align: center;
+    z-index: 9999;
+    animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-lg);
+}
+.mindful-reminder .mindful-text {
+    font-size: 0.88em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.mindful-reminder .mindful-close {
+    margin-top: 12px;
+    padding: 6px 16px;
+    background: rgba(124, 108, 255, 0.1);
+    border: none;
+    border-radius: var(--radius-pill);
+    color: var(--accent);
+    font-size: 0.82em;
+    cursor: pointer;
+}
+
+.health-tip {
+    padding: 12px 16px;
+    margin: 8px 12px;
+    background: rgba(124, 108, 255, 0.04);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--accent);
+}
+.health-tip-text {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════
+   对话统计页面
+   ═══════════════════════════════════════ */
+
+.stats-container {
+    padding: 20px;
+}
+.stats-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.stat-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(124, 108, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    text-align: center;
+}
+.stat-value {
+    font-size: 1.8em;
+    font-weight: 300;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+.stat-label {
+    font-size: 0.78em;
+    color: var(--text-secondary);
+}
+.stats-subtitle {
+    font-size: 1em;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+.stats-periods {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.period-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.period-label {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    width: 100px;
+    flex-shrink: 0;
+}
+.period-fill {
+    height: 8px;
+    background: linear-gradient(90deg, var(--accent), rgba(124, 108, 255, 0.3));
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+.period-count {
+    font-size: 0.78em;
+    color: var(--text-tertiary);
+    width: 30px;
+    text-align: right;
+}
+
+/* ═══════════════════════════════════════
+   重新生成按钮
+   ═══════════════════════════════════════ */
+
+.regenerate-btn {
+    display: block;
+    margin-top: 8px;
+    padding: 4px 12px;
+    background: rgba(124, 108, 255, 0.08);
+    border: 1px solid rgba(124, 108, 255, 0.15);
+    border-radius: var(--radius-pill);
+    color: var(--accent);
+    font-size: 0.75em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.regenerate-btn:hover {
+    background: rgba(124, 108, 255, 0.15);
+}
+.regenerate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

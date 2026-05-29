@@ -3,6 +3,7 @@
 import json
 import logging
 import threading
+from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Query
 from fastapi.responses import StreamingResponse
@@ -517,6 +518,13 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
                     "completion_tokens": counter.total_completion_tokens,
                     "turns": counter.session_turns,
                 }
+        # 持久化对话（供搜索/统计使用）
+        try:
+            from core.conversation_store import append_turn
+            append_turn(slug, user_id, message, reply, stickers=stickers, source="web")
+        except Exception:
+            pass
+
         return ChatResponse(reply=reply, stickers=stickers, tokens=token_info)
     except Exception as e:
         logger.error("对话失败: %s", e, exc_info=True)
@@ -681,3 +689,176 @@ def list_versions_route(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.version_manager import list_versions
     return {"slug": slug, "versions": list_versions(slug)}
+
+
+# --- 对话搜索 ---
+
+@router.get("/exes/{slug}/messages/search")
+def search_messages(slug: str, q: str = Query(..., min_length=1, max_length=200), user_id: int = Depends(require_auth)):
+    """全文搜索对话内容（基于 JSONL 归档）。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.conversation_store import load_jsonl_messages
+
+    messages = load_jsonl_messages(slug)
+    q_lower = q.lower()
+    results = []
+    for msg in messages:
+        content = msg.get("content", "")
+        if q_lower in content.lower():
+            # 高亮匹配片段
+            idx = content.lower().find(q_lower)
+            start = max(0, idx - 30)
+            end = min(len(content), idx + len(q) + 30)
+            snippet = content[start:end]
+            if start > 0:
+                snippet = "…" + snippet
+            if end < len(content):
+                snippet = snippet + "…"
+            results.append({
+                "id": msg.get("id", ""),
+                "role": msg.get("role", ""),
+                "content": content,
+                "snippet": snippet,
+                "created_at": msg.get("created_at", ""),
+            })
+    return {"results": results[-100:], "total": len(results)}
+
+
+# --- 对话统计 ---
+
+@router.get("/exes/{slug}/stats")
+def get_stats(slug: str, user_id: int = Depends(require_auth)):
+    """对话统计数据：总消息数、消息频率、活跃时段。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.conversation_store import load_jsonl_messages
+    from collections import Counter
+
+    messages = load_jsonl_messages(slug)
+    total = len(messages)
+    user_msgs = [m for m in messages if m.get("role") == "user"]
+    assistant_msgs = [m for m in messages if m.get("role") == "assistant"]
+
+    # 按日期统计消息频率
+    daily = Counter()
+    hourly = Counter()
+    for m in messages:
+        ts = m.get("created_at", "")
+        if ts:
+            try:
+                dt = datetime.fromisoformat(ts)
+                daily[dt.strftime("%Y-%m-%d")] += 1
+                hourly[dt.hour] += 1
+            except (ValueError, TypeError):
+                pass
+
+    # 活跃时段分布
+    time_periods = {"凌晨(0-6)": 0, "上午(6-12)": 0, "下午(12-18)": 0, "晚上(18-24)": 0}
+    for h, count in hourly.items():
+        if h < 6:
+            time_periods["凌晨(0-6)"] += count
+        elif h < 12:
+            time_periods["上午(6-12)"] += count
+        elif h < 18:
+            time_periods["下午(12-18)"] += count
+        else:
+            time_periods["晚上(18-24)"] += count
+
+    return {
+        "total_messages": total,
+        "user_messages": len(user_msgs),
+        "assistant_messages": len(assistant_msgs),
+        "daily_frequency": dict(sorted(daily.items(), reverse=True)[:30]),
+        "hourly_distribution": dict(sorted(hourly.items())),
+        "time_periods": time_periods,
+    }
+
+
+# --- 情感分析 ---
+
+@router.get("/exes/{slug}/emotion")
+def get_emotion(slug: str, user_id: int = Depends(require_auth)):
+    """对话情感分析：整体情感倾向 + 情感曲线。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.conversation_store import load_jsonl_messages
+    from core.emotion_tracker import analyze_history, generate_emotion_curve
+
+    messages = load_jsonl_messages(slug)
+    history = [{"role": m.get("role", ""), "content": m.get("content", "")} for m in messages]
+    analysis = analyze_history(history)
+    curve = generate_emotion_curve(history)
+    return {"analysis": analysis, "curve": curve}
+
+
+# --- 健康提醒 ---
+
+@router.get("/user/health/check")
+def health_check(user_id: int = Depends(require_auth)):
+    """检查是否需要显示使用时长提醒。"""
+    from core.health_tracker import health_tracker
+    health_tracker.start_session(user_id)
+    should_remind = health_tracker.should_remind(user_id)
+    tip = health_tracker.get_health_tip()
+    return {"should_remind": should_remind, "health_tip": tip}
+
+
+@router.get("/user/health/stats")
+def health_stats(user_id: int = Depends(require_auth)):
+    """获取用户使用统计。"""
+    from core.health_tracker import health_tracker
+    return health_tracker.get_usage_stats(user_id)
+
+
+@router.get("/user/health/mindful")
+def mindful_message(user_id: int = Depends(require_auth)):
+    """获取正念引导消息。"""
+    from core.health_tracker import health_tracker
+    return {"message": health_tracker.get_mindful_message()}
+
+
+# --- 多人镜像管理 ---
+
+@router.put("/exes/{slug}/group")
+def set_group(slug: str, group: str = Query(...), user_id: int = Depends(require_auth)):
+    """设置镜像分组。"""
+    slug = _check_exe_access(slug, user_id)
+    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    if not meta_file.exists():
+        raise HTTPException(status_code=404, detail="镜像不存在")
+    import json
+    with open(meta_file, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+    meta["group"] = group
+    with open(meta_file, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "slug": slug, "group": group}
+
+
+@router.get("/exes/groups")
+def list_groups(user_id: int = Depends(require_auth)):
+    """获取所有分组列表。"""
+    exes_dir = PROJECT_DIR / "exes"
+    if not exes_dir.exists():
+        return {"groups": {}}
+
+    groups = {}
+    for exe_dir in exes_dir.iterdir():
+        if not exe_dir.is_dir():
+            continue
+        meta_file = exe_dir / "meta.json"
+        if not meta_file.exists():
+            continue
+        try:
+            import json
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            group = meta.get("group", "默认")
+            if group not in groups:
+                groups[group] = []
+            groups[group].append({
+                "slug": exe_dir.name,
+                "name": meta.get("name", exe_dir.name),
+            })
+        except Exception:
+            pass
+
+    return {"groups": groups}
