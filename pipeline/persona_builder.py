@@ -1,4 +1,4 @@
-"""调用 LLM 生成 persona.md（含 9 场景原话样本抽取）。"""
+"""调用 LLM 生成 persona.md（含 9 场景原话样本抽取 + 主动回忆原话）。"""
 
 from pathlib import Path
 from config import get_llm_config, get_llm_client
@@ -16,6 +16,14 @@ SPEECH_SCENES = [
     ("吃醋/占有欲", "你跟谁 你是不是 又是谁"),
     ("感谢/认可", "谢谢 你真好 辛苦了 有你真好"),
     ("告别/晚安", "拜拜 晚安 下次聊 先睡了"),
+]
+
+# 主动回忆场景：检索有代表性的原话，用于 AI 在对话中自然提起
+RECALL_SCENES = [
+    ("开心回忆", "好开心 太棒了 哈哈哈 笑死 最开心"),
+    ("感动瞬间", "好感动 谢谢你 有你真好 幸福"),
+    ("日常小事", "今天 告诉你 分享 你知道吗"),
+    ("约定/计划", "下次 一起 约好 要去 什么时候"),
 ]
 
 
@@ -76,7 +84,33 @@ def build_persona(
         if samples:
             speech_samples = "\n".join(samples)
 
+    # Step 2.5: 抽取主动回忆原话样本
+    recall_samples = ""
+    if vector_store and embedder:
+        recall_parts = []
+        for scene_name, query in RECALL_SCENES:
+            results = vector_store.search_target_only(query, embedder, top_k=6)
+            picked = []
+            seen = set()
+            for r in results:
+                text = r.get("display_text", "").strip()
+                if text and len(text) > 3 and text not in seen:
+                    seen.add(text)
+                    picked.append(text)
+                if len(picked) >= 2:
+                    break
+            if picked:
+                recall_parts.append(f"#### {scene_name}")
+                for p in picked:
+                    recall_parts.append(f"- {p}")
+        if recall_parts:
+            recall_samples = "\n".join(recall_parts)
+
     # Step 3: 生成完整 persona.md
+    recall_section = ""
+    if recall_samples:
+        recall_section = f"\n\n## 主动回忆原话（用于对话中自然提起 ta 曾说过的话）\n{recall_samples}"
+
     user_content = f"""请根据以下分析结果生成 persona.md：
 
 ## 性格分析
@@ -84,7 +118,7 @@ def build_persona(
 
 ## 原话样本（从聊天记录中提取的真实原话）
 {speech_samples if speech_samples else "（无原话样本，请基于分析结果推断）"}
-
+{recall_section}
 请按照 persona_builder.md 的 5 层结构输出完整的 persona.md。"""
 
     build_response = client.chat.completions.create(

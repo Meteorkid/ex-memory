@@ -7,6 +7,11 @@ let currentName = '';
 let tabHistory = [];
 let speechRecognition = null;
 
+// ── 情感健康：使用时长追踪 ──
+let loginTime = Date.now();
+let lastReminderTime = 0;
+const REMINDER_INTERVAL = 30 * 60 * 1000; // 30 分钟
+
 // ── Toast 通知系统 ──
 function ensureToastContainer() {
     let c = document.querySelector('.toast-container');
@@ -93,6 +98,24 @@ async function parseChatStream(res, msgsEl) {
     msgsEl.appendChild(replyRow);
     const assistantDiv = replyRow.querySelector('.msg');
 
+    // 打字延迟：模拟真人打字节奏
+    const typeQueue = [];
+    let isTyping = false;
+    function typeNext() {
+        if (typeQueue.length === 0) { isTyping = false; return; }
+        isTyping = true;
+        const text = typeQueue.shift();
+        assistantDiv.textContent += text;
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+        // 随机延迟 30-80ms，模拟打字节奏
+        const delay = 30 + Math.random() * 50;
+        setTimeout(typeNext, delay);
+    }
+    function queueType(text) {
+        typeQueue.push(text);
+        if (!isTyping) typeNext();
+    }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -114,7 +137,7 @@ async function parseChatStream(res, msgsEl) {
                     assistantDiv.textContent = item.error;
                     replyRow.className = 'msg-row sys';
                 } else if (item.type === 'text' && item.content) {
-                    assistantDiv.textContent += item.content;
+                    queueType(item.content);
                 } else if (item.type === 'sticker' && item.id) {
                     msgsEl.appendChild(stickerMsg(item.id));
                 } else if (item.type === 'red_packet') {
@@ -124,7 +147,11 @@ async function parseChatStream(res, msgsEl) {
                 }
             } catch (e) { /* skip malformed SSE */ }
         }
-        msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+
+    // 等待打字队列完成
+    while (typeQueue.length > 0 || isTyping) {
+        await new Promise(r => setTimeout(r, 50));
     }
 
     if (!assistantDiv.textContent.trim() && replyRow.parentNode) {
@@ -203,6 +230,61 @@ try { initVoiceToggle(); } catch(e) { console.warn('Voice init skipped:', e.mess
 initSearch();
 registerSW();
 requestNotificationPermission();
+
+// ── 情感健康：使用时长提醒（每 10 分钟检查一次）──
+setInterval(checkUsageReminder, 10 * 60 * 1000);
+
+function checkUsageReminder() {
+    if (!token || !currentSlug) return;
+    const now = Date.now();
+    if (now - loginTime > REMINDER_INTERVAL && now - lastReminderTime > REMINDER_INTERVAL) {
+        lastReminderTime = now;
+        showMindfulReminder();
+    }
+}
+
+function showMindfulReminder() {
+    // 在聊天中插入系统消息，而非弹窗打断
+    const msgsEl = $('chat-msgs');
+    if (!msgsEl || msgsEl.style.display === 'none') return;
+    fetchHealthTip().then(tip => {
+        const row = document.createElement('div');
+        row.className = 'msg-row sys';
+        row.innerHTML = `<div class="msg mindful-msg">🌿 ${escHtml(tip)}</div>`;
+        msgsEl.appendChild(row);
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+    });
+    loginTime = Date.now(); // 重置计时
+}
+
+async function fetchHealthTip() {
+    try {
+        const data = await api('GET', '/user/health/check');
+        return data.health_tip || '深呼吸三次，感受当下的平静。';
+    } catch(e) {
+        return '深呼吸三次，感受当下的平静。';
+    }
+}
+
+// ── 正念引导：退出时的温暖告别 ──
+window.addEventListener('beforeunload', (e) => {
+    if (!token) return;
+    const msg = '随时回来找我 🌙';
+    e.returnValue = msg;
+    return msg;
+});
+
+// ── 情感健康贴士：加载到聊天列表底部 ──
+async function loadHealthTip() {
+    const container = $('health-tip-container');
+    if (!container) return;
+    try {
+        const tip = await fetchHealthTip();
+        container.innerHTML = `<div class="health-tip">${escHtml(tip)}</div>`;
+    } catch(e) {
+        container.innerHTML = `<div class="health-tip">深呼吸三次，感受当下的平静。</div>`;
+    }
+}
 
 function updateStatusTime() {
     const now = new Date();
@@ -785,6 +867,15 @@ async function loadContactList() {
                 c.classList.toggle('selected', c.dataset.slug === currentSlug);
             });
         }
+
+        // 情感健康贴士
+        let tipEl = $('health-tip-container');
+        if (!tipEl) {
+            tipEl = document.createElement('div');
+            tipEl.id = 'health-tip-container';
+            el.appendChild(tipEl);
+        }
+        loadHealthTip();
     } catch(e) {
         if (token) el.innerHTML = '<p class="list-empty">加载失败: ' + escHtml(e.message) + '</p>';
     }
@@ -1017,8 +1108,15 @@ async function sendMessage() {
     }
 
     maybeAddTimestamp(msgsEl);
-    msgsEl.appendChild(chatBubble('user', msg));
+    const userRow = chatBubble('user', msg);
+    msgsEl.appendChild(userRow);
     storeLastMessage(currentSlug, msg);
+
+    // 添加已读标记
+    const readStatus = document.createElement('div');
+    readStatus.className = 'msg-read-status';
+    readStatus.textContent = '已读';
+    userRow.appendChild(readStatus);
 
     // 离线时排队消息
     if (!navigator.onLine) {
@@ -1045,6 +1143,8 @@ async function sendMessage() {
             body: JSON.stringify({slug: currentSlug, message: msg, history: hist.slice(-50)}),
         });
 
+        // 模拟对方"看到消息后思考"的延迟（1-3秒）
+        await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
         typingRow.remove();
         await parseChatStream(res, msgsEl);
 

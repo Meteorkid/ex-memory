@@ -1958,50 +1958,92 @@ button:focus-visible, .nav-tab:focus-visible {
    情感健康提醒
    ═══════════════════════════════════════ */
 
-.mindful-reminder {
+.mindful-reminder-overlay {
     position: fixed;
-    bottom: 100px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--glass-thick);
-    backdrop-filter: var(--glass-blur-mid);
-    -webkit-backdrop-filter: var(--glass-blur-mid);
-    border: 1px solid rgba(124, 108, 255, 0.1);
-    border-radius: var(--radius-lg);
-    padding: 16px 24px;
-    max-width: 320px;
-    text-align: center;
-    z-index: 9999;
-    animation: toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: var(--shadow-lg);
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fade-in 0.3s ease;
 }
-.mindful-reminder .mindful-text {
+
+.mindful-reminder {
+    width: 300px;
+    background: rgba(18, 18, 30, 0.95);
+    backdrop-filter: var(--glass-saturate) var(--glass-blur-mid);
+    -webkit-backdrop-filter: var(--glass-saturate) var(--glass-blur-mid);
+    border: 1px solid rgba(124, 108, 255, 0.1);
+    border-radius: var(--radius-xl);
+    padding: 32px 28px;
+    text-align: center;
+    animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-xl);
+}
+.mindful-reminder-icon {
+    font-size: 2.8em;
+    margin-bottom: 12px;
+}
+.mindful-reminder-title {
+    font-size: 1.15em;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+.mindful-reminder-text {
     font-size: 0.88em;
     color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+.mindful-reminder-tip {
+    font-size: 0.82em;
+    color: var(--accent);
+    font-style: italic;
+    padding: 10px 14px;
+    background: rgba(124, 108, 255, 0.06);
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
     line-height: 1.5;
 }
-.mindful-reminder .mindful-close {
-    margin-top: 12px;
-    padding: 6px 16px;
-    background: rgba(124, 108, 255, 0.1);
-    border: none;
+.mindful-reminder-actions {
+    display: flex;
+    justify-content: center;
+}
+.mindful-btn {
+    padding: 10px 32px;
+    background: linear-gradient(135deg, rgba(124, 108, 255, 0.15), rgba(124, 108, 255, 0.08));
+    border: 1px solid rgba(124, 108, 255, 0.2);
     border-radius: var(--radius-pill);
     color: var(--accent);
-    font-size: 0.82em;
+    font-size: 0.9em;
+    font-weight: 500;
     cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+.mindful-btn:hover {
+    background: rgba(124, 108, 255, 0.2);
+    box-shadow: 0 0 16px rgba(124, 108, 255, 0.15);
+}
+.mindful-btn:active {
+    transform: scale(0.96);
 }
 
 .health-tip {
     padding: 12px 16px;
-    margin: 8px 12px;
+    margin: 8px 12px 16px;
     background: rgba(124, 108, 255, 0.04);
     border-radius: var(--radius-md);
     border-left: 3px solid var(--accent);
-}
-.health-tip-text {
     font-size: 0.82em;
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: 1.6;
+    animation: msgSlideIn 0.5s ease;
 }
 
 /* ═══════════════════════════════════════
@@ -2097,4 +2139,34 @@ button:focus-visible, .nav-tab:focus-visible {
 .regenerate-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════
+   已读/未读状态
+   ═══════════════════════════════════════ */
+
+.msg-read-status {
+    font-size: 0.65em;
+    color: var(--text-tertiary);
+    text-align: right;
+    margin-top: 2px;
+    opacity: 0.6;
+}
+.msg-read-status.read {
+    color: var(--accent);
+    opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════
+   健康提醒（聊天内系统消息）
+   ═══════════════════════════════════════ */
+
+.mindful-msg {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 8px 16px;
+    background: rgba(124, 108, 255, 0.04);
+    border-radius: var(--radius-md);
+    border-left: 2px solid rgba(124, 108, 255, 0.2);
 }
