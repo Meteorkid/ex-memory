@@ -1604,6 +1604,67 @@ async function searchMessages(query) {
 }
 
 // ═══════════════════════════════════════
+// 对话截图与分享
+// ═══════════════════════════════════════
+
+async function generateScreenshot() {
+    const msgsEl = $('chat-msgs');
+    if (!msgsEl || msgsEl.style.display === 'none') {
+        showToast('请先打开对话', 'warning');
+        return;
+    }
+
+    showToast('正在生成截图...', 'info');
+
+    try {
+        // 动态加载 html2canvas
+        if (!window.html2canvas) {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+            document.head.appendChild(script);
+            await new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = reject;
+            });
+        }
+
+        const canvas = await window.html2canvas(msgsEl, {
+            backgroundColor: '#0a0a12',
+            scale: 2,
+            useCORS: true,
+        });
+
+        // 下载截图
+        const link = document.createElement('a');
+        link.download = `ex-memory-${currentSlug || 'chat'}-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        showToast('截图已保存', 'success');
+    } catch(e) {
+        showToast('截图失败: ' + e.message, 'error');
+    }
+}
+
+async function generateShareLink() {
+    if (!currentSlug) {
+        showToast('请先选择一个镜像', 'warning');
+        return;
+    }
+
+    try {
+        const data = await api('POST', `/exes/${currentSlug}/share`);
+        if (data.url) {
+            // 复制链接
+            await navigator.clipboard.writeText(data.url);
+            showToast('分享链接已复制', 'success');
+        }
+    } catch(e) {
+        showToast('生成分享链接失败', 'error');
+    }
+}
+
+// ═══════════════════════════════════════
 // 对话统计
 // ═══════════════════════════════════════
 
@@ -1613,7 +1674,11 @@ async function loadStats() {
         return;
     }
     try {
-        const stats = await api('GET', `/exes/${currentSlug}/stats`);
+        const [stats, emotion] = await Promise.all([
+            api('GET', `/exes/${currentSlug}/stats`),
+            api('GET', `/exes/${currentSlug}/emotion`).catch(() => ({analysis: {overall: {score: 0}}, curve: []})),
+        ]);
+
         const el = $('chat-msgs');
         el.style.display = 'block';
         el.innerHTML = `
@@ -1632,7 +1697,19 @@ async function loadStats() {
                         <div class="stat-value">${stats.assistant_messages}</div>
                         <div class="stat-label">TA 回复的</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Math.round((emotion.analysis?.overall?.score || 0) * 100)}%</div>
+                        <div class="stat-label">情感指数</div>
+                    </div>
                 </div>
+
+                <!-- 情感曲线 -->
+                <h4 class="stats-subtitle">情感曲线</h4>
+                <div class="emotion-curve-container">
+                    <canvas id="emotion-canvas" width="400" height="120"></canvas>
+                </div>
+
+                <!-- 活跃时段 -->
                 <h4 class="stats-subtitle">活跃时段</h4>
                 <div class="stats-periods">
                     ${Object.entries(stats.time_periods || {}).map(([period, count]) => `
@@ -1644,10 +1721,71 @@ async function loadStats() {
                     `).join('')}
                 </div>
             </div>`;
+
+        // 绘制情感曲线
+        drawEmotionCurve(emotion.curve || []);
         $('chat-empty-hint').style.display = 'none';
     } catch(e) {
         showToast('加载统计失败: ' + e.message, 'error');
     }
+}
+
+function drawEmotionCurve(curve) {
+    const canvas = $('emotion-canvas');
+    if (!canvas || curve.length === 0) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const padding = 20;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // 背景网格
+    ctx.strokeStyle = 'rgba(124, 108, 255, 0.08)';
+    ctx.lineWidth = 1;
+    for (let y = padding; y <= h - padding; y += 30) {
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(w - padding, y);
+        ctx.stroke();
+    }
+
+    // 中线（0 分）
+    ctx.strokeStyle = 'rgba(124, 108, 255, 0.2)';
+    ctx.beginPath();
+    ctx.moveTo(padding, h / 2);
+    ctx.lineTo(w - padding, h / 2);
+    ctx.stroke();
+
+    // 情感曲线
+    const stepX = (w - 2 * padding) / Math.max(curve.length - 1, 1);
+    ctx.strokeStyle = '#7c6cff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    curve.forEach((point, i) => {
+        const x = padding + i * stepX;
+        const y = h / 2 - point.score * (h / 2 - padding) * 0.8;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // 填充区域
+    ctx.lineTo(padding + (curve.length - 1) * stepX, h / 2);
+    ctx.lineTo(padding, h / 2);
+    ctx.closePath();
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, 'rgba(124, 108, 255, 0.15)');
+    gradient.addColorStop(0.5, 'rgba(124, 108, 255, 0.02)');
+    gradient.addColorStop(1, 'rgba(124, 108, 255, 0.15)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // 标签
+    ctx.fillStyle = 'rgba(122, 116, 144, 0.6)';
+    ctx.font = '10px -apple-system';
+    ctx.textAlign = 'right';
+    ctx.fillText('正面', padding - 4, padding + 4);
+    ctx.fillText('负面', padding - 4, h - padding + 4);
 }
 
 // ═══════════════════════════════════════
@@ -1985,6 +2123,8 @@ function initVoiceToggle() {
 
     const recordBtn = $('voice-record-btn');
     let recordTimer, recordDuration, voiceRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
 
     recordBtn.addEventListener('touchstart', startVoiceRecord, {passive: false});
     recordBtn.addEventListener('mousedown', e => {
@@ -1995,18 +2135,39 @@ function initVoiceToggle() {
     recordBtn.addEventListener('mouseup', stopVoiceRecord);
     recordBtn.addEventListener('mouseleave', stopVoiceRecord);
 
-    function startVoiceRecord(e) {
+    async function startVoiceRecord(e) {
         if (!isVoiceMode || voiceRecording) return;
         e.preventDefault();
         voiceRecording = true;
+        audioChunks = [];
         recordBtn.classList.add('recording');
         recordBtn.innerHTML = '<span class="voice-recording-dot"></span> 松开 发送';
         recordDuration = 0;
-        recordTimer = setInterval(() => { recordDuration++; }, 1000);
+        recordTimer = setInterval(() => { recordDuration++; updateRecordTimer(); }, 1000);
+
+        // 启动 MediaRecorder 录制真实音频
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+            mediaRecorder = new MediaRecorder(stream, {mimeType: 'audio/webm;codecs=opus'});
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+            mediaRecorder.start();
+        } catch(err) {
+            console.warn('MediaRecorder not available:', err);
+        }
+
         // 启动语音识别
         if (speechRecognition) {
             try { speechRecognition.start(); } catch(e) {}
         }
+    }
+
+    function updateRecordTimer() {
+        const min = Math.floor(recordDuration / 60);
+        const sec = recordDuration % 60;
+        const timeStr = `${min}:${sec.toString().padStart(2, '0')}`;
+        recordBtn.innerHTML = `<span class="voice-recording-dot"></span> ${timeStr} 松开 发送`;
     }
 
     function stopVoiceRecord(e) {
@@ -2016,6 +2177,13 @@ function initVoiceToggle() {
         recordBtn.classList.remove('recording');
         recordBtn.innerHTML = '<span class="voice-recording-dot"></span> 按住 说话';
         clearInterval(recordTimer);
+
+        // 停止 MediaRecorder
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        }
+
         // 停止语音识别
         if (speechRecognition) {
             try { speechRecognition.stop(); } catch(e) {}
@@ -2049,6 +2217,65 @@ function initVoiceToggle() {
             }
         };
         speechRecognition.onerror = () => {};
+    }
+
+    // ── 加号按钮：展开更多功能 ──
+    const plusBtn = $('plus-btn');
+    const plusPanel = $('plus-panel');
+    if (plusBtn && plusPanel) {
+        plusBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const visible = plusPanel.style.display !== 'none';
+            plusPanel.style.display = visible ? 'none' : 'flex';
+        });
+        document.addEventListener('click', () => {
+            plusPanel.style.display = 'none';
+        });
+    }
+
+    // ── 图片上传 ──
+    const imageInput = $('image-file-input');
+    if (imageInput) {
+        imageInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !currentSlug) return;
+            const msgsEl = $('chat-msgs');
+            if (!msgsEl) return;
+
+            // 显示图片预览
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const row = document.createElement('div');
+                row.className = 'msg-row user';
+                row.dataset.timestamp = Date.now();
+                row.innerHTML = `<div class="msg user image-msg"><img src="${ev.target.result}" class="msg-image" alt="图片"></div>`;
+                msgsEl.appendChild(row);
+                msgsEl.scrollTop = msgsEl.scrollHeight;
+
+                // 添加已读标记
+                const readStatus = document.createElement('div');
+                readStatus.className = 'msg-read-status';
+                readStatus.textContent = '已发送';
+                row.appendChild(readStatus);
+
+                // 发送图片消息
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const resp = await fetch(`${API}/chat`, {
+                        method: 'POST',
+                        headers: authHeaders(false),
+                        body: JSON.stringify({slug: currentSlug, message: '[图片]'}),
+                    });
+                    readStatus.textContent = '已读';
+                    readStatus.classList.add('read');
+                } catch(err) {
+                    readStatus.textContent = '发送失败';
+                }
+            };
+            reader.readAsDataURL(file);
+            imageInput.value = '';
+        });
     }
 }
 

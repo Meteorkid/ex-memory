@@ -162,6 +162,7 @@
                     </div>
                     <!-- 输入栏 -->
                     <div class="chat-input-bar" role="group" aria-label="消息输入">
+                        <button id="plus-btn" class="input-action" title="更多" aria-label="更多功能">＋</button>
                         <button id="voice-toggle-btn" class="input-action" title="语音" aria-label="语音输入">🎤</button>
                         <div id="voice-record-btn" class="voice-record-btn" style="display:none">
                             <span class="voice-recording-dot"></span>
@@ -170,6 +171,15 @@
                         <input type="text" id="msg-input" placeholder="" disabled aria-label="输入消息">
                         <button id="sticker-toggle-btn" class="input-action" aria-label="表情">😊</button>
                         <button id="msg-send" class="send-btn" disabled aria-label="发送消息">发送</button>
+                    </div>
+                    <!-- 图片上传（隐藏） -->
+                    <input type="file" id="image-file-input" accept="image/*" style="display:none">
+                    <!-- 更多功能面板 -->
+                    <div id="plus-panel" class="plus-panel" style="display:none">
+                        <div class="plus-panel-item" onclick="document.getElementById('image-file-input').click()">
+                            <div class="plus-panel-icon">🖼</div>
+                            <div class="plus-panel-label">图片</div>
+                        </div>
                     </div>
                 </div>
 

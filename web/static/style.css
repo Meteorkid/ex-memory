@@ -2284,3 +2284,123 @@ button:focus-visible, .nav-tab:focus-visible {
     from { opacity: 0; transform: translateX(-20px); }
     to { opacity: 1; transform: translateX(0); }
 }
+
+/* ═══════════════════════════════════════
+   加号面板
+   ═══════════════════════════════════════ */
+
+.plus-panel {
+    position: absolute;
+    bottom: 60px;
+    left: 0;
+    right: 0;
+    background: rgba(14, 14, 24, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid rgba(124, 108, 255, 0.08);
+    padding: 16px 20px;
+    display: flex;
+    gap: 24px;
+    justify-content: flex-start;
+    animation: menuFadeIn 0.2s ease;
+}
+.plus-panel-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.plus-panel-item:active {
+    transform: scale(0.92);
+}
+.plus-panel-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+}
+.plus-panel-label {
+    font-size: 0.72em;
+    color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════
+   图片消息
+   ═══════════════════════════════════════ */
+
+.image-msg {
+    padding: 4px !important;
+    background: none !important;
+    border: none !important;
+    backdrop-filter: none !important;
+}
+.msg-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    display: block;
+}
+
+/* ═══════════════════════════════════════
+   朋友圈九宫格
+   ═══════════════════════════════════════ */
+
+.moment-images {
+    display: grid;
+    gap: 4px;
+    margin-top: 8px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+.moment-images.grid-1 { grid-template-columns: 1fr; }
+.moment-images.grid-2 { grid-template-columns: 1fr 1fr; }
+.moment-images.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.moment-images.grid-4 { grid-template-columns: 1fr 1fr; }
+.moment-images.grid-5,
+.moment-images.grid-6 { grid-template-columns: 1fr 1fr 1fr; }
+.moment-images.grid-7,
+.moment-images.grid-8,
+.moment-images.grid-9 { grid-template-columns: 1fr 1fr 1fr; }
+.moment-img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 4px;
+}
+.moment-img:first-child:last-child {
+    aspect-ratio: 16/9;
+}
+
+/* ═══════════════════════════════════════
+   语音消息增强
+   ═══════════════════════════════════════ */
+
+.msg.voice.playing .voice-wave .bar {
+    animation: waveAnim 0.6s ease-in-out infinite alternate;
+}
+.msg.voice .voice-wave .bar {
+    transition: height 0.1s ease;
+}
+
+/* ═══════════════════════════════════════
+   情感曲线
+   ═══════════════════════════════════════ */
+
+.emotion-curve-container {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(124, 108, 255, 0.06);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin-bottom: 20px;
+}
+.emotion-curve-container canvas {
+    width: 100%;
+    height: auto;
+}
