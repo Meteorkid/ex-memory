@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, R
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from config import EXES_DIR, get_ex_dir, get_collection_name, DISABLE_REGISTRATION
+from config import EXES_DIR, PROJECT_DIR, get_ex_dir, get_collection_name, DISABLE_REGISTRATION
 from core.validation import validate_slug, validate_user_input, sanitize_chat_history
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
