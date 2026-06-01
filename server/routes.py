@@ -950,3 +950,69 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
         "overall_score": overall,
         "user_score": user_score,
     }
+
+
+# --- 使用统计 ---
+
+@router.get("/stats/usage")
+def get_usage_stats(user_id: int = Depends(require_auth)):
+    """获取用户使用统计。"""
+    from datetime import datetime
+
+    exes_dir = PROJECT_DIR / "exes"
+    total_exes = 0
+    total_messages = 0
+
+    if exes_dir.exists():
+        for exe_dir in exes_dir.iterdir():
+            if not exe_dir.is_dir():
+                continue
+            # 检查访问权限
+            try:
+                from core.exe_access import check_access
+                if not check_access(exe_dir.name, user_id):
+                    continue
+            except Exception:
+                continue
+
+            total_exes += 1
+            conv_file = exe_dir / "conversations" / "conversation.jsonl"
+            if conv_file.exists():
+                try:
+                    with open(conv_file, "r", encoding="utf-8") as f:
+                        total_messages += sum(1 for _ in f)
+                except Exception:
+                    pass
+
+    return {
+        "total_exes": total_exes,
+        "total_messages": total_messages,
+        "user_id": user_id,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.post("/feedback")
+def submit_feedback(
+    feedback_type: str = Query(...),
+    content: str = Query(...),
+    user_id: int = Depends(require_auth),
+):
+    """提交用户反馈。"""
+    from datetime import datetime
+
+    feedback_file = PROJECT_DIR / "data" / "feedback.jsonl"
+    feedback_file.parent.mkdir(parents=True, exist_ok=True)
+
+    import json
+    entry = {
+        "user_id": user_id,
+        "type": feedback_type,
+        "content": content,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+    with open(feedback_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    return {"ok": True, "message": "感谢你的反馈"}

@@ -864,11 +864,16 @@ async function loadContactList() {
                 </div>`;
             return;
         }
-        el.innerHTML = exes.map(e => {
+        // 优化：使用 DocumentFragment 批量插入
+        const fragment = document.createDocumentFragment();
+        exes.forEach(e => {
             const lastMsg = getLastMessage(e.slug);
-            const isOnline = Math.random() > 0.6; // 模拟在线状态
-            return `
-            <div class="contact-item" data-slug="${escHtml(e.slug)}" data-name="${escHtml(e.name)}">
+            const isOnline = Math.random() > 0.6;
+            const div = document.createElement('div');
+            div.className = 'contact-item';
+            div.dataset.slug = e.slug;
+            div.dataset.name = e.name;
+            div.innerHTML = `
                 <div class="contact-avatar" style="background:${avatarColor(e.slug)}">
                     ${(e.name || e.slug)[0]}
                     <span class="online-dot ${isOnline ? 'online' : ''}"></span>
@@ -881,9 +886,14 @@ async function loadContactList() {
                 </div>
                 <div class="contact-meta">
                     <div class="contact-time">${(e.created_at || '').slice(0,10)}</div>
-                </div>
-            </div>
-        `}).join('');
+                </div>`;
+            div.addEventListener('click', () => {
+                enterChat(div.dataset.slug, div.dataset.name);
+            });
+            fragment.appendChild(div);
+        });
+        el.innerHTML = '';
+        el.appendChild(fragment);
 
         el.querySelectorAll('.contact-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -2248,7 +2258,7 @@ function initVoiceToggle() {
                 const row = document.createElement('div');
                 row.className = 'msg-row user';
                 row.dataset.timestamp = Date.now();
-                row.innerHTML = `<div class="msg user image-msg"><img src="${ev.target.result}" class="msg-image" alt="图片"></div>`;
+                row.innerHTML = `<div class="msg user image-msg"><img src="${ev.target.result}" class="msg-image" alt="图片" loading="lazy"></div>`;
                 msgsEl.appendChild(row);
                 msgsEl.scrollTop = msgsEl.scrollHeight;
 
