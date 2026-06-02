@@ -7,6 +7,154 @@ let currentName = '';
 let tabHistory = [];
 let speechRecognition = null;
 
+// ═══════════════════════════════════════
+// 懒加载工具
+// ═══════════════════════════════════════
+
+const LazyLoader = {
+    loaded: new Map(),
+
+    async load(url, type = 'script') {
+        if (this.loaded.has(url)) return this.loaded.get(url);
+
+        const promise = new Promise((resolve, reject) => {
+            let el;
+            if (type === 'script') {
+                el = document.createElement('script');
+                el.src = url;
+                el.async = true;
+            } else if (type === 'style') {
+                el = document.createElement('link');
+                el.href = url;
+                el.rel = 'stylesheet';
+            }
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error(`Failed to load ${url}`));
+            document.head.appendChild(el);
+        });
+
+        this.loaded.set(url, promise);
+        return promise;
+    },
+
+    preload(urls) {
+        urls.forEach(url => {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.href = url;
+            link.as = url.endsWith('.js') ? 'script' : 'style';
+            document.head.appendChild(link);
+        });
+    }
+};
+
+// 预加载关键资源
+LazyLoader.preload(['/static/style.css']);
+
+// ═══════════════════════════════════════
+// 内存管理
+// ═══════════════════════════════════════
+
+const MemoryManager = {
+    timers: new Set(),
+    observers: new Set(),
+    listeners: new Map(),
+
+    // 注册定时器
+    setInterval(fn, delay) {
+        const id = setInterval(fn, delay);
+        this.timers.add(id);
+        return id;
+    },
+
+    setTimeout(fn, delay) {
+        const id = setTimeout(fn, delay);
+        this.timers.add(id);
+        return id;
+    },
+
+    // 清除所有定时器
+    clearAllTimers() {
+        this.timers.forEach(id => {
+            clearInterval(id);
+            clearTimeout(id);
+        });
+        this.timers.clear();
+    },
+
+    // 注册 IntersectionObserver
+    observe(el, callback, options) {
+        const observer = new IntersectionObserver(callback, options);
+        observer.observe(el);
+        this.observers.add(observer);
+        return observer;
+    },
+
+    // 清除所有观察者
+    clearAllObservers() {
+        this.observers.forEach(obs => obs.disconnect());
+        this.observers.clear();
+    },
+
+    // 注册事件监听器（自动清理）
+    addEventListener(el, event, handler, options) {
+        el.addEventListener(event, handler, options);
+        if (!this.listeners.has(el)) {
+            this.listeners.set(el, []);
+        }
+        this.listeners.get(el).push({ event, handler, options });
+    },
+
+    // 清除元素的所有监听器
+    clearListeners(el) {
+        const listeners = this.listeners.get(el);
+        if (listeners) {
+            listeners.forEach(({ event, handler, options }) => {
+                el.removeEventListener(event, handler, options);
+            });
+            this.listeners.delete(el);
+        }
+    },
+
+    // 内存使用检查
+    checkMemory() {
+        if (performance.memory) {
+            const used = performance.memory.usedJSHeapSize;
+            const limit = performance.memory.jsHeapSizeLimit;
+            const ratio = used / limit;
+            if (ratio > 0.8) {
+                console.warn(`[Memory] High usage: ${(ratio * 100).toFixed(1)}%`);
+                this.cleanup();
+            }
+        }
+    },
+
+    // 清理未使用资源
+    cleanup() {
+        // 清理过期的缓存
+        if (typeof cache !== 'undefined') {
+            cache.clear();
+        }
+        // 强制垃圾回收（如果可用）
+        if (window.gc) {
+            window.gc();
+        }
+    },
+
+    // 页面卸载时清理
+    destroy() {
+        this.clearAllTimers();
+        this.clearAllObservers();
+        this.listeners.forEach((_, el) => this.clearListeners(el));
+    }
+};
+
+// 页面卸载时自动清理
+window.addEventListener('beforeunload', () => MemoryManager.destroy());
+
+// 定期检查内存（每5分钟）
+MemoryManager.setInterval(() => MemoryManager.checkMemory(), 5 * 60 * 1000);
+
 // ── 情感健康：使用时长追踪 ──
 let loginTime = Date.now();
 let lastReminderTime = 0;
@@ -739,34 +887,53 @@ $('reg-password2').onkeydown = e => { if(e.key==='Enter') doRegister(); };
 // API 封装
 // ═══════════════════════════════════════
 
+// 请求去重
+const pendingRequests = new Map();
+
 async function api(method, path, body, retries = 2) {
     if (!navigator.onLine) {
         showToast('网络连接已断开，请检查网络', 'warning');
         throw new Error('网络连接已断开');
     }
+
+    // GET 请求去重
+    const requestKey = method === 'GET' ? `${method}:${path}` : null;
+    if (requestKey && pendingRequests.has(requestKey)) {
+        return pendingRequests.get(requestKey);
+    }
+
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-    for (let i = 0; i <= retries; i++) {
-        try {
-            const res = await fetch(`${API}${path}`, {
-                method, headers,
-                body: body !== undefined ? JSON.stringify(body) : undefined,
-                signal: AbortSignal.timeout(10000), // 10秒超时
-            });
-            if (res.status === 401) { logout(); throw new Error('登录已过期'); }
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.detail || `请求失败 (${res.status})`);
-            return data;
-        } catch(e) {
-            if (i < retries && (e.name === 'AbortError' || e.message.includes('网络'))) {
-                await new Promise(r => setTimeout(r, 1000 * (i + 1))); // 递增延迟
-                continue;
+    const promise = (async () => {
+        for (let i = 0; i <= retries; i++) {
+            try {
+                const res = await fetch(`${API}${path}`, {
+                    method, headers,
+                    body: body !== undefined ? JSON.stringify(body) : undefined,
+                    signal: AbortSignal.timeout(10000),
+                });
+                if (res.status === 401) { logout(); throw new Error('登录已过期'); }
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.detail || `请求失败 (${res.status})`);
+                return data;
+            } catch(e) {
+                if (i < retries && (e.name === 'AbortError' || e.message.includes('网络'))) {
+                    await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+                    continue;
+                }
+                throw e;
             }
-            throw e;
         }
+    })();
+
+    if (requestKey) {
+        pendingRequests.set(requestKey, promise);
+        promise.finally(() => pendingRequests.delete(requestKey));
     }
+
+    return promise;
 }
 
 function logout() {
