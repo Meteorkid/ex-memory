@@ -1016,3 +1016,78 @@ def submit_feedback(
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     return {"ok": True, "message": "感谢你的反馈"}
+
+
+# --- 情感记忆 ---
+
+@router.get("/exes/{slug}/emotional-memories")
+def get_emotional_memories(slug: str, user_id: int = Depends(require_auth)):
+    """获取情感记忆。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.emotional_memory import load_emotional_memories
+    memories = load_emotional_memories(slug)
+    return {"memories": memories}
+
+
+@router.post("/exes/{slug}/emotional-memories/extract")
+def extract_memories(slug: str, user_id: int = Depends(require_auth)):
+    """从对话历史中提取情感记忆。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.conversation_store import load_jsonl_messages
+    from core.emotional_memory import extract_emotional_memories, save_emotional_memories
+
+    messages = load_jsonl_messages(slug)
+    history = [{"role": m.get("role", ""), "content": m.get("content", ""), "created_at": m.get("created_at", "")} for m in messages]
+
+    memories = extract_emotional_memories(history)
+    save_emotional_memories(slug, memories)
+
+    return {"ok": True, "memories": memories}
+
+
+# --- 个性化 ---
+
+@router.get("/exes/{slug}/user-profile")
+def get_user_profile(slug: str, user_id: int = Depends(require_auth)):
+    """获取用户画像。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.personalization import load_user_profile
+    profile = load_user_profile(slug)
+    return {"profile": profile}
+
+
+@router.post("/exes/{slug}/user-profile/analyze")
+def analyze_user_profile(slug: str, user_id: int = Depends(require_auth)):
+    """分析用户对话风格。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.conversation_store import load_jsonl_messages
+    from core.personalization import analyze_user_style, calculate_relationship_temperature, save_user_profile
+
+    messages = load_jsonl_messages(slug)
+    history = [{"role": m.get("role", ""), "content": m.get("content", ""), "created_at": m.get("created_at", "")} for m in messages]
+
+    style = analyze_user_style(history)
+    temperature = calculate_relationship_temperature(slug, history)
+
+    profile = {
+        "style": style,
+        "temperature": temperature,
+        "analyzed_at": datetime.now().isoformat(),
+    }
+
+    save_user_profile(slug, profile)
+    return {"ok": True, "profile": profile}
+
+
+@router.get("/exes/{slug}/relationship-temperature")
+def get_relationship_temperature(slug: str, user_id: int = Depends(require_auth)):
+    """获取关系温度。"""
+    slug = _check_exe_access(slug, user_id)
+    from core.conversation_store import load_jsonl_messages
+    from core.personalization import calculate_relationship_temperature
+
+    messages = load_jsonl_messages(slug)
+    history = [{"role": m.get("role", ""), "content": m.get("content", ""), "created_at": m.get("created_at", "")} for m in messages]
+
+    temperature = calculate_relationship_temperature(slug, history)
+    return {"temperature": temperature}

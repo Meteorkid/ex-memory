@@ -1938,16 +1938,36 @@ async function loadStats() {
         return;
     }
     try {
-        const [stats, emotion] = await Promise.all([
+        const [stats, emotion, temperature] = await Promise.all([
             api('GET', `/exes/${currentSlug}/stats`),
             api('GET', `/exes/${currentSlug}/emotion`).catch(() => ({analysis: {overall: {score: 0}}, curve: []})),
+            api('GET', `/exes/${currentSlug}/relationship-temperature`).catch(() => ({temperature: {temperature: 50, level: 'warm'}})),
         ]);
+
+        const temp = temperature.temperature || {};
+        const tempLevel = temp.level || 'warm';
+        const tempValue = temp.temperature || 50;
+        const tempEmoji = {hot: '🔥', warm: '☀️', cool: '🌤️', cold: '❄️'}[tempLevel] || '☀️';
 
         const el = $('chat-msgs');
         el.style.display = 'block';
         el.innerHTML = `
             <div class="stats-container">
                 <h3 class="stats-title">对话统计</h3>
+
+                <!-- 关系温度 -->
+                <div class="relationship-temperature">
+                    <div class="temp-display">
+                        <div class="temp-emoji">${tempEmoji}</div>
+                        <div class="temp-value">${tempValue}°</div>
+                        <div class="temp-label">关系温度</div>
+                    </div>
+                    <div class="temp-bar">
+                        <div class="temp-fill" style="width: ${tempValue}%"></div>
+                    </div>
+                    <div class="temp-desc">${getTemperatureDesc(tempLevel)}</div>
+                </div>
+
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-value">${stats.total_messages}</div>
@@ -1992,6 +2012,16 @@ async function loadStats() {
     } catch(e) {
         showToast('加载统计失败: ' + e.message, 'error');
     }
+}
+
+function getTemperatureDesc(level) {
+    const descs = {
+        'hot': '你们的关系很亲密，充满了爱和温暖',
+        'warm': '你们的关系还不错，有温馨的互动',
+        'cool': '你们的关系有些冷淡，需要更多关心',
+        'cold': '你们的关系很疏远，需要努力修复',
+    };
+    return descs[level] || descs.warm;
 }
 
 function drawEmotionCurve(curve) {

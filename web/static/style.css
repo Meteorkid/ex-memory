@@ -2712,3 +2712,53 @@ button:focus-visible, .nav-tab:focus-visible {
 .quote-preview-close:hover {
     background: rgba(255, 255, 255, 0.05);
 }
+
+/* ═══════════════════════════════════════
+   关系温度
+   ═══════════════════════════════════════ */
+
+.relationship-temperature {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(124, 108, 255, 0.08);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+.temp-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.temp-emoji {
+    font-size: 2.5em;
+}
+.temp-value {
+    font-size: 2em;
+    font-weight: 300;
+    color: var(--accent);
+}
+.temp-label {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+}
+.temp-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+.temp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--mauve));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+.temp-desc {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
