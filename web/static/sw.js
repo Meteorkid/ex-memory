@@ -1,25 +1,53 @@
-/* ex-memory PWA Service Worker — Network-First API + Stale-While-Revalidate 静态资源 */
+/* ex-memory PWA Service Worker — 优化版 */
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `ex-memory-${CACHE_VERSION}`;
 const API_CACHE_NAME = `ex-memory-api-${CACHE_VERSION}`;
+const IMAGE_CACHE_NAME = `ex-memory-images-${CACHE_VERSION}`;
 
-const STATIC_FILES = [
+// 关键静态资源（预缓存）
+const CRITICAL_FILES = [
     '/',
     '/static/style.css',
     '/static/app.js',
     '/static/offline.html',
     '/static/manifest.json',
+];
+
+// 非关键资源（懒缓存）
+const LAZY_FILES = [
     '/static/icon-192.svg',
     '/static/icon-512.svg',
 ];
 
-// ── 安装时预缓存静态资源 ──
+// ── 安装时预缓存关键资源 ──
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(STATIC_FILES))
+            .then(cache => cache.addAll(CRITICAL_FILES))
             .then(() => self.skipWaiting())
+    );
+});
+
+// ── 激活时清理旧缓存 ──
+self.addEventListener('activate', event => {
+    event.waitUntil(
+        caches.keys().then(keys =>
+            Promise.all(
+                keys
+                    .filter(k => k !== CACHE_NAME && k !== API_CACHE_NAME && k !== IMAGE_CACHE_NAME)
+                    .map(k => caches.delete(k))
+            )
+        ).then(() => self.clients.claim())
+    );
+});
+
+// ── 预加载非关键资源 ──
+self.addEventListener('activate', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(LAZY_FILES))
+            .catch(() => {})
     );
 });
 

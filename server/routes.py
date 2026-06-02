@@ -3,8 +3,10 @@
 import json
 import logging
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
+from functools import wraps
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Query
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
@@ -18,6 +20,37 @@ from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
 from server.middleware import require_auth, _get_client_ip, security
 from fastapi.security import HTTPAuthorizationCredentials
+
+# ═══════════════════════════════════════
+# 简单内存缓存
+# ═══════════════════════════════════════
+
+class SimpleCache:
+    """简单的内存缓存，支持 TTL。"""
+
+    def __init__(self, default_ttl=60):
+        self._cache = {}
+        self._default_ttl = default_ttl
+
+    def get(self, key):
+        if key in self._cache:
+            data, expiry = self._cache[key]
+            if time.time() < expiry:
+                return data
+            del self._cache[key]
+        return None
+
+    def set(self, key, value, ttl=None):
+        self._cache[key] = (value, time.time() + (ttl or self._default_ttl))
+
+    def delete(self, key):
+        self._cache.pop(key, None)
+
+    def clear(self):
+        self._cache.clear()
+
+# 全局缓存实例
+cache = SimpleCache(default_ttl=30)  # 30秒 TTL
 from server.models import (
     CreateRequest, ResumeRequest, ChatRequest, UpdateRequest,
     BackupRequest, RollbackRequest, DeleteRequest,
@@ -730,6 +763,13 @@ def search_messages(slug: str, q: str = Query(..., min_length=1, max_length=200)
 def get_stats(slug: str, user_id: int = Depends(require_auth)):
     """对话统计数据：总消息数、消息频率、活跃时段。"""
     slug = _check_exe_access(slug, user_id)
+
+    # 检查缓存
+    cache_key = f"stats:{slug}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
     from core.conversation_store import load_jsonl_messages
     from collections import Counter
 
@@ -763,7 +803,7 @@ def get_stats(slug: str, user_id: int = Depends(require_auth)):
         else:
             time_periods["晚上(18-24)"] += count
 
-    return {
+    result = {
         "total_messages": total,
         "user_messages": len(user_msgs),
         "assistant_messages": len(assistant_msgs),
@@ -771,6 +811,10 @@ def get_stats(slug: str, user_id: int = Depends(require_auth)):
         "hourly_distribution": dict(sorted(hourly.items())),
         "time_periods": time_periods,
     }
+
+    # 缓存结果
+    cache.set(cache_key, result, ttl=60)  # 缓存60秒
+    return result
 
 
 # --- 情感分析 ---

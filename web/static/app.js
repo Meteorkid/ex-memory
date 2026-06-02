@@ -989,6 +989,7 @@ function showChatActions() {
 // ═══════════════════════════════════════
 
 async function loadContactList() {
+    PerfMonitor.start('loadContactList');
     const el = $('contact-list');
     // 清理旧的事件监听器
     el.querySelectorAll('.contact-item').forEach(item => {
@@ -1014,6 +1015,7 @@ async function loadContactList() {
                     <p class="onboarding-desc">导入聊天记录，让 TA 重新和你对话</p>
                     <button class="btn onboarding-btn" onclick="switchTab('create')">立即创建</button>
                 </div>`;
+            PerfMonitor.end('loadContactList');
             return;
         }
         // 优化：使用 DocumentFragment 批量插入
@@ -1059,6 +1061,8 @@ async function loadContactList() {
                 c.classList.toggle('selected', c.dataset.slug === currentSlug);
             });
         }
+
+        PerfMonitor.end('loadContactList');
 
         // 情感健康贴士
         let tipEl = $('health-tip-container');
@@ -1439,6 +1443,102 @@ function addRegenerateButton(msgsEl) {
     };
     lastRow.appendChild(btn);
 }
+
+// ═══════════════════════════════════════
+// 虚拟滚动管理器
+// ═══════════════════════════════════════
+
+class VirtualScrollManager {
+    constructor(container, itemHeight = 60, bufferSize = 10) {
+        this.container = container;
+        this.itemHeight = itemHeight;
+        this.bufferSize = bufferSize;
+        this.items = [];
+        this.visibleItems = new Map();
+        this.observer = null;
+        this.init();
+    }
+
+    init() {
+        // 使用 IntersectionObserver 监控可见区域
+        this.observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach(entry => {
+                    const id = entry.target.dataset.virtualId;
+                    if (entry.isIntersecting) {
+                        this.visibleItems.set(id, entry.target);
+                    } else {
+                        this.visibleItems.delete(id);
+                    }
+                });
+            },
+            { root: this.container, rootMargin: '100px' }
+        );
+    }
+
+    addElement(el, id) {
+        el.dataset.virtualId = id;
+        this.items.push({ el, id });
+        this.observer.observe(el);
+    }
+
+    clear() {
+        this.items.forEach(item => this.observer.unobserve(item.el));
+        this.items = [];
+        this.visibleItems.clear();
+    }
+
+    getVisibleCount() {
+        return this.visibleItems.size;
+    }
+}
+
+// 全局虚拟滚动实例
+let virtualScroll = null;
+
+// DOM 批量操作工具
+const DOMBatch = {
+    fragment: null,
+
+    startBatch() {
+        this.fragment = document.createDocumentFragment();
+    },
+
+    appendToBatch(el) {
+        if (this.fragment) {
+            this.fragment.appendChild(el);
+        }
+    },
+
+    commitBatch(target) {
+        if (this.fragment && target) {
+            target.appendChild(this.fragment);
+            this.fragment = null;
+        }
+    }
+};
+
+// 性能监控
+const PerfMonitor = {
+    marks: new Map(),
+
+    start(name) {
+        this.marks.set(name, performance.now());
+    },
+
+    end(name) {
+        const start = this.marks.get(name);
+        if (start) {
+            const duration = performance.now() - start;
+            this.marks.delete(name);
+            if (duration > 100) {
+                console.warn(`[Perf] ${name}: ${duration.toFixed(2)}ms`);
+            }
+            return duration;
+        }
+        return 0;
+    }
+};
 
 function chatBubble(role, text) {
     const row = document.createElement('div');
