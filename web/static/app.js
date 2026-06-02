@@ -666,6 +666,7 @@ function switchTab(tab) {
             $('titlebar-app-name').textContent = '钱包';
             $('nav-back-btn').style.display = 'block';
             loadWallet();
+            animateTabSwitch($('tab-wallet'));
         } else if (tab === 'create') {
             $('tab-me').style.display = 'none';
             $('tab-create').style.display = 'block';
@@ -1152,6 +1153,9 @@ async function sendMessage() {
     msgsEl.appendChild(userRow);
     storeLastMessage(currentSlug, msg);
 
+    // 动画效果：消息发送后弹跳
+    animateMessageSend(userRow);
+
     // 添加已读标记（初始为已发送）
     const readStatus = document.createElement('div');
     readStatus.className = 'msg-read-status';
@@ -1374,6 +1378,40 @@ document.addEventListener('click', () => {
     if (menu) menu.style.display = 'none';
 });
 
+// ── 动画增强：消息发送后气泡弹跳 ──
+function animateMessageSend(row) {
+    row.style.animation = 'none';
+    row.offsetHeight; // 触发重绘
+    row.style.animation = 'msgBounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+}
+
+// ── 动画增强：Tab 切换 ──
+function animateTabSwitch(el) {
+    el.style.animation = 'none';
+    el.offsetHeight;
+    el.style.animation = 'fadeInUp 0.3s ease-out forwards';
+}
+
+// ── 动画增强：按钮点击波纹效果 ──
+function addRippleEffect(button) {
+    button.addEventListener('click', function(e) {
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple-effect';
+        const rect = this.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = e.clientX - rect.left - size/2 + 'px';
+        ripple.style.top = e.clientY - rect.top - size/2 + 'px';
+        this.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
+    });
+}
+
+// ── 动画增强：滚动到视图中间 ──
+function scrollToCenter(el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function startQuote(text) {
     const input = $('msg-input');
     const preview = text.replace(/\n/g, ' ').slice(0, 50);
@@ -1443,6 +1481,7 @@ function stickerMsg(stickerId) {
 }
 
 $('msg-send').addEventListener('click', sendMessage);
+addRippleEffect($('msg-send'));
 $('msg-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
@@ -1624,7 +1663,11 @@ async function generateScreenshot() {
         return;
     }
 
-    showToast('正在生成截图...', 'info');
+    // 显示加载状态
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'loading-overlay';
+    loadingEl.innerHTML = '<div class="loading-spinner"></div><div class="loading-text">正在生成截图...</div>';
+    document.body.appendChild(loadingEl);
 
     try {
         // 动态加载 html2canvas
@@ -1650,8 +1693,10 @@ async function generateScreenshot() {
         link.href = canvas.toDataURL('image/png');
         link.click();
 
-        showToast('截图已保存', 'success');
+        loadingEl.remove();
+        showToast('截图已保存到本地', 'success');
     } catch(e) {
+        loadingEl.remove();
         showToast('截图失败: ' + e.message, 'error');
     }
 }
@@ -2390,9 +2435,17 @@ function formatTime(ts) {
     const m = d.getMinutes().toString().padStart(2,'0');
     const isToday = d.toDateString() === now.toDateString();
     if (isToday) return h + ':' + m;
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+    if (isYesterday) return '昨天 ' + h + ':' + m;
+
     const M = (d.getMonth()+1).toString().padStart(2,'0');
     const D = d.getDate().toString().padStart(2,'0');
-    return M + '-' + D + ' ' + h + ':' + m;
+    const Y = d.getFullYear();
+    if (Y === now.getFullYear()) return M + '-' + D + ' ' + h + ':' + m;
+    return Y + '-' + M + '-' + D + ' ' + h + ':' + m;
 }
 
 // ═══════════════════════════════════════
