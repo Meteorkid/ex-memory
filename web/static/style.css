@@ -2580,3 +2580,89 @@ button:focus-visible, .nav-tab:focus-visible {
     10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
     20%, 40%, 60%, 80% { transform: translateX(4px); }
 }
+
+/* ═══════════════════════════════════════
+   搜索高亮
+   ═══════════════════════════════════════ */
+
+.search-highlight {
+    background: rgba(124, 108, 255, 0.3);
+    color: var(--text-primary);
+    padding: 1px 4px;
+    border-radius: 4px;
+    animation: highlightPulse 1s ease-out;
+}
+@keyframes highlightPulse {
+    0% { background: rgba(124, 108, 255, 0.6); }
+    100% { background: rgba(124, 108, 255, 0.3); }
+}
+
+/* 搜索结果计数 */
+.search-count {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    background: rgba(20, 20, 34, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(124, 108, 255, 0.15);
+    border-radius: var(--radius-md);
+    padding: 8px 16px;
+    color: var(--text-primary);
+    font-size: 0.82em;
+    z-index: 100;
+    animation: fadeIn 0.3s ease;
+}
+
+/* ═══════════════════════════════════════
+   移动端优化
+   ═══════════════════════════════════════ */
+
+/* 安全区域适配 */
+.has-safe-area .phone-tabbar {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.has-safe-area .chat-input-bar {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0));
+}
+
+/* 键盘弹出时适配 */
+@media (max-height: 500px) {
+    .phone-tabbar {
+        height: 60px;
+    }
+    .chat-input-bar {
+        height: 50px;
+    }
+    .chat-msgs {
+        bottom: 50px;
+    }
+}
+
+/* 触摸优化 */
+@media (hover: none) {
+    .contact-item:active {
+        background: rgba(124, 108, 255, 0.08);
+    }
+
+    .btn:active,
+    .send-btn:active {
+        transform: scale(0.95);
+    }
+
+    .sticker-item:active {
+        transform: scale(0.9);
+    }
+}
+
+/* 滚动优化 */
+.chat-msgs {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+}
+
+/* 防止双击缩放 */
+* {
+    touch-action: manipulation;
+}

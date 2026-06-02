@@ -221,7 +221,16 @@ window.matchMedia('(min-width: 769px)').addEventListener('change', e => {
 
 // ── 初始化 ──
 initTheme();
-if (token) { showMain(); } else { showAuth(); }
+if (token) {
+    showMain();
+    // 恢复上次聊天状态
+    try {
+        const savedChat = JSON.parse(localStorage.getItem('ex-memory-current-chat') || '{}');
+        if (savedChat.slug && savedChat.name) {
+            setTimeout(() => enterChat(savedChat.slug, savedChat.name), 500);
+        }
+    } catch(e) {}
+} else { showAuth(); }
 updateStatusTime();
 setInterval(updateStatusTime, 30000);
 initDesktopLayout();
@@ -230,6 +239,75 @@ try { initVoiceToggle(); } catch(e) { console.warn('Voice init skipped:', e.mess
 initSearch();
 registerSW();
 requestNotificationPermission();
+initMobileGestures();
+
+// ── 移动手势初始化 ──
+function initMobileGestures() {
+    // 左滑返回手势
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, {passive: true});
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, {passive: true});
+
+    function handleSwipe() {
+        const swipeThreshold = 50;
+        const diff = touchStartX - touchEndX;
+
+        if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+                // 左滑：返回上一级
+                handleSwipeLeft();
+            } else {
+                // 右滑：前进
+                handleSwipeRight();
+            }
+        }
+    }
+
+    function handleSwipeLeft() {
+        if (tabHistory.length > 1) {
+            tabHistory.pop();
+            const prevTab = tabHistory[tabHistory.length - 1];
+            switchTab(prevTab);
+        }
+    }
+
+    function handleSwipeRight() {
+        // 在聊天详情页左滑返回列表
+        if (currentTab === 'chat-detail' && !isDesktop) {
+            switchTab('chat-list');
+        }
+    }
+}
+
+// ── 键盘弹出适配 ──
+function initKeyboardAdaptation() {
+    const chatInput = $('msg-input');
+    if (!chatInput) return;
+
+    // 聚焦输入框时滚动到底部
+    chatInput.addEventListener('focus', () => {
+        setTimeout(() => {
+            const msgsEl = $('chat-msgs');
+            if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+        }, 300);
+    });
+}
+
+// ── 安全区域适配 ──
+function initSafeArea() {
+    // 检测是否支持安全区域
+    if (CSS.supports('padding', 'env(safe-area-inset-bottom)')) {
+        document.documentElement.classList.add('has-safe-area');
+    }
+}
 
 // ── 情感健康：使用时长提醒（每 10 分钟检查一次）──
 setInterval(checkUsageReminder, 10 * 60 * 1000);
@@ -604,7 +682,7 @@ $('reg-password2').onkeydown = e => { if(e.key==='Enter') doRegister(); };
 // API 封装
 // ═══════════════════════════════════════
 
-async function api(method, path, body) {
+async function api(method, path, body, retries = 2) {
     if (!navigator.onLine) {
         showToast('网络连接已断开，请检查网络', 'warning');
         throw new Error('网络连接已断开');
@@ -612,14 +690,26 @@ async function api(method, path, body) {
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const res = await fetch(`${API}${path}`, {
-        method, headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    if (res.status === 401) { logout(); throw new Error('登录已过期'); }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || `请求失败 (${res.status})`);
-    return data;
+
+    for (let i = 0; i <= retries; i++) {
+        try {
+            const res = await fetch(`${API}${path}`, {
+                method, headers,
+                body: body !== undefined ? JSON.stringify(body) : undefined,
+                signal: AbortSignal.timeout(10000), // 10秒超时
+            });
+            if (res.status === 401) { logout(); throw new Error('登录已过期'); }
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || `请求失败 (${res.status})`);
+            return data;
+        } catch(e) {
+            if (i < retries && (e.name === 'AbortError' || e.message.includes('网络'))) {
+                await new Promise(r => setTimeout(r, 1000 * (i + 1))); // 递增延迟
+                continue;
+            }
+            throw e;
+        }
+    }
 }
 
 function logout() {
@@ -980,6 +1070,8 @@ function enterChat(slug, name) {
     } else {
         switchTab('chat-detail');
     }
+    // 持久化当前聊天状态
+    localStorage.setItem('ex-memory-current-chat', JSON.stringify({slug, name}));
     setTimeout(() => $('msg-input').focus(), 300);
 }
 
@@ -1646,7 +1738,34 @@ async function searchMessages(query) {
     if (!currentSlug || !query.trim()) return [];
     try {
         const data = await api('GET', `/exes/${currentSlug}/messages/search?q=${encodeURIComponent(query)}`);
-        return data.results || [];
+        const results = data.results || [];
+
+        // 高亮显示搜索结果
+        if (results.length > 0) {
+            const msgsEl = $('chat-msgs');
+            if (msgsEl) {
+                // 清除旧高亮
+                msgsEl.querySelectorAll('.search-highlight').forEach(el => {
+                    el.outerHTML = el.textContent;
+                });
+                // 添加新高亮
+                results.forEach(result => {
+                    const rows = msgsEl.querySelectorAll('.msg-row');
+                    rows.forEach(row => {
+                        const msg = row.querySelector('.msg');
+                        if (msg && msg.textContent.includes(query)) {
+                            const regex = new RegExp(`(${query})`, 'gi');
+                            msg.innerHTML = msg.textContent.replace(regex, '<mark class="search-highlight">$1</mark>');
+                        }
+                    });
+                });
+                // 滚动到第一个匹配
+                const firstMatch = msgsEl.querySelector('.search-highlight');
+                if (firstMatch) scrollToCenter(firstMatch);
+            }
+        }
+
+        return results;
     } catch(e) {
         return [];
     }
