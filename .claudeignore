@@ -1,0 +1,33 @@
+# 运行时数据
+data/
+exes/
+*.db
+*.sqlite3
+.coverage
+
+# 缓存
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+
+# 依赖
+node_modules/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 构建产物
+dist/
+build/
+*.egg-info/
+
+# 日志
+*.log
+logs/

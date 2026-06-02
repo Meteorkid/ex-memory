@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make *)",
+      "Bash(python3 *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(node --check *)",
+      "Bash(git *)",
+      "Bash(docker *)",
+      "Bash(curl *)",
+      "Bash(pip *)",
+      "Bash(wc *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(rm -f *)",
+      "Bash(sleep *)",
+      "Bash(lsof *)",
+      "Bash(open *)"
+    ],
+    "deny": []
+  },
+  "context": {
+    "excludePatterns": [
+      "node_modules/**",
+      "__pycache__/**",
+      "*.pyc",
+      ".git/**",
+      ".coverage",
+      "htmlcov/**",
+      ".pytest_cache/**",
+      ".ruff_cache/**",
+      "data/**",
+      "exes/**",
+      "*.db",
+      "*.sqlite3"
+    ]
+  }
+}
