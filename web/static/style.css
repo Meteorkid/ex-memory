@@ -2762,3 +2762,273 @@ button:focus-visible, .nav-tab:focus-visible {
     color: var(--text-secondary);
     line-height: 1.5;
 }
+
+/* ═══════════════════════════════════════
+   裸眼3D效果
+   ═══════════════════════════════════════ */
+
+/* 消息气泡3D悬浮 */
+.msg-row.user .msg {
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.msg-row.user .msg:hover {
+    transform: translateZ(10px) rotateX(2deg) rotateY(-2deg);
+    box-shadow:
+        0 10px 30px rgba(124, 108, 255, 0.2),
+        0 5px 15px rgba(0, 0, 0, 0.3),
+        5px 5px 0 rgba(124, 108, 255, 0.1);
+}
+
+.msg-row.assistant .msg {
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.msg-row.assistant .msg:hover {
+    transform: translateZ(10px) rotateX(2deg) rotateY(2deg);
+    box-shadow:
+        0 10px 30px rgba(124, 108, 255, 0.15),
+        0 5px 15px rgba(0, 0, 0, 0.2),
+        -5px 5px 0 rgba(124, 108, 255, 0.08);
+}
+
+/* 联系人卡片3D翻转 */
+.contact-item {
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    transition: transform 0.3s ease;
+}
+.contact-item:hover {
+    transform: translateZ(5px) scale(1.02);
+}
+
+.contact-avatar {
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease;
+}
+.contact-avatar:hover {
+    transform: rotateY(15deg) scale(1.05);
+}
+
+/* 3D卡片效果 */
+.stat-card,
+.wallet-action-btn {
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.stat-card:hover,
+.wallet-action-btn:hover {
+    transform: translateZ(8px) rotateX(5deg);
+    box-shadow:
+        0 15px 35px rgba(124, 108, 255, 0.2),
+        0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* 视差滚动容器 */
+.parallax-container {
+    perspective: 1000px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.parallax-layer {
+    transform-style: preserve-3d;
+    will-change: transform;
+}
+
+/* 3D按钮效果 */
+.btn,
+.send-btn {
+    transform-style: preserve-3d;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn:hover,
+.send-btn:hover {
+    transform: translateY(-2px) translateZ(5px);
+    box-shadow:
+        0 10px 20px rgba(124, 108, 255, 0.3),
+        0 5px 10px rgba(0, 0, 0, 0.2);
+}
+.btn:active,
+.send-btn:active {
+    transform: translateY(1px) translateZ(0);
+    box-shadow:
+        0 2px 5px rgba(124, 108, 255, 0.2),
+        0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 3D Tab切换 */
+.tabbar-btn {
+    transform-style: preserve-3d;
+    transition: transform 0.2s ease;
+}
+.tabbar-btn.active {
+    transform: translateZ(5px);
+}
+.tabbar-btn:hover {
+    transform: translateZ(3px) scale(1.05);
+}
+
+/* ═══════════════════════════════════════
+   表情雨效果
+   ═══════════════════════════════════════ */
+
+.emoji-rain-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99999;
+    overflow: hidden;
+}
+.emoji-rain-item {
+    position: absolute;
+    top: -50px;
+    animation: emojiRainFall linear forwards;
+    pointer-events: none;
+}
+@keyframes emojiRainFall {
+    0% {
+        transform: translateY(-50px) rotate(0deg);
+        opacity: 1;
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+/* ═══════════════════════════════════════
+   表情反应
+   ═══════════════════════════════════════ */
+
+.reaction-picker {
+    position: fixed;
+    display: none;
+    background: rgba(20, 20, 34, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(124, 108, 255, 0.15);
+    border-radius: 30px;
+    padding: 8px 12px;
+    gap: 4px;
+    z-index: 10000;
+    animation: reactionPickerIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+@keyframes reactionPickerIn {
+    from {
+        opacity: 0;
+        transform: scale(0.5) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+.reaction-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: transform 0.15s ease, background 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.reaction-btn:hover {
+    transform: scale(1.3);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.msg-reactions {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.msg-reaction {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    font-size: 0.9em;
+    background: rgba(124, 108, 255, 0.1);
+    border: 1px solid rgba(124, 108, 255, 0.15);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.msg-reaction:hover {
+    transform: scale(1.2);
+}
+@keyframes reactionPop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+/* ═══════════════════════════════════════
+   烟花效果
+   ═══════════════════════════════════════ */
+
+.fireworks-container {
+    position: fixed;
+    pointer-events: none;
+    z-index: 99999;
+}
+.firework-particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: fireworkBurst 0.8s ease-out forwards;
+    transform: translate(-50%, -50%);
+}
+@keyframes fireworkBurst {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform:
+            translate(
+                calc(cos(var(--angle)) * var(--distance)),
+                calc(sin(var(--angle)) * var(--distance))
+            )
+            scale(0);
+        opacity: 0;
+    }
+}
+
+/* ═══════════════════════════════════════
+   点赞撒花
+   ═══════════════════════════════════════ */
+
+.confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99999;
+}
+.confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
