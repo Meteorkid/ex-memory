@@ -43,12 +43,41 @@ function showToast(message, type = 'info', duration = 3000) {
 window.onerror = function(msg, src, line, col, err) {
     showToast('发生了一个错误，请刷新页面重试', 'error');
     console.error('[Global Error]', msg, src, line, col, err);
+    reportError({msg, src, line, col, stack: err?.stack});
 };
 
 window.addEventListener('unhandledrejection', function(e) {
     showToast('操作失败，请稍后重试', 'error');
     console.error('[Unhandled Rejection]', e.reason);
+    reportError({msg: e.reason?.message, stack: e.reason?.stack});
 });
+
+// 错误上报
+function reportError(errorData) {
+    try {
+        const errors = JSON.parse(localStorage.getItem('ex-memory-errors') || '[]');
+        errors.push({
+            ...errorData,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+        });
+        // 保留最近 50 条错误
+        if (errors.length > 50) errors.splice(0, errors.length - 50);
+        localStorage.setItem('ex-memory-errors', JSON.stringify(errors));
+    } catch(e) {}
+}
+
+// 导出错误日志
+function exportErrorLog() {
+    const errors = localStorage.getItem('ex-memory-errors') || '[]';
+    const blob = new Blob([errors], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ex-memory-errors-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
 
 // 离线检测
 window.addEventListener('offline', () => {
@@ -195,8 +224,36 @@ function applyTheme(theme) {
     // 更新 theme-color meta 标签
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-        meta.content = theme === 'dark' ? '#000000' : '#F2F2F7';
+        meta.content = theme === 'dark' ? '#0a0a12' : '#F2F2F7';
     }
+}
+
+// ── 字体大小调节 ──
+function initFontSize() {
+    const saved = localStorage.getItem('ex-memory-fontsize') || 'normal';
+    applyFontSize(saved);
+    setTimeout(() => {
+        const select = $('font-size-select');
+        if (select) {
+            select.value = saved;
+            select.addEventListener('change', () => {
+                const size = select.value;
+                localStorage.setItem('ex-memory-fontsize', size);
+                applyFontSize(size);
+            });
+        }
+    }, 100);
+}
+
+function applyFontSize(size) {
+    const root = document.documentElement;
+    const sizes = {
+        'small': '14px',
+        'normal': '16px',
+        'large': '18px',
+        'xlarge': '20px',
+    };
+    root.style.setProperty('--base-font-size', sizes[size] || '16px');
 }
 
 // ── 平台检测（响应窗口大小变化）──
@@ -933,6 +990,10 @@ function showChatActions() {
 
 async function loadContactList() {
     const el = $('contact-list');
+    // 清理旧的事件监听器
+    el.querySelectorAll('.contact-item').forEach(item => {
+        item.onclick = null;
+    });
     // 加载微光骨架
     el.innerHTML = Array.from({length:3}, () => `
         <div class="skeleton-row">
@@ -1439,13 +1500,21 @@ function showMsgMenu(row, e) {
     }
 
     const options = [
-        {label: '复制', action: () => { navigator.clipboard.writeText(text); showToast('已复制', 'success'); }},
-        {label: '引用', action: () => startQuote(text) },
+        {label: '📋 复制', action: () => {
+            navigator.clipboard.writeText(text);
+            showToast('已复制到剪贴板', 'success');
+        }},
+        {label: '↩️ 引用', action: () => startQuote(text) },
+        {label: '💬 回复', action: () => {
+            const input = $('msg-input');
+            input.value = `@${currentName || currentSlug} `;
+            input.focus();
+        }},
     ];
     if (isUser) {
         const age = Date.now() - parseInt(row.dataset.timestamp || '0');
         if (age < 2 * 60 * 1000) { // 2 分钟内可撤回
-            options.push({label: '撤回', action: () => recallMessage(row), danger: true});
+            options.push({label: '🗑️ 撤回', action: () => recallMessage(row), danger: true});
         }
     }
 
@@ -1507,9 +1576,30 @@ function scrollToCenter(el) {
 function startQuote(text) {
     const input = $('msg-input');
     const preview = text.replace(/\n/g, ' ').slice(0, 50);
-    input.value = `> ${preview}${text.length > 50 ? '...' : ''}\n`;
+    const quotePreview = $('quote-preview');
+
+    // 显示引用预览
+    if (quotePreview) {
+        quotePreview.innerHTML = `
+            <div class="quote-preview-content">
+                <div class="quote-preview-text">引用: ${escHtml(preview)}${text.length > 50 ? '...' : ''}</div>
+                <button class="quote-preview-close" onclick="clearQuote()">×</button>
+            </div>`;
+        quotePreview.style.display = 'block';
+    }
+
+    input.value = '';
     input.focus();
     quoteMode = true;
+    input.placeholder = '回复引用的消息...';
+}
+
+function clearQuote() {
+    const quotePreview = $('quote-preview');
+    if (quotePreview) quotePreview.style.display = 'none';
+    quoteMode = false;
+    const input = $('msg-input');
+    input.placeholder = '';
 }
 
 function recallMessage(row) {

@@ -160,6 +160,8 @@
                         <button id="sticker-upload-btn" class="sticker-upload-btn" title="添加自定义表情" aria-label="上传自定义贴纸">+</button>
                         <input type="file" id="sticker-file-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
                     </div>
+                    <!-- 引用预览 -->
+                    <div id="quote-preview" class="quote-preview" style="display:none"></div>
                     <!-- 输入栏 -->
                     <div class="chat-input-bar" role="group" aria-label="消息输入">
                         <button id="plus-btn" class="input-action" title="更多" aria-label="更多功能">＋</button>
@@ -220,6 +222,15 @@
                                 <option value="auto">跟随系统</option>
                                 <option value="light">浅色</option>
                                 <option value="dark">深色</option>
+                            </select>
+                        </div>
+                        <div class="me-item">
+                            <span>🔤 字体大小</span>
+                            <select id="font-size-select" class="theme-select">
+                                <option value="small">小</option>
+                                <option value="normal">标准</option>
+                                <option value="large">大</option>
+                                <option value="xlarge">特大</option>
                             </select>
                         </div>
                         <div class="me-item" id="wallet-entry">

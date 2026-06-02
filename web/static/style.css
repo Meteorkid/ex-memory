@@ -7,6 +7,7 @@
 :root {
     /* ── Midnight Color System ── */
     --accent: #7c6cff;
+    --base-font-size: 16px;
     --accent-hover: #9b8aff;
     --accent-light: rgba(124, 108, 255, 0.12);
     --accent-glow: rgba(124, 108, 255, 0.25);
@@ -115,6 +116,7 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
                  "PingFang SC", "Helvetica Neue", sans-serif;
+    font-size: var(--base-font-size);
     background: #0a0a12;
     display: flex;
     justify-content: center;
@@ -2665,4 +2667,48 @@ button:focus-visible, .nav-tab:focus-visible {
 /* 防止双击缩放 */
 * {
     touch-action: manipulation;
+}
+
+/* ═══════════════════════════════════════
+   引用预览
+   ═══════════════════════════════════════ */
+
+.quote-preview {
+    position: absolute;
+    bottom: 60px;
+    left: 0;
+    right: 0;
+    background: rgba(20, 20, 34, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(124, 108, 255, 0.1);
+    padding: 8px 12px;
+    animation: slideUp 0.2s ease;
+}
+.quote-preview-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.quote-preview-text {
+    flex: 1;
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.quote-preview-close {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+.quote-preview-close:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
