@@ -39,6 +39,7 @@
       "exes/**",
       "*.db",
       "*.sqlite3"
-    ]
+    ],
+    "autoCompact": true
   }
 }
