@@ -7,7 +7,9 @@ dist/
 build/
 .venv/
 venv/
-data/
+# 仅根目录运行时数据（evals/data/ 评测数据集需进仓库）
+/data/
 .DS_Store
 *.tmp
 logs/
+.planning/

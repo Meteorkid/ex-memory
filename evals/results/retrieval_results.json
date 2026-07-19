@@ -1,0 +1,1911 @@
+{
+ "meta": {
+  "corpus_size": 316,
+  "n_queries": 147,
+  "k_values": [
+   1,
+   3,
+   5,
+   10
+  ],
+  "thresholds": [
+   0.0,
+   0.2,
+   0.3,
+   0.4,
+   0.5,
+   0.6
+  ],
+  "max_top_k": 10,
+  "embedder": "BAAI/bge-m3"
+ },
+ "configs": [
+  {
+   "label": "turns3_overlap0",
+   "turns": 3,
+   "overlap": 0,
+   "n_chunks": 106,
+   "n_target_chunks": 56,
+   "unfiltered": {
+    "recall@1": 0.5793650793650794,
+    "precision@1": 0.7278911564625851,
+    "hit@1": 0.7278911564625851,
+    "ndcg@1": 0.7278911564625851,
+    "recall@3": 0.7403628117913832,
+    "precision@3": 0.3242630385487528,
+    "hit@3": 0.8435374149659864,
+    "ndcg@3": 0.7211584143881705,
+    "recall@5": 0.8027210884353742,
+    "precision@5": 0.20952380952380953,
+    "hit@5": 0.8979591836734694,
+    "ndcg@5": 0.7477751948948661,
+    "recall@10": 0.8775510204081632,
+    "precision@10": 0.11496598639455784,
+    "hit@10": 0.9455782312925171,
+    "ndcg@10": 0.774476295211349,
+    "mrr": 0.7991685563114135
+   },
+   "target_only": {
+    "recall@1": 0.5011337868480726,
+    "precision@1": 0.5510204081632653,
+    "hit@1": 0.5510204081632653,
+    "ndcg@1": 0.5510204081632653,
+    "recall@3": 0.6145124716553287,
+    "precision@3": 0.23129251700680273,
+    "hit@3": 0.6802721088435374,
+    "ndcg@3": 0.6249379900130207,
+    "recall@5": 0.6394557823129252,
+    "precision@5": 0.145578231292517,
+    "hit@5": 0.7074829931972789,
+    "ndcg@5": 0.6381553410608256,
+    "recall@10": 0.6768707482993197,
+    "precision@10": 0.07755102040816327,
+    "hit@10": 0.7551020408163265,
+    "ndcg@10": 0.653615719090106,
+    "mrr": 0.6228620019436346
+   },
+   "threshold_sweep": [
+    {
+     "threshold": 0.0,
+     "recall": 0.6768707482993197,
+     "avg_kept": 10.0,
+     "precision_kept": 0.07755102040816327
+    },
+    {
+     "threshold": 0.2,
+     "recall": 0.6768707482993197,
+     "avg_kept": 10.0,
+     "precision_kept": 0.07755102040816327
+    },
+    {
+     "threshold": 0.3,
+     "recall": 0.6768707482993197,
+     "avg_kept": 10.0,
+     "precision_kept": 0.07755102040816327
+    },
+    {
+     "threshold": 0.4,
+     "recall": 0.6768707482993197,
+     "avg_kept": 9.741496598639456,
+     "precision_kept": 0.07869290573372206
+    },
+    {
+     "threshold": 0.5,
+     "recall": 0.5952380952380952,
+     "avg_kept": 3.6598639455782314,
+     "precision_kept": 0.273304718712882
+    },
+    {
+     "threshold": 0.6,
+     "recall": 0.3412698412698413,
+     "avg_kept": 0.42857142857142855,
+     "precision_kept": 0.34183673469387754
+    }
+   ]
+  },
+  {
+   "label": "turns3_overlap1",
+   "turns": 3,
+   "overlap": 1,
+   "n_chunks": 158,
+   "n_target_chunks": 81,
+   "unfiltered": {
+    "recall@1": 0.63718820861678,
+    "precision@1": 0.782312925170068,
+    "hit@1": 0.782312925170068,
+    "ndcg@1": 0.782312925170068,
+    "recall@3": 0.8412698412698413,
+    "precision@3": 0.45351473922902485,
+    "hit@3": 0.8843537414965986,
+    "ndcg@3": 0.7006346944675075,
+    "recall@5": 0.8775510204081632,
+    "precision@5": 0.29931972789115646,
+    "hit@5": 0.9183673469387755,
+    "ndcg@5": 0.7355007351545142,
+    "recall@10": 0.9659863945578231,
+    "precision@10": 0.16802721088435377,
+    "hit@10": 0.9863945578231292,
+    "ndcg@10": 0.7715476103514798,
+    "mrr": 0.8500080984774863
+   },
+   "target_only": {
+    "recall@1": 0.7392290249433107,
+    "precision@1": 0.7687074829931972,
+    "hit@1": 0.7687074829931972,
+    "ndcg@1": 0.7687074829931972,
+    "recall@3": 0.8752834467120181,
+    "precision@3": 0.3446712018140589,
+    "hit@3": 0.8843537414965986,
+    "ndcg@3": 0.7796813995559192,
+    "recall@5": 0.9149659863945578,
+    "precision@5": 0.2204081632653061,
+    "hit@5": 0.9183673469387755,
+    "ndcg@5": 0.8021116357169864,
+    "recall@10": 0.935374149659864,
+    "precision@10": 0.11836734693877553,
+    "hit@10": 0.9387755102040817,
+    "ndcg@10": 0.8213068998329832,
+    "mrr": 0.8258503401360544
+   },
+   "threshold_sweep": [
+    {
+     "threshold": 0.0,
+     "recall": 0.935374149659864,
+     "avg_kept": 10.0,
+     "precision_kept": 0.11836734693877553
+    },
+    {
+     "threshold": 0.2,
+     "recall": 0.935374149659864,
+     "avg_kept": 10.0,
+     "precision_kept": 0.11836734693877553
+    },
+    {
+     "threshold": 0.3,
+     "recall": 0.935374149659864,
+     "avg_kept": 10.0,
+     "precision_kept": 0.11836734693877553
+    },
+    {
+     "threshold": 0.4,
+     "recall": 0.935374149659864,
+     "avg_kept": 9.863945578231293,
+     "precision_kept": 0.12543461829176117
+    },
+    {
+     "threshold": 0.5,
+     "recall": 0.8571428571428571,
+     "avg_kept": 4.680272108843537,
+     "precision_kept": 0.392700572292409
+    },
+    {
+     "threshold": 0.6,
+     "recall": 0.4897959183673469,
+     "avg_kept": 0.5782312925170068,
+     "precision_kept": 0.4775510204081633
+    }
+   ]
+  },
+  {
+   "label": "turns5_overlap1",
+   "turns": 5,
+   "overlap": 1,
+   "n_chunks": 79,
+   "n_target_chunks": 51,
+   "unfiltered": {
+    "recall@1": 0.7312925170068028,
+    "precision@1": 0.8027210884353742,
+    "hit@1": 0.8027210884353742,
+    "ndcg@1": 0.8027210884353742,
+    "recall@3": 0.8469387755102041,
+    "precision@3": 0.4240362811791383,
+    "hit@3": 0.8639455782312925,
+    "ndcg@3": 0.7631145533250154,
+    "recall@5": 0.9183673469387755,
+    "precision@5": 0.2789115646258503,
+    "hit@5": 0.9319727891156463,
+    "ndcg@5": 0.7976262908581239,
+    "recall@10": 0.9659863945578231,
+    "precision@10": 0.1523809523809524,
+    "hit@10": 0.9727891156462585,
+    "ndcg@10": 0.8244812924902917,
+    "mrr": 0.8494034121585142
+   },
+   "target_only": {
+    "recall@1": 0.564625850340136,
+    "precision@1": 0.6190476190476191,
+    "hit@1": 0.6190476190476191,
+    "ndcg@1": 0.6190476190476191,
+    "recall@3": 0.6564625850340136,
+    "precision@3": 0.3514739229024943,
+    "hit@3": 0.673469387755102,
+    "ndcg@3": 0.5882852673986193,
+    "recall@5": 0.7108843537414966,
+    "precision@5": 0.2326530612244898,
+    "hit@5": 0.7210884353741497,
+    "ndcg@5": 0.6168812233716751,
+    "recall@10": 0.7312925170068028,
+    "precision@10": 0.12653061224489798,
+    "hit@10": 0.7346938775510204,
+    "ndcg@10": 0.6375670737644669,
+    "mrr": 0.6552154195011337
+   },
+   "threshold_sweep": [
+    {
+     "threshold": 0.0,
+     "recall": 0.7312925170068028,
+     "avg_kept": 10.0,
+     "precision_kept": 0.12653061224489798
+    },
+    {
+     "threshold": 0.2,
+     "recall": 0.7312925170068028,
+     "avg_kept": 10.0,
+     "precision_kept": 0.12653061224489798
+    },
+    {
+     "threshold": 0.3,
+     "recall": 0.7312925170068028,
+     "avg_kept": 10.0,
+     "precision_kept": 0.12653061224489798
+    },
+    {
+     "threshold": 0.4,
+     "recall": 0.7312925170068028,
+     "avg_kept": 9.755102040816327,
+     "precision_kept": 0.13785768275564195
+    },
+    {
+     "threshold": 0.5,
+     "recall": 0.6462585034013606,
+     "avg_kept": 4.190476190476191,
+     "precision_kept": 0.3438856494978944
+    },
+    {
+     "threshold": 0.6,
+     "recall": 0.2891156462585034,
+     "avg_kept": 0.4013605442176871,
+     "precision_kept": 0.30884353741496595
+    }
+   ]
+  },
+  {
+   "label": "turns8_overlap2",
+   "turns": 8,
+   "overlap": 2,
+   "n_chunks": 53,
+   "n_target_chunks": 7,
+   "unfiltered": {
+    "recall@1": 0.7585034013605442,
+    "precision@1": 0.7891156462585034,
+    "hit@1": 0.7891156462585034,
+    "ndcg@1": 0.7891156462585034,
+    "recall@3": 0.8639455782312925,
+    "precision@3": 0.3696145124716553,
+    "hit@3": 0.8775510204081632,
+    "ndcg@3": 0.7423801764337141,
+    "recall@5": 0.9285714285714286,
+    "precision@5": 0.2503401360544218,
+    "hit@5": 0.9387755102040817,
+    "ndcg@5": 0.7854618002779508,
+    "recall@10": 0.9863945578231292,
+    "precision@10": 0.13877551020408166,
+    "hit@10": 0.9863945578231292,
+    "ndcg@10": 0.8166698459227937,
+    "mrr": 0.8456322211424252
+   },
+   "target_only": {
+    "recall@1": 0.16326530612244897,
+    "precision@1": 0.16326530612244897,
+    "hit@1": 0.16326530612244897,
+    "ndcg@1": 0.16326530612244897,
+    "recall@3": 0.2108843537414966,
+    "precision@3": 0.08163265306122448,
+    "hit@3": 0.22448979591836735,
+    "ndcg@3": 0.19922162259475337,
+    "recall@5": 0.2108843537414966,
+    "precision@5": 0.0489795918367347,
+    "hit@5": 0.22448979591836735,
+    "ndcg@5": 0.19922162259475337,
+    "recall@10": 0.2108843537414966,
+    "precision@10": 0.02448979591836735,
+    "hit@10": 0.22448979591836735,
+    "ndcg@10": 0.19922162259475337,
+    "mrr": 0.19047619047619047
+   },
+   "threshold_sweep": [
+    {
+     "threshold": 0.0,
+     "recall": 0.2108843537414966,
+     "avg_kept": 7.0,
+     "precision_kept": 0.034985422740524776
+    },
+    {
+     "threshold": 0.2,
+     "recall": 0.2108843537414966,
+     "avg_kept": 7.0,
+     "precision_kept": 0.034985422740524776
+    },
+    {
+     "threshold": 0.3,
+     "recall": 0.2108843537414966,
+     "avg_kept": 6.918367346938775,
+     "precision_kept": 0.03576287657920311
+    },
+    {
+     "threshold": 0.4,
+     "recall": 0.2108843537414966,
+     "avg_kept": 4.585034013605442,
+     "precision_kept": 0.06491739552964043
+    },
+    {
+     "threshold": 0.5,
+     "recall": 0.1655328798185941,
+     "avg_kept": 0.7346938775510204,
+     "precision_kept": 0.14705215419501133
+    },
+    {
+     "threshold": 0.6,
+     "recall": 0.05442176870748299,
+     "avg_kept": 0.06802721088435375,
+     "precision_kept": 0.05442176870748299
+    }
+   ]
+  },
+  {
+   "label": "turns10_overlap2",
+   "turns": 10,
+   "overlap": 2,
+   "n_chunks": 40,
+   "n_target_chunks": 14,
+   "unfiltered": {
+    "recall@1": 0.6972789115646258,
+    "precision@1": 0.7210884353741497,
+    "hit@1": 0.7210884353741497,
+    "ndcg@1": 0.7210884353741497,
+    "recall@3": 0.8843537414965986,
+    "precision@3": 0.3673469387755102,
+    "hit@3": 0.891156462585034,
+    "ndcg@3": 0.747537169762138,
+    "recall@5": 0.9285714285714286,
+    "precision@5": 0.24489795918367346,
+    "hit@5": 0.9319727891156463,
+    "ndcg@5": 0.7842115863806398,
+    "recall@10": 0.9659863945578231,
+    "precision@10": 0.13333333333333333,
+    "hit@10": 0.9659863945578231,
+    "ndcg@10": 0.8083310260100343,
+    "mrr": 0.8105037252996437
+   },
+   "target_only": {
+    "recall@1": 0.336734693877551,
+    "precision@1": 0.3469387755102041,
+    "hit@1": 0.3469387755102041,
+    "ndcg@1": 0.3469387755102041,
+    "recall@3": 0.41383219954648526,
+    "precision@3": 0.18594104308390022,
+    "hit@3": 0.42857142857142855,
+    "ndcg@3": 0.377958002108714,
+    "recall@5": 0.42970521541950113,
+    "precision@5": 0.12108843537414966,
+    "hit@5": 0.4489795918367347,
+    "ndcg@5": 0.39225108033728445,
+    "recall@10": 0.46598639455782315,
+    "precision@10": 0.06666666666666667,
+    "hit@10": 0.4897959183673469,
+    "ndcg@10": 0.4098126360078325,
+    "mrr": 0.3935077205485369
+   },
+   "threshold_sweep": [
+    {
+     "threshold": 0.0,
+     "recall": 0.46598639455782315,
+     "avg_kept": 10.0,
+     "precision_kept": 0.06666666666666667
+    },
+    {
+     "threshold": 0.2,
+     "recall": 0.46598639455782315,
+     "avg_kept": 10.0,
+     "precision_kept": 0.06666666666666667
+    },
+    {
+     "threshold": 0.3,
+     "recall": 0.46598639455782315,
+     "avg_kept": 10.0,
+     "precision_kept": 0.06666666666666667
+    },
+    {
+     "threshold": 0.4,
+     "recall": 0.46598639455782315,
+     "avg_kept": 8.53061224489796,
+     "precision_kept": 0.09664183133570889
+    },
+    {
+     "threshold": 0.5,
+     "recall": 0.35714285714285715,
+     "avg_kept": 1.727891156462585,
+     "precision_kept": 0.2697818810063708
+    },
+    {
+     "threshold": 0.6,
+     "recall": 0.08503401360544217,
+     "avg_kept": 0.11564625850340136,
+     "precision_kept": 0.08503401360544217
+    }
+   ]
+  }
+ ],
+ "per_query_prod": [
+  {
+   "qid": "milktea-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6188,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "milktea-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.7072,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "milktea-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.655,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "coffee-q1",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5431,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "coffee-q2",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5334,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "coffee-q3",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.6193,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "hotpot-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6371,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "hotpot-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6691,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "hotpot-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.5683,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "fruit-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5479,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "fruit-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6173,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "fruit-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.487,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "color-q1",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5073,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "color-q2",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5086,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "color-q3",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.54,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "music-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6071,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "music-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5903,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "music-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5933,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "movie-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5094,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "movie-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5531,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "movie-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5176,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "dessert-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6554,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "dessert-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5775,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "dessert-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.6029,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "season-q1",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5206,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "season-q2",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5457,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "season-q3",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5622,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "cat-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6248,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "cat-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6186,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "cat-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5227,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "perfume-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5232,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "perfume-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.4742,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "perfume-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5239,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "breakfast-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.609,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "breakfast-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6526,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "breakfast-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6455,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "spicy-q1",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6384,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "spicy-q2",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6258,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "spicy-q3",
+   "category": "偏好",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6868,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "first-meet-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5621,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "first-meet-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6251,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "first-meet-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5831,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "first-date-q1",
+   "category": "经历",
+   "recall@5": 0.5,
+   "recall@10": 0.5,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5852,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "first-date-q2",
+   "category": "经历",
+   "recall@5": 0.5,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.582,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "first-date-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5924,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "trip-chengdu-q1",
+   "category": "经历",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5216,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "trip-chengdu-q2",
+   "category": "经历",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4904,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "trip-chengdu-q3",
+   "category": "经历",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4721,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "trip-xiamen-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.4892,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "trip-xiamen-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6477,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "trip-xiamen-q3",
+   "category": "经历",
+   "recall@5": 0.5,
+   "recall@10": 1.0,
+   "mrr": 0.2,
+   "first_hit_rank": 5,
+   "top1_score": 0.5572,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "anniversary-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6359,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "anniversary-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6509,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "anniversary-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.4698,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "fight-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5798,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "fight-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6028,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "fight-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5465,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "gift-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6835,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "gift-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6353,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "gift-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6657,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "concert-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5869,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "concert-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5983,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "concert-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6725,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "newyear-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6531,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "newyear-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5091,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "newyear-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5934,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "fever-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5931,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "fever-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5408,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "fever-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6291,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "graduation-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6512,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "graduation-q2",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6407,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "graduation-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5964,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "confession-q1",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.25,
+   "first_hit_rank": 4,
+   "top1_score": 0.5568,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "confession-q2",
+   "category": "经历",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5481,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "confession-q3",
+   "category": "经历",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.5448,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "mom-q1",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5754,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "mom-q2",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5969,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "mom-q3",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5778,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "dad-q1",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6684,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "dad-q2",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5522,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "dad-q3",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5529,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "brother-q1",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5633,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "brother-q2",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6481,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "brother-q3",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5988,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "bestie-q1",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.25,
+   "first_hit_rank": 4,
+   "top1_score": 0.4937,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "bestie-q2",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5974,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "bestie-q3",
+   "category": "家庭朋友",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5589,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "grandma-q1",
+   "category": "家庭朋友",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.507,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "grandma-q2",
+   "category": "家庭朋友",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.533,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "grandma-q3",
+   "category": "家庭朋友",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5303,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "roommate-q1",
+   "category": "家庭朋友",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.558,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "roommate-q2",
+   "category": "家庭朋友",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.557,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "roommate-q3",
+   "category": "家庭朋友",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.593,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "major-q1",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5399,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "major-q2",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 1.0,
+   "mrr": 0.16666666666666666,
+   "first_hit_rank": 6,
+   "top1_score": 0.5768,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "major-q3",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.2,
+   "first_hit_rank": 5,
+   "top1_score": 0.5673,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "intern-q1",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6144,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "intern-q2",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5818,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "intern-q3",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6718,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "skill-q1",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5251,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "skill-q2",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4796,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "skill-q3",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5409,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "dream-q1",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.25,
+   "first_hit_rank": 4,
+   "top1_score": 0.5009,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "dream-q2",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6258,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "dream-q3",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.4994,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "cert-q1",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.615,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "cert-q2",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5669,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "cert-q3",
+   "category": "工作学校",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.25,
+   "first_hit_rank": 4,
+   "top1_score": 0.548,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "thesis-q1",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5056,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "thesis-q2",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4865,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "thesis-q3",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5059,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "bear-q1",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5633,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "bear-q2",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.25,
+   "first_hit_rank": 4,
+   "top1_score": 0.6189,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "bear-q3",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.4694,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "catchphrase-q1",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6062,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "catchphrase-q2",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5391,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "catchphrase-q3",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5381,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "thunder-q1",
+   "category": "习惯怪癖",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.6011,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "thunder-q2",
+   "category": "习惯怪癖",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5174,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "thunder-q3",
+   "category": "习惯怪癖",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5716,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "clean-q1",
+   "category": "习惯怪癖",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5406,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "clean-q2",
+   "category": "习惯怪癖",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5709,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "clean-q3",
+   "category": "习惯怪癖",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4893,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "direction-q1",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5588,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "direction-q2",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6061,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "direction-q3",
+   "category": "习惯怪癖",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5969,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "latenight-q1",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5802,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "latenight-q2",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5976,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "latenight-q3",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5659,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "photo-q1",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6007,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "photo-q2",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6388,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "photo-q3",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6159,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "rainday-q1",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6771,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "rainday-q2",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6239,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "rainday-q3",
+   "category": "习惯怪癖",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6197,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "stomach-q1",
+   "category": "健康约定",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5687,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "stomach-q2",
+   "category": "健康约定",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5782,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "stomach-q3",
+   "category": "健康约定",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6511,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "myopia-q1",
+   "category": "健康约定",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4732,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "myopia-q2",
+   "category": "健康约定",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4963,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "myopia-q3",
+   "category": "健康约定",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.4565,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "promise-xinjiang-q1",
+   "category": "健康约定",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5416,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "promise-xinjiang-q2",
+   "category": "健康约定",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5005,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "promise-xinjiang-q3",
+   "category": "健康约定",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5661,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "promise-harbin-q1",
+   "category": "健康约定",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6572,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "promise-harbin-q2",
+   "category": "健康约定",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.641,
+   "relevant_chunks_target": 2
+  },
+  {
+   "qid": "promise-harbin-q3",
+   "category": "健康约定",
+   "recall@5": 0.0,
+   "recall@10": 1.0,
+   "mrr": 0.16666666666666666,
+   "first_hit_rank": 6,
+   "top1_score": 0.5176,
+   "relevant_chunks_target": 2
+  }
+ ]
+}

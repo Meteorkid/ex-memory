@@ -1,0 +1,147 @@
+{"qid": "milktea-q1", "query": "你最喜欢喝什么奶茶来着", "category": "偏好", "fact": "最喜欢的奶茶是乌龙玛奇朵，三分糖去冰", "gold_msg_ids": [192, 194]}
+{"qid": "milktea-q2", "query": "帮你点奶茶的话要选什么口味", "category": "偏好", "fact": "最喜欢的奶茶是乌龙玛奇朵，三分糖去冰", "gold_msg_ids": [192, 194]}
+{"qid": "milktea-q3", "query": "你奶茶一般几分糖", "category": "偏好", "fact": "最喜欢的奶茶是乌龙玛奇朵，三分糖去冰", "gold_msg_ids": [192, 194]}
+{"qid": "coffee-q1", "query": "你平时喝什么咖啡", "category": "偏好", "fact": "只喝冰美式，讨厌拿铁的奶味", "gold_msg_ids": [242, 243]}
+{"qid": "coffee-q2", "query": "你为什么不喝拿铁", "category": "偏好", "fact": "只喝冰美式，讨厌拿铁的奶味", "gold_msg_ids": [242, 243]}
+{"qid": "coffee-q3", "query": "点咖啡你要热的还是冰的", "category": "偏好", "fact": "只喝冰美式，讨厌拿铁的奶味", "gold_msg_ids": [242, 243]}
+{"qid": "hotpot-q1", "query": "我们吃火锅一般点什么锅底", "category": "偏好", "fact": "吃火锅点微辣牛油锅底，必点毛肚和虾滑", "gold_msg_ids": [127, 128]}
+{"qid": "hotpot-q2", "query": "吃火锅你必点的菜是什么", "category": "偏好", "fact": "吃火锅点微辣牛油锅底，必点毛肚和虾滑", "gold_msg_ids": [127, 128]}
+{"qid": "hotpot-q3", "query": "你吃火锅能吃多辣", "category": "偏好", "fact": "吃火锅点微辣牛油锅底，必点毛肚和虾滑", "gold_msg_ids": [127, 128]}
+{"qid": "fruit-q1", "query": "你不能吃什么水果", "category": "偏好", "fact": "最爱吃芒果，对猕猴桃过敏", "gold_msg_ids": [308, 309]}
+{"qid": "fruit-q2", "query": "你最喜欢的水果是什么", "category": "偏好", "fact": "最爱吃芒果，对猕猴桃过敏", "gold_msg_ids": [308, 309]}
+{"qid": "fruit-q3", "query": "买果切要避开哪种", "category": "偏好", "fact": "最爱吃芒果，对猕猴桃过敏", "gold_msg_ids": [308, 309]}
+{"qid": "color-q1", "query": "你最喜欢什么颜色", "category": "偏好", "fact": "最喜欢雾霾蓝，房间窗帘都是这个颜色", "gold_msg_ids": [271]}
+{"qid": "color-q2", "query": "你房间窗帘是什么颜色的", "category": "偏好", "fact": "最喜欢雾霾蓝，房间窗帘都是这个颜色", "gold_msg_ids": [271]}
+{"qid": "color-q3", "query": "给你挑东西选什么色不会错", "category": "偏好", "fact": "最喜欢雾霾蓝，房间窗帘都是这个颜色", "gold_msg_ids": [271]}
+{"qid": "music-q1", "query": "你最喜欢听谁的歌", "category": "偏好", "fact": "爱听陈奕迅的老歌，最喜欢《好久不见》", "gold_msg_ids": [152, 153]}
+{"qid": "music-q2", "query": "你单曲循环最多的歌是哪首", "category": "偏好", "fact": "爱听陈奕迅的老歌，最喜欢《好久不见》", "gold_msg_ids": [152, 153]}
+{"qid": "music-q3", "query": "你喜欢听什么类型的音乐", "category": "偏好", "fact": "爱听陈奕迅的老歌，最喜欢《好久不见》", "gold_msg_ids": [152, 153]}
+{"qid": "movie-q1", "query": "你最喜欢的电影导演是谁", "category": "偏好", "fact": "最爱宫崎骏动画，看《千与千寻》哭了三次", "gold_msg_ids": [156, 157]}
+{"qid": "movie-q2", "query": "哪部电影把你看哭过", "category": "偏好", "fact": "最爱宫崎骏动画，看《千与千寻》哭了三次", "gold_msg_ids": [156, 157]}
+{"qid": "movie-q3", "query": "你最喜欢什么动画电影", "category": "偏好", "fact": "最爱宫崎骏动画，看《千与千寻》哭了三次", "gold_msg_ids": [156, 157]}
+{"qid": "dessert-q1", "query": "你生日蛋糕一般选什么", "category": "偏好", "fact": "最爱提拉米苏，生日必吃", "gold_msg_ids": [61]}
+{"qid": "dessert-q2", "query": "你最喜欢的甜品是什么", "category": "偏好", "fact": "最爱提拉米苏，生日必吃", "gold_msg_ids": [61]}
+{"qid": "dessert-q3", "query": "给你买甜点买哪种最稳", "category": "偏好", "fact": "最爱提拉米苏，生日必吃", "gold_msg_ids": [61]}
+{"qid": "season-q1", "query": "你最喜欢哪个季节", "category": "偏好", "fact": "最喜欢秋天，因为可以穿卫衣", "gold_msg_ids": [9, 10]}
+{"qid": "season-q2", "query": "你为什么喜欢秋天", "category": "偏好", "fact": "最喜欢秋天，因为可以穿卫衣", "gold_msg_ids": [9, 10]}
+{"qid": "season-q3", "query": "降温了你最开心的是什么", "category": "偏好", "fact": "最喜欢秋天，因为可以穿卫衣", "gold_msg_ids": [9, 10]}
+{"qid": "cat-q1", "query": "你以后想养什么猫", "category": "偏好", "fact": "想养一只布偶猫，名字都想好了叫汤圆", "gold_msg_ids": [169]}
+{"qid": "cat-q2", "query": "你给未来的猫取的名字是什么", "category": "偏好", "fact": "想养一只布偶猫，名字都想好了叫汤圆", "gold_msg_ids": [169]}
+{"qid": "cat-q3", "query": "你的梦中情宠是什么", "category": "偏好", "fact": "想养一只布偶猫，名字都想好了叫汤圆", "gold_msg_ids": [169]}
+{"qid": "perfume-q1", "query": "你喜欢什么香型的香水", "category": "偏好", "fact": "喜欢木质调香水，觉得甜香太俗", "gold_msg_ids": [188, 189]}
+{"qid": "perfume-q2", "query": "你讨厌哪种香水味", "category": "偏好", "fact": "喜欢木质调香水，觉得甜香太俗", "gold_msg_ids": [188, 189]}
+{"qid": "perfume-q3", "query": "给你选香水要注意什么", "category": "偏好", "fact": "喜欢木质调香水，觉得甜香太俗", "gold_msg_ids": [188, 189]}
+{"qid": "breakfast-q1", "query": "你早餐一般吃什么", "category": "偏好", "fact": "早餐爱吃豆浆油条，周末必喝胡辣汤", "gold_msg_ids": [279, 280]}
+{"qid": "breakfast-q2", "query": "你周末早上必吃的东西是什么", "category": "偏好", "fact": "早餐爱吃豆浆油条，周末必喝胡辣汤", "gold_msg_ids": [279, 280]}
+{"qid": "breakfast-q3", "query": "明早给你带什么早饭", "category": "偏好", "fact": "早餐爱吃豆浆油条，周末必喝胡辣汤", "gold_msg_ids": [279, 280]}
+{"qid": "spicy-q1", "query": "你能吃辣吗", "category": "偏好", "fact": "无辣不欢但胃不好，吃完辣总后悔", "gold_msg_ids": [232, 233]}
+{"qid": "spicy-q2", "query": "你吃辣之后会怎么样", "category": "偏好", "fact": "无辣不欢但胃不好，吃完辣总后悔", "gold_msg_ids": [232, 233]}
+{"qid": "spicy-q3", "query": "你明知道胃不好为什么还吃辣", "category": "偏好", "fact": "无辣不欢但胃不好，吃完辣总后悔", "gold_msg_ids": [232, 233]}
+{"qid": "first-meet-q1", "query": "我们第一次见面是在哪里", "category": "经历", "fact": "2023年4月15日在大学图书馆三楼第一次见面，她找不到座位", "gold_msg_ids": [287, 288]}
+{"qid": "first-meet-q2", "query": "我们是哪天认识的", "category": "经历", "fact": "2023年4月15日在大学图书馆三楼第一次见面，她找不到座位", "gold_msg_ids": [287, 288]}
+{"qid": "first-meet-q3", "query": "第一次见面的时候发生了什么", "category": "经历", "fact": "2023年4月15日在大学图书馆三楼第一次见面，她找不到座位", "gold_msg_ids": [287, 288]}
+{"qid": "first-date-q1", "query": "我们第一次约会去了哪里", "category": "经历", "fact": "第一次约会去海边看日落，她踩进水坑鞋全湿了", "gold_msg_ids": [312, 313]}
+{"qid": "first-date-q2", "query": "第一次约会你出了什么糗", "category": "经历", "fact": "第一次约会去海边看日落，她踩进水坑鞋全湿了", "gold_msg_ids": [312, 313]}
+{"qid": "first-date-q3", "query": "还记得那次看日落吗", "category": "经历", "fact": "第一次约会去海边看日落，她踩进水坑鞋全湿了", "gold_msg_ids": [312, 313]}
+{"qid": "trip-chengdu-q1", "query": "我们国庆去哪里旅行过", "category": "经历", "fact": "2023年国庆一起去成都，人民公园喝盖碗茶、看熊猫", "gold_msg_ids": [29, 30]}
+{"qid": "trip-chengdu-q2", "query": "在成都我们做了什么", "category": "经历", "fact": "2023年国庆一起去成都，人民公园喝盖碗茶、看熊猫", "gold_msg_ids": [29, 30]}
+{"qid": "trip-chengdu-q3", "query": "你还记得看熊猫那次吗", "category": "经历", "fact": "2023年国庆一起去成都，人民公园喝盖碗茶、看熊猫", "gold_msg_ids": [29, 30]}
+{"qid": "trip-xiamen-q1", "query": "我们在厦门发生过什么", "category": "经历", "fact": "在厦门鼓浪屿迷路，一天吃了三份沙茶面", "gold_msg_ids": [131, 132]}
+{"qid": "trip-xiamen-q2", "query": "你在鼓浪屿吃了什么", "category": "经历", "fact": "在厦门鼓浪屿迷路，一天吃了三份沙茶面", "gold_msg_ids": [131, 132]}
+{"qid": "trip-xiamen-q3", "query": "哪次旅行我们迷路了", "category": "经历", "fact": "在厦门鼓浪屿迷路，一天吃了三份沙茶面", "gold_msg_ids": [131, 132]}
+{"qid": "anniversary-q1", "query": "我们是哪天在一起的", "category": "经历", "fact": "5月20日在一起的", "gold_msg_ids": [292]}
+{"qid": "anniversary-q2", "query": "我们的纪念日是什么时候", "category": "经历", "fact": "5月20日在一起的", "gold_msg_ids": [292]}
+{"qid": "anniversary-q3", "query": "520对我们来说意味着什么", "category": "经历", "fact": "5月20日在一起的", "gold_msg_ids": [292]}
+{"qid": "fight-q1", "query": "我们那次冷战是因为什么", "category": "经历", "fact": "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好", "gold_msg_ids": [78, 79]}
+{"qid": "fight-q2", "query": "上次吵架是怎么和好的", "category": "经历", "fact": "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好", "gold_msg_ids": [78, 79]}
+{"qid": "fight-q3", "query": "你打游戏输了会怎么样", "category": "经历", "fact": "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好", "gold_msg_ids": [78, 79]}
+{"qid": "gift-q1", "query": "我送过你什么让你哭的礼物", "category": "经历", "fact": "收到星空投影灯的礼物感动哭了", "gold_msg_ids": [87, 88]}
+{"qid": "gift-q2", "query": "你最喜欢我送的哪个礼物", "category": "经历", "fact": "收到星空投影灯的礼物感动哭了", "gold_msg_ids": [87, 88]}
+{"qid": "gift-q3", "query": "你房间那个灯是谁送的", "category": "经历", "fact": "收到星空投影灯的礼物感动哭了", "gold_msg_ids": [87, 88]}
+{"qid": "concert-q1", "query": "我们一起看过谁的演唱会", "category": "经历", "fact": "一起看了周深演唱会，她抢票抢了两个小时", "gold_msg_ids": [91, 92]}
+{"qid": "concert-q2", "query": "演唱会的票是怎么来的", "category": "经历", "fact": "一起看了周深演唱会，她抢票抢了两个小时", "gold_msg_ids": [91, 92]}
+{"qid": "concert-q3", "query": "看演唱会那天你什么反应", "category": "经历", "fact": "一起看了周深演唱会，她抢票抢了两个小时", "gold_msg_ids": [91, 92]}
+{"qid": "newyear-q1", "query": "我们跨年去过哪里", "category": "经历", "fact": "跨年在外滩人挤人，手机没电差点走散", "gold_msg_ids": [176, 177]}
+{"qid": "newyear-q2", "query": "跨年那晚出了什么状况", "category": "经历", "fact": "跨年在外滩人挤人，手机没电差点走散", "gold_msg_ids": [176, 177]}
+{"qid": "newyear-q3", "query": "为什么你不想再去外滩", "category": "经历", "fact": "跨年在外滩人挤人，手机没电差点走散", "gold_msg_ids": [176, 177]}
+{"qid": "fever-q1", "query": "我发烧那次你做了什么", "category": "经历", "fact": "她发烧39度，我凌晨跑了三家药店买布洛芬", "gold_msg_ids": [139, 140]}
+{"qid": "fever-q2", "query": "你半夜买过什么药", "category": "经历", "fact": "她发烧39度，我凌晨跑了三家药店买布洛芬", "gold_msg_ids": [139, 140]}
+{"qid": "fever-q3", "query": "我烧到多少度那次", "category": "经历", "fact": "她发烧39度，我凌晨跑了三家药店买布洛芬", "gold_msg_ids": [139, 140]}
+{"qid": "graduation-q1", "query": "毕业典礼我送了你什么花", "category": "经历", "fact": "毕业典礼上收到向日葵", "gold_msg_ids": [123, 124]}
+{"qid": "graduation-q2", "query": "为什么送你向日葵", "category": "经历", "fact": "毕业典礼上收到向日葵", "gold_msg_ids": [123, 124]}
+{"qid": "graduation-q3", "query": "毕业那天你印象最深的是什么", "category": "经历", "fact": "毕业典礼上收到向日葵", "gold_msg_ids": [123, 124]}
+{"qid": "confession-q1", "query": "我是在哪里跟你表白的", "category": "经历", "fact": "表白是在天台，她紧张得把「我愿意」说成「我可以」", "gold_msg_ids": [147, 148]}
+{"qid": "confession-q2", "query": "表白的时候你说错了什么话", "category": "经历", "fact": "表白是在天台，她紧张得把「我愿意」说成「我可以」", "gold_msg_ids": [147, 148]}
+{"qid": "confession-q3", "query": "你答应我的时候说了什么", "category": "经历", "fact": "表白是在天台，她紧张得把「我愿意」说成「我可以」", "gold_msg_ids": [147, 148]}
+{"qid": "mom-q1", "query": "你妈妈是做什么工作的", "category": "家庭朋友", "fact": "妈妈是护士，每周末给她打视频电话", "gold_msg_ids": [69, 70, 72]}
+{"qid": "mom-q2", "query": "你多久跟你妈视频一次", "category": "家庭朋友", "fact": "妈妈是护士，每周末给她打视频电话", "gold_msg_ids": [69, 70, 72]}
+{"qid": "mom-q3", "query": "你妈妈周末常做什么", "category": "家庭朋友", "fact": "妈妈是护士，每周末给她打视频电话", "gold_msg_ids": [69, 70, 72]}
+{"qid": "dad-q1", "query": "你爸爸的爱好是什么", "category": "家庭朋友", "fact": "爸爸爱钓鱼，话少但会偷偷给她转生活费", "gold_msg_ids": [212, 213]}
+{"qid": "dad-q2", "query": "你爸是个什么样的人", "category": "家庭朋友", "fact": "爸爸爱钓鱼，话少但会偷偷给她转生活费", "gold_msg_ids": [212, 213]}
+{"qid": "dad-q3", "query": "你爸怎么表达对你的关心", "category": "家庭朋友", "fact": "爸爸爱钓鱼，话少但会偷偷给她转生活费", "gold_msg_ids": [212, 213]}
+{"qid": "brother-q1", "query": "你弟弟在读什么", "category": "家庭朋友", "fact": "弟弟是高中生，游戏打得比她好，总被她凶", "gold_msg_ids": [259, 260]}
+{"qid": "brother-q2", "query": "你和你弟谁游戏打得好", "category": "家庭朋友", "fact": "弟弟是高中生，游戏打得比她好，总被她凶", "gold_msg_ids": [259, 260]}
+{"qid": "brother-q3", "query": "你平时怎么对你弟", "category": "家庭朋友", "fact": "弟弟是高中生，游戏打得比她好，总被她凶", "gold_msg_ids": [259, 260]}
+{"qid": "bestie-q1", "query": "你最好的朋友是谁", "category": "家庭朋友", "fact": "闺蜜叫楠楠，小学认识的，无话不谈", "gold_msg_ids": [296, 297]}
+{"qid": "bestie-q2", "query": "你和楠楠是怎么认识的", "category": "家庭朋友", "fact": "闺蜜叫楠楠，小学认识的，无话不谈", "gold_msg_ids": [296, 297]}
+{"qid": "bestie-q3", "query": "你有什么事都跟谁说", "category": "家庭朋友", "fact": "闺蜜叫楠楠，小学认识的，无话不谈", "gold_msg_ids": [296, 297]}
+{"qid": "grandma-q1", "query": "你外婆的拿手菜是什么", "category": "家庭朋友", "fact": "外婆做的梅干菜烧肉一绝，每年暑假都回去", "gold_msg_ids": [41, 42]}
+{"qid": "grandma-q2", "query": "你每年暑假去哪里", "category": "家庭朋友", "fact": "外婆做的梅干菜烧肉一绝，每年暑假都回去", "gold_msg_ids": [41, 42]}
+{"qid": "grandma-q3", "query": "你最想念的家常菜是什么", "category": "家庭朋友", "fact": "外婆做的梅干菜烧肉一绝，每年暑假都回去", "gold_msg_ids": [41, 42]}
+{"qid": "roommate-q1", "query": "你宿舍是几号房", "category": "家庭朋友", "fact": "422宿舍三个室友，最爱一起点炸鸡", "gold_msg_ids": [13, 14]}
+{"qid": "roommate-q2", "query": "你和室友最爱一起吃什么", "category": "家庭朋友", "fact": "422宿舍三个室友，最爱一起点炸鸡", "gold_msg_ids": [13, 14]}
+{"qid": "roommate-q3", "query": "你们宿舍几个人", "category": "家庭朋友", "fact": "422宿舍三个室友，最爱一起点炸鸡", "gold_msg_ids": [13, 14]}
+{"qid": "major-q1", "query": "你学的什么专业", "category": "工作学校", "fact": "视觉传达设计专业，天天熬夜赶图", "gold_msg_ids": [300, 301]}
+{"qid": "major-q2", "query": "你为什么老熬夜", "category": "工作学校", "fact": "视觉传达设计专业，天天熬夜赶图", "gold_msg_ids": [300, 301]}
+{"qid": "major-q3", "query": "你专业平时都在忙什么", "category": "工作学校", "fact": "视觉传达设计专业，天天熬夜赶图", "gold_msg_ids": [300, 301]}
+{"qid": "intern-q1", "query": "你在什么公司实习", "category": "工作学校", "fact": "在广告公司实习，带她的 mentor 姓周", "gold_msg_ids": [251, 252]}
+{"qid": "intern-q2", "query": "带你实习的老师姓什么", "category": "工作学校", "fact": "在广告公司实习，带她的 mentor 姓周", "gold_msg_ids": [251, 252]}
+{"qid": "intern-q3", "query": "你实习感觉怎么样", "category": "工作学校", "fact": "在广告公司实习，带她的 mentor 姓周", "gold_msg_ids": [251, 252]}
+{"qid": "skill-q1", "query": "你擅长什么软件", "category": "工作学校", "fact": "PS 和 AI 用得很溜，帮我修过证件照", "gold_msg_ids": [1, 2]}
+{"qid": "skill-q2", "query": "我的证件照是谁修的", "category": "工作学校", "fact": "PS 和 AI 用得很溜，帮我修过证件照", "gold_msg_ids": [1, 2]}
+{"qid": "skill-q3", "query": "你能帮我P图吗", "category": "工作学校", "fact": "PS 和 AI 用得很溜，帮我修过证件照", "gold_msg_ids": [1, 2]}
+{"qid": "dream-q1", "query": "你的梦想是什么", "category": "工作学校", "fact": "梦想是开一家自己的甜品工作室", "gold_msg_ids": [216, 217]}
+{"qid": "dream-q2", "query": "你以后想开什么店", "category": "工作学校", "fact": "梦想是开一家自己的甜品工作室", "gold_msg_ids": [216, 217]}
+{"qid": "dream-q3", "query": "你理想中的生活是什么样", "category": "工作学校", "fact": "梦想是开一家自己的甜品工作室", "gold_msg_ids": [216, 217]}
+{"qid": "cert-q1", "query": "你考了什么证", "category": "工作学校", "fact": "考了教师资格证当备胎", "gold_msg_ids": [304, 305]}
+{"qid": "cert-q2", "query": "你为什么考教师资格证", "category": "工作学校", "fact": "考了教师资格证当备胎", "gold_msg_ids": [304, 305]}
+{"qid": "cert-q3", "query": "设计做不下去你打算干嘛", "category": "工作学校", "fact": "考了教师资格证当备胎", "gold_msg_ids": [304, 305]}
+{"qid": "thesis-q1", "query": "你毕业设计做的什么", "category": "工作学校", "fact": "毕业设计做的是城市记忆主题的插画集", "gold_msg_ids": [21, 22]}
+{"qid": "thesis-q2", "query": "你毕设为什么选城市记忆", "category": "工作学校", "fact": "毕业设计做的是城市记忆主题的插画集", "gold_msg_ids": [21, 22]}
+{"qid": "thesis-q3", "query": "你的插画集画的是什么", "category": "工作学校", "fact": "毕业设计做的是城市记忆主题的插画集", "gold_msg_ids": [21, 22]}
+{"qid": "bear-q1", "query": "你睡觉必须抱着什么", "category": "习惯怪癖", "fact": "必须抱着玩偶小熊「布布」才能睡着", "gold_msg_ids": [200, 201]}
+{"qid": "bear-q2", "query": "你的玩偶叫什么名字", "category": "习惯怪癖", "fact": "必须抱着玩偶小熊「布布」才能睡着", "gold_msg_ids": [200, 201]}
+{"qid": "bear-q3", "query": "你认床还是认玩偶", "category": "习惯怪癖", "fact": "必须抱着玩偶小熊「布布」才能睡着", "gold_msg_ids": [200, 201]}
+{"qid": "catchphrase-q1", "query": "你的口头禅是什么", "category": "习惯怪癖", "fact": "口头禅是「离谱」和「就这？」", "gold_msg_ids": [247, 248]}
+{"qid": "catchphrase-q2", "query": "你最常挂嘴边的词是啥", "category": "习惯怪癖", "fact": "口头禅是「离谱」和「就这？」", "gold_msg_ids": [247, 248]}
+{"qid": "catchphrase-q3", "query": "你说话有什么标志性习惯", "category": "习惯怪癖", "fact": "口头禅是「离谱」和「就这？」", "gold_msg_ids": [247, 248]}
+{"qid": "thunder-q1", "query": "你怕什么天气", "category": "习惯怪癖", "fact": "怕打雷，打雷天要开灯睡觉", "gold_msg_ids": [37, 38]}
+{"qid": "thunder-q2", "query": "打雷的时候你会怎么办", "category": "习惯怪癖", "fact": "怕打雷，打雷天要开灯睡觉", "gold_msg_ids": [37, 38]}
+{"qid": "thunder-q3", "query": "你为什么开灯睡觉", "category": "习惯怪癖", "fact": "怕打雷，打雷天要开灯睡觉", "gold_msg_ids": [37, 38]}
+{"qid": "clean-q1", "query": "你吃饭前必做什么", "category": "习惯怪癖", "fact": "出门必带酒精湿巾，餐具要先烫一遍", "gold_msg_ids": [33, 34]}
+{"qid": "clean-q2", "query": "你包里常备什么", "category": "习惯怪癖", "fact": "出门必带酒精湿巾，餐具要先烫一遍", "gold_msg_ids": [33, 34]}
+{"qid": "clean-q3", "query": "你有洁癖吗", "category": "习惯怪癖", "fact": "出门必带酒精湿巾，餐具要先烫一遍", "gold_msg_ids": [33, 34]}
+{"qid": "direction-q1", "query": "你认路吗", "category": "习惯怪癖", "fact": "重度路痴，开着导航都能走反", "gold_msg_ids": [224, 225]}
+{"qid": "direction-q2", "query": "你用导航会怎么样", "category": "习惯怪癖", "fact": "重度路痴，开着导航都能走反", "gold_msg_ids": [224, 225]}
+{"qid": "direction-q3", "query": "为什么每次都要我去接你", "category": "习惯怪癖", "fact": "重度路痴，开着导航都能走反", "gold_msg_ids": [224, 225]}
+{"qid": "latenight-q1", "query": "你晚上一般几点睡", "category": "习惯怪癖", "fact": "追剧追到凌晨两点，第二天必赖床", "gold_msg_ids": [115, 116]}
+{"qid": "latenight-q2", "query": "你为什么老赖床", "category": "习惯怪癖", "fact": "追剧追到凌晨两点，第二天必赖床", "gold_msg_ids": [115, 116]}
+{"qid": "latenight-q3", "query": "你熬夜都在干什么", "category": "习惯怪癖", "fact": "追剧追到凌晨两点，第二天必赖床", "gold_msg_ids": [115, 116]}
+{"qid": "photo-q1", "query": "你拍照有什么习惯", "category": "习惯怪癖", "fact": "拍照必须连拍二十张再慢慢挑", "gold_msg_ids": [160, 161]}
+{"qid": "photo-q2", "query": "为什么你挑照片那么久", "category": "习惯怪癖", "fact": "拍照必须连拍二十张再慢慢挑", "gold_msg_ids": [160, 161]}
+{"qid": "photo-q3", "query": "给你拍照要注意什么", "category": "习惯怪癖", "fact": "拍照必须连拍二十张再慢慢挑", "gold_msg_ids": [160, 161]}
+{"qid": "rainday-q1", "query": "你喜欢下雨天吗", "category": "习惯怪癖", "fact": "下雨天心情会变好，喜欢听雨声睡觉", "gold_msg_ids": [220, 221]}
+{"qid": "rainday-q2", "query": "什么天气让你心情变好", "category": "习惯怪癖", "fact": "下雨天心情会变好，喜欢听雨声睡觉", "gold_msg_ids": [220, 221]}
+{"qid": "rainday-q3", "query": "你睡觉喜欢听什么声音", "category": "习惯怪癖", "fact": "下雨天心情会变好，喜欢听雨声睡觉", "gold_msg_ids": [220, 221]}
+{"qid": "stomach-q1", "query": "你身体有什么老毛病", "category": "健康约定", "fact": "有老胃病，包里常备胃药", "gold_msg_ids": [228, 229]}
+{"qid": "stomach-q2", "query": "你包里一直带着什么药", "category": "健康约定", "fact": "有老胃病，包里常备胃药", "gold_msg_ids": [228, 229]}
+{"qid": "stomach-q3", "query": "你胃不舒服会怎么处理", "category": "健康约定", "fact": "有老胃病，包里常备胃药", "gold_msg_ids": [228, 229]}
+{"qid": "myopia-q1", "query": "你近视多少度", "category": "健康约定", "fact": "近视600度，平时戴隐形眼镜", "gold_msg_ids": [17, 18]}
+{"qid": "myopia-q2", "query": "你平时戴框架还是隐形", "category": "健康约定", "fact": "近视600度，平时戴隐形眼镜", "gold_msg_ids": [17, 18]}
+{"qid": "myopia-q3", "query": "你摘了眼镜什么状态", "category": "健康约定", "fact": "近视600度，平时戴隐形眼镜", "gold_msg_ids": [17, 18]}
+{"qid": "promise-xinjiang-q1", "query": "我们约好毕业旅行去哪里", "category": "健康约定", "fact": "约好毕业旅行去新疆看那拉提草原", "gold_msg_ids": [5, 6]}
+{"qid": "promise-xinjiang-q2", "query": "你最想看的草原是哪个", "category": "健康约定", "fact": "约好毕业旅行去新疆看那拉提草原", "gold_msg_ids": [5, 6]}
+{"qid": "promise-xinjiang-q3", "query": "我们之间有什么旅行约定", "category": "健康约定", "fact": "约好毕业旅行去新疆看那拉提草原", "gold_msg_ids": [5, 6]}
+{"qid": "promise-harbin-q1", "query": "我们冬天约好去哪玩", "category": "健康约定", "fact": "约好冬天去哈尔滨看冰雕和烟花", "gold_msg_ids": [172, 173]}
+{"qid": "promise-harbin-q2", "query": "你想去哈尔滨看什么", "category": "健康约定", "fact": "约好冬天去哈尔滨看冰雕和烟花", "gold_msg_ids": [172, 173]}
+{"qid": "promise-harbin-q3", "query": "我们拉勾约定过什么", "category": "健康约定", "fact": "约好冬天去哈尔滨看冰雕和烟花", "gold_msg_ids": [172, 173]}

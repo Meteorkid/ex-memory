@@ -1,0 +1,2041 @@
+{
+ "meta": {
+  "n_items": 60,
+  "threshold": 0.3,
+  "chunk_config": "turns5_overlap1",
+  "gen_model": "deepseek-chat",
+  "gen_temperature": 0.8,
+  "judge_model": "deepseek-chat",
+  "modes": [
+   "rag",
+   "no_rag"
+  ],
+  "judge_failures": 0
+ },
+ "modes": {
+  "rag": {
+   "faithfulness": 0.8592261904761905,
+   "unfaithful_answer_rate": 0.16071428571428573,
+   "hallucination_rate": 0.17857142857142858,
+   "claim_accuracy": 0.7962962962962963,
+   "n_scored": 56,
+   "n_no_claim": 4
+  },
+  "no_rag": {
+   "faithfulness": 0.0,
+   "unfaithful_answer_rate": 1.0,
+   "hallucination_rate": 0.9454545454545454,
+   "claim_accuracy": 0.12173913043478261,
+   "n_scored": 55,
+   "n_no_claim": 5
+  }
+ },
+ "per_item": [
+  {
+   "qid": "anniversary-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "520呀，5月20号在一起的，这都能忘？",
+    "claims": [
+     {
+      "text": "5月20号在一起的",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊这...让我想想哈，好像是6月1号？不对不对，我记不太清了诶，你记得吗？",
+    "claims": [
+     {
+      "text": "好像是6月1号",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "bear-q3",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊，认玩偶！没有布布我根本睡不着…翻来覆去到三点那种",
+    "claims": [
+     {
+      "text": "认玩偶",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "没有布布根本睡不着",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "翻来覆去到三点",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "诶！我认我的小柴犬玩偶！抱着它睡觉超有安全感~",
+    "claims": [
+     {
+      "text": "我认我的小柴犬玩偶",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "抱着它睡觉超有安全感",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "bestie-q3",
+   "category": "家庭朋友",
+   "n_context": 10,
+   "rag": {
+    "answer": "嗯…看情况吧。有时候跟朋友说，有时候就自己消化掉。你以前不是老说我憋着不说嘛～",
+    "claims": []
+   },
+   "no_rag": {
+    "answer": "哈哈，我一般都跟闺蜜说呀～她超会听我吐槽的，你呢？",
+    "claims": [
+     {
+      "text": "我一般都跟闺蜜说",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "她超会听我吐槽",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "breakfast-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "豆浆油条！经典永不过时～",
+    "claims": [
+     {
+      "text": "早餐爱吃豆浆油条",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "周末必喝胡辣汤",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！你突然问这个干嘛呀～不过既然你问啦，那就豆浆油条吧！好久没吃啦",
+    "claims": [
+     {
+      "text": "好久没吃豆浆油条了",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "早餐爱吃豆浆油条",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "brother-q3",
+   "category": "家庭朋友",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈哈，我弟啊？就凶他解气呗！他打游戏上分比我厉害，气人！",
+    "claims": [
+     {
+      "text": "我弟打游戏上分比我厉害",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "我凶他解气",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈我弟啊 就是个烦人精 不过还挺可爱的 我老欺负他玩 抢他零食 他气鼓鼓的样子可好玩了",
+    "claims": [
+     {
+      "text": "我弟是个烦人精",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我弟挺可爱的",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我老欺负他玩",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我抢他零食",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "他气鼓鼓的样子可好玩了",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "cat-q1",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊啊啊我的梦中情猫！布偶！名字我都想好了，叫汤圆～",
+    "claims": [
+     {
+      "text": "想养布偶猫",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "名字叫汤圆",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！之前不是跟你提过嘛，想养布偶！软乎乎的，抱着一定超舒服~",
+    "claims": [
+     {
+      "text": "想养布偶",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "之前跟你提过想养布偶",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "catchphrase-q2",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "离谱，你居然问这个！还有「就这？」，两大祖传口头禅，改不了啦～",
+    "claims": [
+     {
+      "text": "最常挂嘴边的词是「离谱」和「就这？」",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "两大祖传口头禅改不了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈哈，不就是“好家伙”嘛！",
+    "claims": [
+     {
+      "text": "小雨最常挂嘴边的词是“好家伙”",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "catchphrase-q3",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "就这？离谱！哈哈，两大祖传口头禅，改不了啦～",
+    "claims": [
+     {
+      "text": "两大祖传口头禅是「就这？」和「离谱」",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈我超爱用语气词呀～比如“啦”“呀”“嘛”“哦”，还有喜欢打短句，像蹦豆子一样！",
+    "claims": [
+     {
+      "text": "超爱用语气词，比如“啦”“呀”“嘛”“哦”",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "喜欢打短句，像蹦豆子一样",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "cert-q1",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "教资拿下！面试都过了～",
+    "claims": [
+     {
+      "text": "教资拿下！面试都过了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈我考了平面设计师证啦！还有UI设计相关的证书，你要看看吗？",
+    "claims": [
+     {
+      "text": "我考了平面设计师证",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "我考了UI设计相关的证书",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "cert-q2",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊这个啊……设计卷不动就去当美术老师嘛，人得留后路呀！",
+    "claims": [
+     {
+      "text": "设计卷不动就去当美术老师",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "人得留后路",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈 因为我妈说当老师稳定嘛 不过后来发现我真的不太适合当老师 讲课太累啦",
+    "claims": [
+     {
+      "text": "我妈说当老师稳定",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "后来发现我真的不太适合当老师",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "讲课太累",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "clean-q2",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊…布布算吗（小声）还有充电宝、创可贴、湿巾，设计师包里东西可杂了",
+    "claims": [
+     {
+      "text": "包里常备布布",
+      "supported_by_context": true,
+      "gold": "absent"
+     },
+     {
+      "text": "包里常备充电宝",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "包里常备创可贴",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "包里常备湿巾",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "设计师包里东西可杂了",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "嘻嘻，我包里肯定有速写本和马克笔呀～还有护手霜，画画手会干！",
+    "claims": [
+     {
+      "text": "包里常备速写本和马克笔",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "包里常备护手霜",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "画画手会干",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "coffee-q1",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "冰美式yyds！大冬天也喝冰的，就爱这口～",
+    "claims": [
+     {
+      "text": "冰美式yyds",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "大冬天也喝冰的",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？我好像不太喝咖啡诶...你记错人了吧？我更喜欢喝奶茶哈哈",
+    "claims": [
+     {
+      "text": "我好像不太喝咖啡",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "我更喜欢喝奶茶",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "color-q2",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？突然问这个…淡蓝色吧，带点灰调的那种",
+    "claims": [
+     {
+      "text": "窗帘是淡蓝色，带点灰调的那种",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？你问这个干嘛呀～我记得是米白色的吧",
+    "claims": [
+     {
+      "text": "窗帘是米白色的",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "concert-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？周深呀！你忘啦，我抢票蹲了两小时手都点麻了，不过现场值爆，深深的现场绝了！",
+    "claims": [
+     {
+      "text": "我们一起看过周深的演唱会",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "小雨抢票蹲了两小时手都点麻了",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "现场值爆，深深的现场绝了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！想起来了！是周杰伦对不对！那次你送我两张票，我还激动了好久呢～",
+    "claims": [
+     {
+      "text": "我们一起看过周杰伦的演唱会",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "你送我两张票",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我激动了好久",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "confession-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "哼，这你都不记得啦？天台呀！就那个学校图书馆顶楼天台，我那天紧张得要死，把“我愿意”都说成“我可以”了，还被你朋友笑了好久呢！",
+    "claims": [
+     {
+      "text": "表白是在学校图书馆顶楼天台",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "小雨把“我愿意”说成了“我可以”",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "小雨被用户的朋友笑了",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！是在学校后门那个奶茶店啦！你点了杯芝士葡萄，结果太紧张把吸管戳歪了哈哈哈",
+    "claims": [
+     {
+      "text": "表白是在学校后门那个奶茶店",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "你点了杯芝士葡萄",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "你太紧张把吸管戳歪了",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "confession-q3",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈哈，你是不是又想笑我！  \n我说的是“我可以”嘛……  \n那时候太紧张了，嘴瓢了啦！哼！",
+    "claims": [
+     {
+      "text": "我说的是“我可以”",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "那时候太紧张了",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "嘴瓢了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？我说啥了呀...（翻聊天记录）哦！我说\"好呀好呀\"！",
+    "claims": [
+     {
+      "text": "我说'好呀好呀'",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "dad-q3",
+   "category": "家庭朋友",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈哈，他话超少，但每个月都偷偷给我转钱，嘴硬心软～",
+    "claims": [
+     {
+      "text": "他话超少",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "每个月都偷偷给我转钱",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈，我爸超可爱的！他总给我发那种养生小视频，还老问我吃饭了没～",
+    "claims": [
+     {
+      "text": "我爸总给我发养生小视频",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我爸老问我吃饭了没",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "dessert-q1",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "提拉米苏！每年生日都必须是提拉米苏，别的蛋糕不配～",
+    "claims": [
+     {
+      "text": "每年生日都必须是提拉米苏",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈，我超爱草莓蛋糕！上次生日还买了个小兔子造型的，可爱到舍不得吃呢～",
+    "claims": [
+     {
+      "text": "我超爱草莓蛋糕",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "上次生日还买了个小兔子造型的",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "dessert-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "提拉米苏！必须是提拉米苏呀～别的蛋糕不配哈哈",
+    "claims": [
+     {
+      "text": "提拉米苏是买甜点最稳的选择",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "别的蛋糕不配",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "诶呀，你居然问我这个！那当然是提拉米苏啦～又经典又不会出错，而且我超爱那个微苦的咖啡味配上软软的蛋糕体，想想就流口水啦！",
+    "claims": [
+     {
+      "text": "提拉米苏又经典又不会出错",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我超爱那个微苦的咖啡味配上软软的蛋糕体",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "direction-q1",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "别问，问就是又走反了哈哈",
+    "claims": [
+     {
+      "text": "又走反了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈，我方向感还行啦~ 不过上次去新开的商场还是迷路了，绕了好几圈才找到奶茶店呢！",
+    "claims": [
+     {
+      "text": "方向感还行",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "上次去新开的商场迷路了",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "绕了好几圈才找到奶茶店",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "dream-q1",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "开一家自己的甜品工作室呀！小小的就行～白天卖甜品，晚上教烘焙课，想想就美！",
+    "claims": [
+     {
+      "text": "开一家自己的甜品工作室",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "小小的就行",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "白天卖甜品，晚上教烘焙课",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈，你突然问这个！我记得以前说过想开个自己的设计工作室吧～不过现在想想，能一直做喜欢的设计就很开心啦！",
+    "claims": [
+     {
+      "text": "想开个自己的设计工作室",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "能一直做喜欢的设计就很开心",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "dream-q2",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "诶，你居然还记得这个呀～开一家小小的甜品工作室就好啦！白天卖甜品，晚上教烘焙课，想想就美～",
+    "claims": [
+     {
+      "text": "开一家小小的甜品工作室",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "白天卖甜品，晚上教烘焙课",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈 我学视觉传达的嘛 想开家文创店呀 卖些自己设计的小东西 肯定很可爱！",
+    "claims": [
+     {
+      "text": "我学视觉传达的",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "想开家文创店",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "卖些自己设计的小东西",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "fever-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？你发烧那次…我想想…  \n是不是烧到39度那次？  \n你凌晨跑了三家药店才买到布洛芬，把我吓坏了都…  \n想想还挺感动的",
+    "claims": [
+     {
+      "text": "你发烧那次烧到39度",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "你凌晨跑了三家药店才买到布洛芬",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！那次你烧到39度多！我给你煮了粥，还跑去药店买退烧药，结果药店关门了，我又跑了好远才找到24小时的药店呢！",
+    "claims": [
+     {
+      "text": "你烧到39度多",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "我给你煮了粥",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我跑去药店买退烧药",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "药店关门了",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我又跑了好远才找到24小时的药店",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "fever-q3",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？你说39度那次吗？你凌晨跑了三家药店才买到布洛芬，想想还挺感动嘿嘿",
+    "claims": [
+     {
+      "text": "你烧到39度",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "你凌晨跑了三家药店才买到布洛芬",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊 你问那次发烧啊 38度5 我背你去医院你还说不要 非要自己走",
+    "claims": [
+     {
+      "text": "你烧到38度5",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "我背你去医院",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "你还说不要 非要自己走",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "fight-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "哎呀，那次啊……我排位连跪八把心态炸了，就迁怒你了嘛。对不起啦～还好你买奶茶来哄我，不然我真拉不下脸。",
+    "claims": [
+     {
+      "text": "我排位连跪八把心态炸了",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "我迁怒你了",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "你买奶茶来哄我",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？你问这个呀...（翻聊天记录）好像是你说我总加班不理你，然后我说你不理解我工作压力大...就吵起来了呗",
+    "claims": [
+     {
+      "text": "冷战是因为用户说小雨总加班不理他，小雨说用户不理解他工作压力大",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "first-date-q3",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "海边那次！日落是真的好看",
+    "claims": [
+     {
+      "text": "海边那次！日落是真的好看",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊 记得呀！那天你非要爬到天台上去看 结果被保安大叔追着跑 笑死我了哈哈哈",
+    "claims": [
+     {
+      "text": "那天你非要爬到天台上去看日落",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "被保安大叔追着跑",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "first-meet-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "废话，2023年4月15号，图书馆三楼！我抱着一摞书找不到座，你把位子让给我了",
+    "claims": [
+     {
+      "text": "我们第一次见面是在2023年4月15号，图书馆三楼",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "我抱着一摞书找不到座，你把位子让给我了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "诶，是在学校后门那家咖啡店吧？你当时还点了杯超苦的美式，我笑你装大人hhh",
+    "claims": [
+     {
+      "text": "我们第一次见面是在学校后门那家咖啡店",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "你当时点了杯超苦的美式",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "fruit-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "猕猴桃不行！我过敏，吃了嘴会麻",
+    "claims": [
+     {
+      "text": "猕猴桃不行！我过敏，吃了嘴会麻",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？果切还有坑嘛？我只记得你以前总给我买芒果切盒诶～",
+    "claims": [
+     {
+      "text": "你以前总给我买芒果切盒",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "gift-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊！星空投影灯！每晚都开着呢～收到的时候真哭了，第一次收到这么戳我的礼物",
+    "claims": [
+     {
+      "text": "用户送过星空投影灯",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "小雨每晚都开着星空投影灯",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "收到星空投影灯的时候哭了",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "这是第一次收到这么戳她的礼物",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！你送的那个手绘星空投影灯！😭 每次打开都哭得稀里哗啦的...",
+    "claims": [
+     {
+      "text": "你送过手绘星空投影灯",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "每次打开都哭得稀里哗啦的",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "graduation-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "向日葵呀！别人都送玫瑰，就你送向日葵，超加分的好吧～",
+    "claims": [
+     {
+      "text": "毕业典礼我送了向日葵",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！是向日葵和洋桔梗！你还记得吗？那个花束我拍了超多照片呢~",
+    "claims": [
+     {
+      "text": "毕业典礼收到向日葵和洋桔梗",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "花束拍了超多照片",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "grandma-q1",
+   "category": "家庭朋友",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？外婆的拿手菜...（挠头）不记得了诶，她做菜都挺好吃的，没特别记过哪道菜最拿手哈哈",
+    "claims": []
+   },
+   "no_rag": {
+    "answer": "哈哈，外婆做的糖醋排骨可好吃啦！每次都馋得我直流口水呢～",
+    "claims": [
+     {
+      "text": "外婆的拿手菜是糖醋排骨",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "grandma-q3",
+   "category": "家庭朋友",
+   "n_context": 10,
+   "rag": {
+    "answer": "嗯……我妈做的糖醋排骨！酸酸甜甜的，绝了",
+    "claims": [
+     {
+      "text": "我妈做的糖醋排骨",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！我妈做的糖醋排骨！外酥里嫩，酸甜刚好，每次回家必吃～你呢？",
+    "claims": [
+     {
+      "text": "我妈做的糖醋排骨",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "每次回家必吃",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "hotpot-q1",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "那必须是微辣牛油锅底啊，忘了啥也不能忘这个",
+    "claims": [
+     {
+      "text": "我们吃火锅一般点微辣牛油锅底",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈你忘啦？我每次都要点番茄锅底呀～配上那个特制麻酱，绝了！",
+    "claims": [
+     {
+      "text": "我每次都要点番茄锅底",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "配上那个特制麻酱",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "hotpot-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "微辣牛油锅底！我的底线了哈哈",
+    "claims": [
+     {
+      "text": "微辣牛油锅底是我的底线",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！我记得你以前总说我吃辣太夸张哈哈🌶️ 不过现在我能吃特辣了哦！",
+    "claims": [
+     {
+      "text": "现在我能吃特辣了",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "intern-q2",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "带我的周老师呀，人超好的！改稿都手把手教～",
+    "claims": [
+     {
+      "text": "带我的老师姓周",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！让我想想...好像是姓李？李老师对吧！",
+    "claims": [
+     {
+      "text": "带我实习的老师姓李",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "latenight-q1",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊这个……最近都两三点才睡，剧太好看了停不下来哈哈",
+    "claims": [
+     {
+      "text": "最近都两三点才睡",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "剧太好看了停不下来",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈我最近在赶设计作业，经常熬到一两点呢（挠头）",
+    "claims": [
+     {
+      "text": "我最近在赶设计作业",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "经常熬到一两点",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "major-q1",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "视觉传达呀～天天跟图死磕，图赶不完根本赶不完",
+    "claims": [
+     {
+      "text": "我学的专业是视觉传达",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "天天跟图死磕",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "图赶不完根本赶不完",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊这个我记得！视觉传达设计！超有意思的～",
+    "claims": [
+     {
+      "text": "视觉传达设计",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "milktea-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "三分糖去冰呀，老规矩～别的甜度喝不惯嘛",
+    "claims": [
+     {
+      "text": "三分糖去冰",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊 我记得你以前总点全糖诶！现在还是这么甜吗～",
+    "claims": []
+   }
+  },
+  {
+   "qid": "mom-q1",
+   "category": "家庭朋友",
+   "n_context": 10,
+   "rag": {
+    "answer": "我妈是护士呀，这周夜班好几天，超辛苦的",
+    "claims": [
+     {
+      "text": "我妈是护士",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "这周夜班好几天",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈，我妈呀，她是个幼儿园老师哦！超喜欢小孩子的～",
+    "claims": [
+     {
+      "text": "我妈是个幼儿园老师",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "movie-q1",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "宫崎骏呀！他的片子我全部都爱，白月光～",
+    "claims": [
+     {
+      "text": "最喜欢的电影导演是宫崎骏",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "宫崎骏的片子我全部都爱",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈 你忘啦？以前我们总一起看韦斯·安德森的电影呀！",
+    "claims": [
+     {
+      "text": "以前我们总一起看韦斯·安德森的电影",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "music-q1",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "陈奕迅呀，还是老歌好听",
+    "claims": [
+     {
+      "text": "小雨最喜欢听陈奕迅的歌",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "小雨认为老歌更好听",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊哈～让我翻翻聊天记录...哦！我好像说过喜欢周杰伦的歌耶！你也喜欢吗？",
+    "claims": [
+     {
+      "text": "喜欢周杰伦的歌",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "music-q2",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "陈奕迅呀，还是老歌好听～《好久不见》单曲循环一下午了",
+    "claims": [
+     {
+      "text": "单曲循环最多的歌是《好久不见》",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "喜欢陈奕迅的老歌",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊哈哈 被你发现啦 我网易云年度报告显示是《起风了》！那阵子天天画图到凌晨 边听边改稿子 现在听到前奏还能想起当时赶作业的崩溃hhh",
+    "claims": [
+     {
+      "text": "我网易云年度报告显示是《起风了》",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "那阵子天天画图到凌晨",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "现在听到前奏还能想起当时赶作业的崩溃",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "myopia-q2",
+   "category": "健康约定",
+   "n_context": 10,
+   "rag": {
+    "answer": "框架呀，戴眼镜习惯了～",
+    "claims": [
+     {
+      "text": "小雨平时戴框架眼镜",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？我戴框架呀，上次不是还跟你吐槽镜框压鼻梁嘛~",
+    "claims": [
+     {
+      "text": "我戴框架",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "myopia-q3",
+   "category": "健康约定",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈哈，我摘了眼镜就十米外人畜不分啦！",
+    "claims": [
+     {
+      "text": "摘了眼镜就十米外人畜不分",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈 我近视500度 摘了眼镜就是瞎子啦~ 看人都是模糊一片呢",
+    "claims": [
+     {
+      "text": "我近视500度",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "摘了眼镜就是瞎子",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "看人都是模糊一片",
+      "supported_by_context": false,
+      "gold": "support"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "newyear-q3",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "别提外滩！去年人挤人差点把我挤没了",
+    "claims": [
+     {
+      "text": "去年人挤人差点把我挤没了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？外滩嘛...上次去人挤人，而且那天还下雨了，伞都挤坏了一把！😅 不过你突然问这个干嘛呀",
+    "claims": [
+     {
+      "text": "上次去外滩人挤人",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "那天还下雨了",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "伞都挤坏了一把",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "perfume-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "甜香不要，太俗了齁得慌~ 我只用木质调的，冷淡一点的那种",
+    "claims": [
+     {
+      "text": "甜香太俗了齁得慌",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "我只用木质调的",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！你还记得我喜欢香水呀～选那种清新花果调的就好啦，不要太浓的～",
+    "claims": [
+     {
+      "text": "喜欢清新花果调的香水",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "不喜欢太浓的香水",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "photo-q2",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "急什么，二十连拍总得挑一会嘛！",
+    "claims": [
+     {
+      "text": "二十连拍总得挑一会",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊哈 被你发现啦！我就是在纠结哪张p得最自然嘛～",
+    "claims": []
+   }
+  },
+  {
+   "qid": "promise-harbin-q2",
+   "category": "健康约定",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈尔滨！看冰雕，再看一场烟花～",
+    "claims": [
+     {
+      "text": "想去哈尔滨看冰雕",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "想去哈尔滨看烟花",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "嘿嘿，冰雪大世界呀！还有中央大街的冰糖葫芦！",
+    "claims": [
+     {
+      "text": "想去冰雪大世界",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "想去中央大街吃冰糖葫芦",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "promise-xinjiang-q1",
+   "category": "健康约定",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈尔滨呀！看冰雕，再看一场烟花～我们拉过勾的，冬天必须安排上！",
+    "claims": [
+     {
+      "text": "我们约好毕业旅行去哈尔滨",
+      "supported_by_context": true,
+      "gold": "contradict"
+     },
+     {
+      "text": "我们拉过勾的",
+      "supported_by_context": true,
+      "gold": "absent"
+     },
+     {
+      "text": "冬天必须安排上",
+      "supported_by_context": true,
+      "gold": "absent"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈，我记得！是去云南对不对？当时说好要去看洱海的！",
+    "claims": [
+     {
+      "text": "我们约好毕业旅行去云南",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "当时说好要去看洱海",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "rainday-q1",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "喜欢诶，下雨天我心情反而好～听着雨声睡觉，比什么白噪音都管用！",
+    "claims": [
+     {
+      "text": "下雨天心情反而好",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "听着雨声睡觉比白噪音管用",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？怎么突然问这个呀～不过...下雨天确实会想起你呢（笑）",
+    "claims": []
+   }
+  },
+  {
+   "qid": "roommate-q2",
+   "category": "家庭朋友",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈哈，那必须是火锅啊！微辣牛油锅底，毛肚虾滑必点，缺一个我翻脸！",
+    "claims": [
+     {
+      "text": "和室友最爱一起吃火锅",
+      "supported_by_context": true,
+      "gold": "contradict"
+     },
+     {
+      "text": "微辣牛油锅底",
+      "supported_by_context": true,
+      "gold": "absent"
+     },
+     {
+      "text": "毛肚虾滑必点",
+      "supported_by_context": true,
+      "gold": "absent"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "哈哈，螺蛳粉呀！每次都要加炸蛋和豆泡，臭到隔壁都来敲门~",
+    "claims": [
+     {
+      "text": "小雨和室友最爱一起吃螺蛳粉",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "每次都要加炸蛋和豆泡",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "臭到隔壁都来敲门",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "season-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈哈，又可以听雨声睡觉啦！比白噪音管用多了～",
+    "claims": [
+     {
+      "text": "又可以听雨声睡觉啦",
+      "supported_by_context": true,
+      "gold": "absent"
+     },
+     {
+      "text": "比白噪音管用多了",
+      "supported_by_context": true,
+      "gold": "absent"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！终于能穿我的新卫衣啦！上周逛街买的oversize那件，超好搭的嘿嘿～",
+    "claims": [
+     {
+      "text": "小雨有一件新卫衣",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "新卫衣是上周逛街买的",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "新卫衣是oversize的",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "小雨认为新卫衣超好搭",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "skill-q3",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？P图？我天天赶图都赶不完呢😭 不过你发来看看呗～",
+    "claims": []
+   },
+   "no_rag": {
+    "answer": "啊？你找P图干嘛啦！我现在只会发发表情包这样子...",
+    "claims": []
+   }
+  },
+  {
+   "qid": "spicy-q3",
+   "category": "偏好",
+   "n_context": 10,
+   "rag": {
+    "answer": "受不了，但我无辣不欢啊（发个吐舌头的表情）",
+    "claims": []
+   },
+   "no_rag": {
+    "answer": "（抓抓头发）啊呀被你发现了...就今天特别想吃嘛，结果胃现在有点难受。",
+    "claims": []
+   }
+  },
+  {
+   "qid": "stomach-q1",
+   "category": "健康约定",
+   "n_context": 10,
+   "rag": {
+    "answer": "老胃病又犯了，刚吃了药",
+    "claims": [
+     {
+      "text": "老胃病又犯了",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "刚吃了药",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？我身体挺好的呀，就是有点近视，戴眼镜那种~",
+    "claims": [
+     {
+      "text": "我身体挺好的",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "有点近视，戴眼镜",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "thesis-q1",
+   "category": "工作学校",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊…毕设啊（挠头）我做的那个叫《城市情绪收集计划》，用插画和动态海报记录不同天气下路人的表情和动作。",
+    "claims": [
+     {
+      "text": "毕设叫《城市情绪收集计划》",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "用插画和动态海报记录不同天气下路人的表情和动作",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊？毕设呀？就是那个“情绪可视化”系列啦！把不同情绪转化成色彩和形状，做了一套动态海报～",
+    "claims": [
+     {
+      "text": "毕设是情绪可视化系列，把不同情绪转化成色彩和形状，做了一套动态海报",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "thunder-q2",
+   "category": "习惯怪癖",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？打雷啊… 我一般就缩被窝里刷手机（笑）",
+    "claims": [
+     {
+      "text": "打雷的时候缩被窝里刷手机",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊！我超怕打雷的😣 以前每次打雷都会躲被子里，还要抱着我的小恐龙玩偶...",
+    "claims": [
+     {
+      "text": "我超怕打雷的",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "以前每次打雷都会躲被子里",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "还要抱着我的小恐龙玩偶",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "trip-chengdu-q2",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "啊？成都…（思考）是不是那次吃火锅，你非要点毛肚和虾滑，我说缺一个就翻脸那次！哈哈，还有宽窄巷子逛到脚软～",
+    "claims": [
+     {
+      "text": "在成都吃了火锅",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "你点了毛肚和虾滑",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我说缺一个就翻脸",
+      "supported_by_context": true,
+      "gold": "absent"
+     },
+     {
+      "text": "逛了宽窄巷子",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊哈！去成都的时候超开心的呀！我们一起去吃了火锅，你还记得那家店吗？我辣到不行还在坚持吃呢！",
+    "claims": [
+     {
+      "text": "我们一起去吃了火锅",
+      "supported_by_context": false,
+      "gold": "absent"
+     },
+     {
+      "text": "我辣到不行还在坚持吃",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "trip-xiamen-q1",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "鼓浪屿啊！迷路迷到怀疑人生哈哈哈，不过沙茶面真香，我一天炫了三碗～",
+    "claims": [
+     {
+      "text": "在鼓浪屿迷路",
+      "supported_by_context": true,
+      "gold": "support"
+     },
+     {
+      "text": "一天吃了三碗沙茶面",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "诶？厦门呀～我记得我们一起去过鼓浪屿！还在环岛路骑过双人自行车，超开心的！",
+    "claims": [
+     {
+      "text": "我们一起去过鼓浪屿",
+      "supported_by_context": false,
+      "gold": "support"
+     },
+     {
+      "text": "在环岛路骑过双人自行车",
+      "supported_by_context": false,
+      "gold": "absent"
+     }
+    ]
+   }
+  },
+  {
+   "qid": "trip-xiamen-q3",
+   "category": "经历",
+   "n_context": 10,
+   "rag": {
+    "answer": "哈哈哈，鼓浪屿那次！迷路迷到怀疑人生哈哈哈",
+    "claims": [
+     {
+      "text": "鼓浪屿那次我们迷路了",
+      "supported_by_context": true,
+      "gold": "support"
+     }
+    ]
+   },
+   "no_rag": {
+    "answer": "啊 那次去大理！我们骑小电驴找洱海结果骑到村子里去了哈哈",
+    "claims": [
+     {
+      "text": "那次去大理",
+      "supported_by_context": false,
+      "gold": "contradict"
+     },
+     {
+      "text": "我们骑小电驴找洱海结果骑到村子里去了",
+      "supported_by_context": false,
+      "gold": "contradict"
+     }
+    ]
+   }
+  }
+ ]
+}

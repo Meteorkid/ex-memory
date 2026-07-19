@@ -22,6 +22,27 @@ ex-memory 是一个开源的数字镜像系统，通过分析你和前任的聊�
 - **微信风格登录页**：双气泡 Logo + 底部边框输入 + 微信绿按钮
 - **纯 Python CLI**：不依赖 Claude，可独立运行
 
+## 效果评测（Evals）
+
+RAG 链路配有一套可复现的量化评测体系（[`evals/`](evals/)，指标全部手写实现，不依赖评测框架）：147 条查询 × 49 个事实簇的 Golden Dataset（消息级 ground truth，合成微信风格语料，隐私数据不进仓库），检索端 Recall@K / MRR / nDCG@K，生成端忠实度 / 幻觉率（LLM judge 论断级判定）。
+
+| 指标（bge-m3 + ChromaDB + deepseek-chat 实测） | 结果 |
+|---|---|
+| 检索 Recall@5（最优分块 3轮/重叠1） | **91.5%**（当前生产配置 71.1%，MRR 0.826） |
+| 生成幻觉率：RAG vs 无 RAG 基线 | **17.9% vs 94.5%** |
+| 生成忠实度（论断被检索上下文支持的比例） | 85.9% |
+
+关键发现：分块窗口大小与 `dominant_speaker=target` 过滤强耦合——窗口越大越难有单一说话人过半，8 轮窗口下候选池枯竭、Recall@5 崩至 21.1%；另外 `RAG_THRESHOLD=0.3` 在 bge-m3 的分数分布下几乎不起过滤作用，真正的召回拐点在 0.5。
+
+完整报告（图表、阈值扫描、dominant_speaker 过滤代价、失败案例分析）：[docs/eval_report.md](docs/eval_report.md)
+
+```bash
+make eval-corpus      # 重新生成语料与 Golden Dataset（固定种子，确定性）
+make eval-retrieval   # 检索 A/B：分块 × 过滤 × 阈值（需 EMBEDDING_API_KEY，或 --mock 冒烟）
+make eval-generation  # 生成评测：忠实度/幻觉率（需 LLM_API_KEY，默认抽样 60 条控制成本）
+make eval-report      # 生成图表与 docs/eval_report.md
+```
+
 ## 快速开始
 
 ### 环境要求
@@ -216,6 +237,7 @@ ex-memory/
 │   └── static/               # 微信模拟器 SPA
 │
 ├── prompts/                  # LLM prompt 模板
+├── evals/                    # RAG 评测：Golden Dataset + 手写指标 + A/B Runner
 ├── tests/                    # 测试套件
 │
 └── exes/{slug}/              # 运行时数据
