@@ -322,6 +322,11 @@ Web API 服务提供以下端点（`http://localhost:8000/api`）：
 | `LOCAL_WECHAT_EXPORT_ENABLED` | 否 | 启用网页本机微信导出向导 | `false` |
 | `WECHAT_EXPORT_BACKUP_ROOT` | 否 | iTunes/iOS 备份扫描根目录 | `~/Library/Application Support/MobileSync/Backup` |
 | `WECHAT_EXPORT_OUTPUT_DIR` | 否 | 微信导出任务输出目录 | `data/wechat_exports` |
+| `LOCAL_WECHAT_HELPER_ENABLED` | 否 | 展示仅验证微信 4.1.12 的 macOS 本地助手下载入口 | `false` |
+| `LOCAL_WECHAT_HELPER_VERSION` | 否 | 本站发布的本地助手版本 | — |
+| `LOCAL_WECHAT_HELPER_MIN_API_VERSION` | 否 | 网站接受的本地助手最低 API 协议版本 | `1` |
+| `LOCAL_WECHAT_HELPER_ARM64_URL` | 否 | 自有网站上的 arm64 DMG HTTPS 地址 | — |
+| `LOCAL_WECHAT_HELPER_ARM64_SHA256` | 否 | arm64 DMG 的 SHA-256 | — |
 
 未配置 Embedding 时 RAG 检索不可用，但对话仍可正常进行（退化为纯文本模式）。
 
@@ -355,6 +360,8 @@ python run.py
 该能力适合本机 CLI 使用，不建议在远程 Web 服务中开放任意本机路径读取。`WECHAT_EXPORTER_BIN` 必须指向已存在且可执行的 WechatExporter 二进制。
 
 网页端提供“发现 → 微信聊天导出”本机向导。该入口还需要 `LOCAL_WECHAT_EXPORT_ENABLED=true`，且仅允许从 localhost 访问；页面只能选择固定根目录下扫描到的 iTunes/iOS 备份，输出固定写入 `data/wechat_exports/{task_id}/`。
+
+macOS 微信 4.1.12 采用独立 localhost 助手：公共网站只负责检测和唤起，联系人、正文、密钥、媒体和导出文件不经过网站服务器。每个微信账号密钥不同，一次任务只处理当前登录账号；首次导入、切换账号或助手重启后需要分别重新提取。当前固定使用“未签名开源 Beta + 用户手动放行 Gatekeeper”发布方式，安装包托管在自己的阿里云网站，不使用 GitHub Release。构建、上传、SIP 专家流程和卸载说明见 [macOS 本地助手 Beta 文档](docs/MACOS_WECHAT_HELPER_BETA.md)。
 
 ## 隐私说明
 

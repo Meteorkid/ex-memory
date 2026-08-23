@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#F2F2F7">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta name="theme-color" content="#0a0a12">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:17653; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
     <title>ex-memory</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icon-192.svg">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=20260822">
+    <link rel="stylesheet" href="/static/wechat-helper.css?v=20260822b">
 </head>
 <body>
 
@@ -195,14 +196,45 @@
 
                 <!-- ═══ Tab 3: 发现 ═══ -->
                 <div id="tab-discover" class="tab-page" style="display:none">
-                    <div class="discover-header">发现</div>
-                    <div class="discover-list">
-                        <div class="discover-item" id="moments-entry">
-                            <span class="discover-icon">🎞</span>
-                            <span class="discover-label">朋友圈</span>
-                            <span class="discover-arrow">›</span>
-                        </div>
+                    <header class="discover-hero">
+                        <span class="discover-eyebrow">EXPLORE</span>
+                        <h1>发现</h1>
+                        <p>浏览记忆动态，或在本机安全整理你的微信聊天。</p>
+                    </header>
+                    <div class="discover-feature-grid">
+                        <button class="discover-feature-card" id="moments-entry" type="button" aria-expanded="false" aria-controls="moments-timeline">
+                            <span class="discover-feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5h16M7.5 4v16M16.5 4v16M4 16.5h16"/><rect x="3" y="3" width="18" height="18" rx="5"/></svg>
+                            </span>
+                            <span class="discover-feature-copy"><strong>朋友圈</strong><small>查看镜像留下的动态与片段</small></span>
+                            <span class="discover-feature-side"><span class="discover-feature-tag">记忆动态</span><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7 4 6 6-6 6"/></svg></span>
+                        </button>
+                        <button class="discover-feature-card" id="wechat-helper-entry" type="button" aria-expanded="false" aria-controls="wechat-helper-panel">
+                            <span class="discover-feature-icon export" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg>
+                            </span>
+                            <span class="discover-feature-copy"><strong>微信聊天导出</strong><small>离线生成完整 HTML 与分类媒体</small></span>
+                            <span class="discover-feature-side"><span class="discover-feature-tag private">本机工具</span><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7 4 6 6-6 6"/></svg></span>
+                        </button>
                     </div>
+                    <section id="wechat-helper-panel" class="wechat-helper-panel" style="display:none" aria-label="微信聊天导出">
+                        <div class="wechat-helper-workspace">
+                            <header class="wechat-helper-header">
+                                <div><span class="wechat-helper-kicker">LOCAL EXPORT</span><h2>本机微信 4.1.12 导出</h2><p>聊天正文、联系人、媒体和数据库密钥只在你的 Mac 上处理，不上传到本站。</p></div>
+                                <span class="wechat-helper-private"><span aria-hidden="true"></span>仅在本机处理</span>
+                            </header>
+                            <div id="wechat-helper-state" class="wechat-helper-state">尚未检测本地助手</div>
+                            <button id="wechat-helper-launch" class="wechat-helper-launch" type="button">检测并启动本地助手<span aria-hidden="true">→</span></button>
+                            <a id="wechat-helper-open" class="wechat-helper-open" href="#" target="_blank" rel="noopener" style="display:none">打开本地安全页面继续<span aria-hidden="true">→</span></a>
+                            <div class="wechat-helper-steps" aria-label="导出流程">
+                                <div><span>01</span><strong>连接助手</strong><small>只连接本机 localhost</small></div>
+                                <div><span>02</span><strong>本机解密</strong><small>聊天数据不上传</small></div>
+                                <div><span>03</span><strong>生成 HTML</strong><small>媒体按类别存放</small></div>
+                            </div>
+                            <aside class="wechat-helper-beta"><span class="wechat-helper-beta-icon" aria-hidden="true">β</span><div><strong>未签名开源 Beta · 仅验证微信 4.1.12</strong><p>每个微信账号的数据库密钥不同，首次导入、切换账号、助手重启、微信升级或密钥验证失败时都要重新提取。流程会临时关闭 SIP；生成解密快照后必须立即重新开启，随后才能导出。</p></div></aside>
+                            <div id="wechat-helper-downloads" class="wechat-helper-downloads" style="display:none"></div>
+                        </div>
+                    </section>
                     <!-- 朋友圈时间线 -->
                     <div id="moments-timeline" class="moments-timeline" style="display:none">
                         <div id="moments-list"></div>
@@ -351,6 +383,8 @@
     </div>
 </div>
 
-<script src="/static/app.js?v=20260529"></script>
+<script src="/static/effects.js"></script>
+<script src="/static/app.js?v=20260823b"></script>
+<script src="/static/wechat-helper.js?v=20260823"></script>
 </body>
 </html>

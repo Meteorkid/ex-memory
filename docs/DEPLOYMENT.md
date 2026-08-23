@@ -107,6 +107,11 @@ sudo certbot --nginx -d your-domain.com
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | 否 | Embedding 模型 |
 | `CORS_ORIGINS` | `http://localhost:8000,http://localhost:7860` | 否 | 允许的来源 |
 | `SINGLE_USER_MODE` | `false` | 否 | 单人本机模式，跳过镜像归属校验 |
+| `LOCAL_WECHAT_HELPER_ENABLED` | `false` | 否 | 启用 macOS 本地助手下载入口 |
+| `LOCAL_WECHAT_HELPER_VERSION` | 空 | 否 | 本站发布的本地助手版本 |
+| `LOCAL_WECHAT_HELPER_MIN_API_VERSION` | `1` | 否 | 网站接受的本地助手最低 API 协议版本 |
+| `LOCAL_WECHAT_HELPER_ARM64_URL` | 空 | 否 | 阿里云 HTTPS DMG 地址 |
+| `LOCAL_WECHAT_HELPER_ARM64_SHA256` | 空 | 否 | DMG SHA-256，用于网页校验展示 |
 | `DISABLE_REGISTRATION` | `false` | 否 | 关闭开放注册 |
 | `TRUSTED_PROXY` | `false` | 否 | 反向代理后信任 `X-Forwarded-For` |
 | `LOG_LEVEL` | `INFO` | 否 | 日志级别 |

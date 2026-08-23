@@ -6,19 +6,32 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from functools import wraps
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Query
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from config import EXES_DIR, PROJECT_DIR, get_ex_dir, get_collection_name, DISABLE_REGISTRATION
+from config import PROJECT_DIR, get_ex_dir, DISABLE_REGISTRATION
 from core.validation import validate_slug, validate_user_input, sanitize_chat_history
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
-from core.file_utils import atomic_write, atomic_write_json
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
 from server.middleware import require_auth, _get_client_ip, security
+from server.models import (
+    AuthRequest,
+    BackupRequest,
+    ChatRequest,
+    ChatResponse,
+    CreateRequest,
+    DeleteRequest,
+    ExeInfo,
+    ResumeRequest,
+    RollbackRequest,
+    StatusResponse,
+    TransferConfirmRequest,
+    TransferRequest,
+    UpdateRequest,
+)
 from fastapi.security import HTTPAuthorizationCredentials
 
 # ═══════════════════════════════════════
@@ -26,21 +39,28 @@ from fastapi.security import HTTPAuthorizationCredentials
 # ═══════════════════════════════════════
 
 class SimpleCache:
-    """简单的内存缓存，支持 TTL。"""
+    """内存缓存：TTL + LRU 淘汰，防止内存泄漏。"""
 
-    def __init__(self, default_ttl=60):
-        self._cache = {}
+    def __init__(self, default_ttl=60, maxsize=256):
+        from collections import OrderedDict
+        self._cache = OrderedDict()
         self._default_ttl = default_ttl
+        self._maxsize = maxsize
 
     def get(self, key):
         if key in self._cache:
             data, expiry = self._cache[key]
             if time.time() < expiry:
+                self._cache.move_to_end(key)
                 return data
             del self._cache[key]
         return None
 
     def set(self, key, value, ttl=None):
+        if key in self._cache:
+            del self._cache[key]
+        elif len(self._cache) >= self._maxsize:
+            self._cache.popitem(last=False)
         self._cache[key] = (value, time.time() + (ttl or self._default_ttl))
 
     def delete(self, key):
@@ -51,12 +71,24 @@ class SimpleCache:
 
 # 全局缓存实例
 cache = SimpleCache(default_ttl=30)  # 30秒 TTL
-from server.models import (
-    CreateRequest, ResumeRequest, ChatRequest, UpdateRequest,
-    BackupRequest, RollbackRequest, DeleteRequest,
-    ExeInfo, ChatResponse, StatusResponse, ErrorResponse, AuthRequest, LogoutRequest,
-    TransferRequest, TransferConfirmRequest,
-)
+
+# ═══════════════════════════════════════
+# meta.json 读写工具
+# ═══════════════════════════════════════
+
+def _load_meta(slug: str) -> dict:
+    """读取镜像 meta.json，不存在则抛 404。"""
+    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    if not meta_file.exists():
+        raise HTTPException(status_code=404, detail="镜像不存在")
+    return json.loads(meta_file.read_text(encoding="utf-8"))
+
+
+def _save_meta(slug: str, meta: dict) -> None:
+    """写入镜像 meta.json。"""
+    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
 
 logger = logging.getLogger("ex-memory")
 router = APIRouter(prefix="/api")
@@ -73,6 +105,14 @@ _engine_cache_lock = threading.Lock()
 # 登录限流 + 审计日志
 _login_limiter = None
 _audit_logger = None
+
+
+@router.get("/local-helper/config")
+def get_local_helper_config():
+    """返回不含本机隐私数据的助手版本和本站下载信息。"""
+    from core.local_helper_release import get_local_helper_release
+
+    return get_local_helper_release()
 
 
 def _get_login_limiter():
@@ -458,7 +498,7 @@ def send_transfer(slug: str, req: TransferRequest, user_id: int = Depends(requir
     """发起转账。"""
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import create_transfer
-    tx = create_transfer(slug, req.amount, req.note, req.direction)
+    create_transfer(slug, req.amount, req.note, req.direction)
     return StatusResponse(message=f"转账已发起: {req.note} (¥{req.amount})")
 
 
@@ -619,7 +659,7 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
                     _session_counters[key] = counter
                 counter.update(approx_usage)
 
-            yield f"data: [DONE]\n\n"
+            yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error("流式对话失败: %s", e, exc_info=True)
             yield f"data: {json.dumps({'error': _INTERNAL_ERROR})}\n\n"
@@ -865,15 +905,9 @@ def mindful_message(user_id: int = Depends(require_auth)):
 def set_group(slug: str, group: str = Query(...), user_id: int = Depends(require_auth)):
     """设置镜像分组。"""
     slug = _check_exe_access(slug, user_id)
-    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
-    if not meta_file.exists():
-        raise HTTPException(status_code=404, detail="镜像不存在")
-    import json
-    with open(meta_file, "r", encoding="utf-8") as f:
-        meta = json.load(f)
+    meta = _load_meta(slug)
     meta["group"] = group
-    with open(meta_file, "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+    _save_meta(slug, meta)
     return {"ok": True, "slug": slug, "group": group}
 
 
@@ -892,9 +926,7 @@ def list_groups(user_id: int = Depends(require_auth)):
         if not meta_file.exists():
             continue
         try:
-            import json
-            with open(meta_file, "r", encoding="utf-8") as f:
-                meta = json.load(f)
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
             group = meta.get("group", "默认")
             if group not in groups:
                 groups[group] = []
@@ -914,12 +946,7 @@ def list_groups(user_id: int = Depends(require_auth)):
 def get_stage(slug: str, user_id: int = Depends(require_auth)):
     """获取当前关系阶段。"""
     slug = _check_exe_access(slug, user_id)
-    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
-    if not meta_file.exists():
-        raise HTTPException(status_code=404, detail="镜像不存在")
-    import json
-    with open(meta_file, "r", encoding="utf-8") as f:
-        meta = json.load(f)
+    meta = _load_meta(slug)
     return {"stage": meta.get("stage", "dating")}
 
 
@@ -930,15 +957,9 @@ def set_stage(slug: str, stage: str = Query(...), user_id: int = Depends(require
     valid_stages = ["dating", "conflicted", "broken", "healing"]
     if stage not in valid_stages:
         raise HTTPException(status_code=400, detail=f"无效阶段，可选: {valid_stages}")
-    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
-    if not meta_file.exists():
-        raise HTTPException(status_code=404, detail="镜像不存在")
-    import json
-    with open(meta_file, "r", encoding="utf-8") as f:
-        meta = json.load(f)
+    meta = _load_meta(slug)
     meta["stage"] = stage
-    with open(meta_file, "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+    _save_meta(slug, meta)
     return {"ok": True, "slug": slug, "stage": stage}
 
 
@@ -962,13 +983,11 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
     user_score = analysis["user_sentiment"]["score"]
 
     # 读取当前阶段
-    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
-    current_stage = "dating"
-    if meta_file.exists():
-        import json
-        with open(meta_file, "r", encoding="utf-8") as f:
-            meta = json.load(f)
+    try:
+        meta = _load_meta(slug)
         current_stage = meta.get("stage", "dating")
+    except HTTPException:
+        current_stage = "dating"
 
     # 根据情感趋势建议阶段
     suggestion = None
@@ -1001,8 +1020,6 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
 @router.get("/stats/usage")
 def get_usage_stats(user_id: int = Depends(require_auth)):
     """获取用户使用统计。"""
-    from datetime import datetime
-
     exes_dir = PROJECT_DIR / "exes"
     total_exes = 0
     total_messages = 0
@@ -1043,12 +1060,9 @@ def submit_feedback(
     user_id: int = Depends(require_auth),
 ):
     """提交用户反馈。"""
-    from datetime import datetime
-
     feedback_file = PROJECT_DIR / "data" / "feedback.jsonl"
     feedback_file.parent.mkdir(parents=True, exist_ok=True)
 
-    import json
     entry = {
         "user_id": user_id,
         "type": feedback_type,

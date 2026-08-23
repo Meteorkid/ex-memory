@@ -1159,44 +1159,196 @@ body::after {
    Discover Page
    ═══════════════════════════════════════ */
 
-.discover-header {
-    padding: 16px 20px 8px; font-size: 1.75em; font-weight: 300;
-    color: var(--text-primary); background: transparent;
-    letter-spacing: 0.5px;
-}
-.discover-list {
-    background: rgba(18, 18, 30, 0.5);
-    backdrop-filter: var(--glass-saturate) var(--glass-blur-near);
-    -webkit-backdrop-filter: var(--glass-saturate) var(--glass-blur-near);
-    margin: 0 12px; border-radius: var(--radius-md);
-    overflow: hidden;
-    border: 1px solid rgba(124, 108, 255, 0.06);
+#tab-discover {
     position: relative;
+    min-height: 100%;
+    overflow-y: auto;
+    background:
+        radial-gradient(circle at 80% -8%, rgba(124, 108, 255, 0.11), transparent 32%),
+        linear-gradient(180deg, rgba(18, 18, 30, 0.35), transparent 38%);
 }
-.discover-item {
-    display: flex; align-items: center; gap: 14px; padding: 16px 20px;
+
+.discover-hero {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 42px 20px 24px;
+}
+
+.discover-eyebrow {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--accent-hover);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+}
+
+.discover-hero h1 {
+    color: var(--text-primary);
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 300;
+    letter-spacing: -0.045em;
+    line-height: 1.05;
+}
+
+.discover-hero p {
+    margin-top: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.discover-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0 20px 24px;
+}
+
+.discover-feature-card {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid rgba(124, 108, 255, 0.1);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(145deg, rgba(26, 26, 40, 0.8), rgba(18, 18, 30, 0.84));
+    box-shadow: var(--shadow-sm);
+    color: var(--text-primary);
     cursor: pointer;
-    transition: background 0.15s ease;
+    text-align: left;
+    font-family: var(--font-body);
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
-.discover-item:not(:last-child) {
-    border-bottom: 0.5px solid rgba(124, 108, 255, 0.05);
+
+.discover-feature-card:hover {
+    border-color: rgba(124, 108, 255, 0.25);
+    background: linear-gradient(145deg, rgba(31, 30, 49, 0.92), rgba(20, 20, 34, 0.92));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
-.discover-item:active {
-    background: rgba(124, 108, 255, 0.06);
-    transition-duration: 0s;
+
+.discover-feature-card.active {
+    border-color: rgba(124, 108, 255, 0.46);
+    background: linear-gradient(145deg, rgba(124, 108, 255, 0.14), rgba(18, 18, 30, 0.94));
+    box-shadow: 0 0 0 1px rgba(124, 108, 255, 0.08), 0 14px 36px rgba(10, 5, 30, 0.45);
 }
-.discover-icon { font-size: 1.4em; width: 28px; text-align: center; }
-.discover-label {
-    flex: 1; font-size: 0.95em; color: var(--text-primary);
+
+.discover-feature-card:focus-visible {
+    outline: 2px solid var(--accent-hover);
+    outline-offset: 3px;
 }
-.discover-arrow { color: var(--text-tertiary); font-size: 1.2em; }
+
+.discover-feature-icon {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    border: 1px solid rgba(124, 108, 255, 0.16);
+    border-radius: 14px;
+    background: rgba(124, 108, 255, 0.11);
+    color: var(--accent-hover);
+}
+
+.discover-feature-icon.export {
+    border-color: rgba(7, 193, 96, 0.16);
+    background: rgba(7, 193, 96, 0.08);
+    color: var(--wechat-green);
+}
+
+.discover-feature-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.discover-feature-copy,
+.discover-feature-copy strong,
+.discover-feature-copy small {
+    display: block;
+    min-width: 0;
+}
+
+.discover-feature-copy strong {
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.discover-feature-copy small {
+    margin-top: 5px;
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.discover-feature-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.discover-feature-side > svg {
+    width: 16px;
+    height: 16px;
+    stroke: var(--text-tertiary);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s ease, stroke 0.2s ease;
+}
+
+.discover-feature-card.active .discover-feature-side > svg {
+    stroke: var(--accent-hover);
+    transform: rotate(90deg);
+}
+
+.discover-feature-tag {
+    padding: 5px 8px;
+    border-radius: var(--radius-pill);
+    background: rgba(124, 108, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 9px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.discover-feature-tag.private {
+    background: rgba(7, 193, 96, 0.07);
+    color: var(--wechat-green);
+}
+
+@media (max-width: 720px) {
+    .discover-hero { padding: 30px 14px 20px; }
+    .discover-feature-grid { grid-template-columns: 1fr; padding: 0 14px 20px; }
+    .discover-feature-side { align-self: stretch; flex-direction: column; justify-content: center; }
+    .discover-feature-tag { display: none; }
+    .moments-timeline { margin: 0 12px 52px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .discover-feature-card,
+    .discover-feature-side > svg { transition: none; }
+    .discover-feature-card:hover { transform: none; }
+}
 
 /* Moments Timeline */
 .moments-timeline {
     background: rgba(18, 18, 30, 0.5);
     backdrop-filter: var(--glass-saturate) var(--glass-blur-near);
     -webkit-backdrop-filter: var(--glass-saturate) var(--glass-blur-near);
-    padding: 16px; min-height: 300px;
+    max-width: 980px; margin: 0 auto 64px; padding: 20px; min-height: 300px;
     border-radius: var(--radius-md);
     border: 1px solid rgba(124, 108, 255, 0.06);
 }

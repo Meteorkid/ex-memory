@@ -1,0 +1,5 @@
+# macOS localhost 助手的最小运行依赖。
+fastapi~=0.128.0
+uvicorn~=0.24.0
+pydantic~=2.13.0
+zstandard~=0.25.0

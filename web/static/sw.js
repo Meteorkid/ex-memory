@@ -1,6 +1,6 @@
 /* ex-memory PWA Service Worker — 优化版 */
 
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v12';
 const CACHE_NAME = `ex-memory-${CACHE_VERSION}`;
 const API_CACHE_NAME = `ex-memory-api-${CACHE_VERSION}`;
 const IMAGE_CACHE_NAME = `ex-memory-images-${CACHE_VERSION}`;
@@ -10,6 +10,9 @@ const CRITICAL_FILES = [
     '/',
     '/static/style.css',
     '/static/app.js',
+    '/static/effects.js',
+    '/static/wechat-helper.css',
+    '/static/wechat-helper.js',
     '/static/offline.html',
     '/static/manifest.json',
 ];
