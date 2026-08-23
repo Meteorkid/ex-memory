@@ -18,7 +18,7 @@ from local_helper import __version__
 from local_helper.export.html_exporter import export_conversation
 from local_helper.security import LocalSession, LocalSessionStore, OneTimeTicketStore, is_loopback_host, validate_origin
 from local_helper.task_store import PublicTaskStore
-from local_helper.wechat_macos.discovery import detect_environment
+from local_helper.wechat_macos.discovery import SUPPORTED_WECHAT_VERSIONS, detect_environment
 from local_helper.wechat_macos.catalog import discover_decrypted_catalog, load_session_catalog
 from local_helper.wechat_macos.pipeline import run_expert_decryption
 from local_helper.wechat_macos.reader import iter_messages
@@ -220,6 +220,8 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
             "platform": "macos",
             "sip_status": app.state.sip_status_provider().value,
             "wechat_version": environment.app_version,
+            "supported_wechat_versions": SUPPORTED_WECHAT_VERSIONS,
+            "current_account_id": environment.current_account_id,
             "data_accessible": environment.data_accessible,
             "error_code": environment.error_code,
             "accounts": [
@@ -242,10 +244,19 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
     def prepare_expert(payload: PrepareExpertRequest, request: Request):
         session = require_local_session(request)
         require_csrf(request, session)
+        if not payload.account_id.strip():
+            raise HTTPException(status_code=400, detail="请先选择当前登录的微信账号")
         environment = app.state.environment_provider()
+        if environment.app_version not in SUPPORTED_WECHAT_VERSIONS:
+            current_version = environment.app_version or "未检测到"
+            supported_versions = "、".join(SUPPORTED_WECHAT_VERSIONS)
+            raise HTTPException(
+                status_code=409,
+                detail=f"当前微信 {current_version} 尚未支持；此助手仅验证 {supported_versions}",
+            )
         account = next((item for item in environment.accounts if item.account_id == payload.account_id), None)
         if account is None:
-            raise HTTPException(status_code=404, detail="微信账号不存在")
+            raise HTTPException(status_code=409, detail="所选微信账号目录已变化，请刷新本地页面后重新选择")
         if not payload.key_rules_confirmed:
             raise HTTPException(status_code=409, detail="请先确认：每个微信账号密钥不同，切换账号后必须重新提取")
         try:
@@ -268,8 +279,9 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
         except WorkflowError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         environment, account = account_for_state(state)
-        if environment.app_version != "4.1.12":
-            raise HTTPException(status_code=409, detail="当前 LLDB 提取器仅验证支持微信 4.1.12")
+        if environment.app_version not in SUPPORTED_WECHAT_VERSIONS:
+            supported_versions = "、".join(SUPPORTED_WECHAT_VERSIONS)
+            raise HTTPException(status_code=409, detail=f"当前 LLDB 提取器仅验证支持微信 {supported_versions}")
         sip_status = app.state.sip_status_provider()
         if sip_status.value != "disabled":
             raise HTTPException(status_code=409, detail="请先在恢复模式中手动关闭 SIP 并重启")
@@ -498,10 +510,10 @@ const csrf=document.querySelector('meta[name="ex-memory-csrf"]').content;
 const elements=Object.fromEntries(['environment','account','key-rules-confirmed','prepare','request-failure','request-error','request-permission-steps','recovery','recovery-list','status','disable-actions','decrypt','enable-actions','authorize','session-card','session-search','sessions','export','failed-hint','failed-detail','task-data-actions','delete-task-data'].map(id=>[id,document.getElementById(id)]));
 let allSessions=[];let selected='';let pollTimer;
 async function api(path,options={}){try{const headers={...(options.headers||{})};if(options.method&&options.method!=='GET')headers['X-Ex-Memory-CSRF']=csrf;if(options.body)headers['Content-Type']='application/json';const response=await fetch(path,{...options,headers});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||'请求失败');return data}catch(error){renderRequestFailure(error);throw error}}
-function renderRequestFailure(error){const message=error?.message||'请求失败';elements['request-error'].textContent=message;elements['request-failure'].classList.remove('hidden');elements['request-permission-steps'].classList.toggle('hidden',!message.includes('完全磁盘访问'));for(const button of [elements.prepare,elements.decrypt,elements.authorize,elements.export])button.disabled=true}
-async function initialize(){try{const [environment,recovery]=await Promise.all([api('/local/api/environment'),api('/local/api/recovery-tasks')]);if(!environment.data_accessible){renderRequestFailure(new Error('本地助手没有“完全磁盘访问”权限。'))}else{elements.environment.textContent=`微信 ${environment.wechat_version||'未检测到'} · SIP ${environment.sip_status} · 发现 ${environment.accounts.length} 个账号目录`;environment.accounts.forEach((item,index)=>{const option=document.createElement('option');option.value=item.account_id;option.textContent=`账号 ${index+1}（${item.database_count} 个数据库）`;elements.account.append(option)});if(!environment.accounts.length){elements.prepare.disabled=true;elements.status.textContent='未发现微信账号目录。请先安装并登录微信 4.1.12，然后重新启动助手。'}}renderRecovery(recovery.tasks)}catch(error){renderRequestFailure(error)}}
+function renderRequestFailure(error,fatal=false){const message=error?.message||'请求失败';elements['request-error'].textContent=message;elements['request-failure'].classList.remove('hidden');elements['request-permission-steps'].classList.toggle('hidden',!message.includes('完全磁盘访问'));if(fatal)for(const button of [elements.prepare,elements.decrypt,elements.authorize,elements.export])button.disabled=true}
+async function initialize(){try{const [environment,recovery]=await Promise.all([api('/local/api/environment'),api('/local/api/recovery-tasks')]);if(!environment.data_accessible){renderRequestFailure(new Error('本地助手没有“完全磁盘访问”权限。'),true)}else{elements.environment.textContent=`微信 ${environment.wechat_version||'未检测到'} · SIP ${environment.sip_status} · 发现 ${environment.accounts.length} 个账号目录`;environment.accounts.forEach((item,index)=>{const option=document.createElement('option');const isCurrent=item.account_id===environment.current_account_id;option.value=item.account_id;option.textContent=`账号 ${index+1}${isCurrent?'（当前登录）':''} · ${item.database_count} 个数据库`;elements.account.append(option)});if(!environment.supported_wechat_versions.includes(environment.wechat_version)){elements.prepare.disabled=true;elements.status.textContent=`当前微信 ${environment.wechat_version||'未检测到'} 尚未支持，为保护本机数据已停止。此助手仅验证 ${environment.supported_wechat_versions.join('、')}；请等待兼容版本，不要关闭 SIP。`}else if(environment.current_account_id&&environment.accounts.some(item=>item.account_id===environment.current_account_id)){elements.account.value=environment.current_account_id;elements.status.textContent='已自动选择当前登录的微信账号，请核对后继续。'}else if(environment.accounts.length){elements.status.textContent='已发现微信账号目录，但无法唯一判断当前登录账号，请在下拉列表手动选择。'}else{elements.prepare.disabled=true;elements.status.textContent='未发现微信账号目录。请先安装并登录微信 4.1.12，然后重新启动助手。'}}renderRecovery(recovery.tasks)}catch(error){renderRequestFailure(error,true)}}
 function renderRecovery(tasks){if(!tasks.length)return;elements.recovery.classList.remove('hidden');for(const item of tasks){const row=document.createElement('div');row.className='task';const label=document.createElement('span');label.textContent=`${item.account_id} · ${phaseText(item.phase)}`;const button=document.createElement('button');button.textContent='恢复';button.onclick=async()=>{await api('/local/api/resume',{method:'POST',body:JSON.stringify({task_id:item.task_id})});startPolling()};row.append(label,button);elements['recovery-list'].append(row)}}
-elements.prepare.onclick=async()=>{try{if(!elements['key-rules-confirmed'].checked)throw new Error('请先确认每个微信账号密钥不同，并确认当前登录账号');await api('/local/api/expert/prepare',{method:'POST',body:JSON.stringify({account_id:elements.account.value,key_rules_confirmed:true})});startPolling()}catch(error){renderRequestFailure(error)}};
+elements.prepare.onclick=async()=>{if(!elements.account.value){renderRequestFailure(new Error('请先选择当前登录的微信账号'));return}if(!elements['key-rules-confirmed'].checked){renderRequestFailure(new Error('请先确认每个微信账号密钥不同，并确认当前登录账号'));return}try{elements['request-failure'].classList.add('hidden');await api('/local/api/expert/prepare',{method:'POST',body:JSON.stringify({account_id:elements.account.value,key_rules_confirmed:true})});startPolling()}catch(error){renderRequestFailure(error)}};
 elements.decrypt.onclick=async()=>{try{await api('/local/api/expert/decrypt',{method:'POST',body:'{}'});startPolling()}catch(error){renderRequestFailure(error)}};
 elements.authorize.onclick=async()=>{try{await api('/local/api/expert/authorize-export',{method:'POST',body:'{}'});startPolling()}catch(error){renderRequestFailure(error)}};
 elements.export.onclick=async()=>{if(!selected)return;try{await api('/local/api/export',{method:'POST',body:JSON.stringify({session_wxid:selected})});elements.export.disabled=true;startPolling()}catch(error){renderRequestFailure(error)}};

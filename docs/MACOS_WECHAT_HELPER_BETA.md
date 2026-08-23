@@ -27,7 +27,7 @@ python3.12 -m venv .venv-local-helper-package
 
 ```bash
 SITE_ORIGINS=https://你的域名,https://www.你的域名 \
-RELEASE_VERSION=0.1.0-beta.2 \
+RELEASE_VERSION=0.1.0-beta.3 \
 PYTHON_BIN=.venv-local-helper-package/bin/python \
 bash packaging/macos/build_helper.sh
 ```
@@ -40,9 +40,9 @@ bash packaging/macos/build_helper.sh
 
 ```dotenv
 LOCAL_WECHAT_HELPER_ENABLED=true
-LOCAL_WECHAT_HELPER_VERSION=0.1.0-beta.2
+LOCAL_WECHAT_HELPER_VERSION=0.1.0-beta.3
 LOCAL_WECHAT_HELPER_MIN_API_VERSION=1
-LOCAL_WECHAT_HELPER_ARM64_URL=https://你的域名/downloads/ex-memory-wechat-helper-0.1.0-beta.2-macos-arm64.dmg
+LOCAL_WECHAT_HELPER_ARM64_URL=https://你的域名/downloads/ex-memory-wechat-helper-0.1.0-beta.3-macos-arm64.dmg
 LOCAL_WECHAT_HELPER_ARM64_SHA256=构建清单中的64位sha256
 ```
 
@@ -58,6 +58,8 @@ LOCAL_WECHAT_HELPER_ARM64_SHA256=构建清单中的64位sha256
 ## 账号与密钥
 
 - 每个微信账号都有独立的数据库密码，不同账号不能复用密钥。
+- 助手会根据微信主进程当前打开的数据库自动选择唯一活动账号；多账号同时活动时仍需手动选择。
+- 检测到未验证的微信版本时会在关闭 SIP 前停止，不会继续密钥提取流程。
 - 同一账号成功提取一次后，助手会结合各数据库的 salt，为该账号全部数据库派生并验证密钥。
 - 首次导入、切换账号、助手重启、微信升级、数据库重建或密钥验证失败时必须重新提取。
 - 一次任务只处理用户确认的当前登录账号；其他账号需要分别登录、分别提取和分别导入。

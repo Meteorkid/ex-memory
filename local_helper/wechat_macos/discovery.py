@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import plistlib
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 
 DEFAULT_WECHAT_APP = Path("/Applications/WeChat.app")
+SUPPORTED_WECHAT_VERSIONS = ("4.1.12",)
 DEFAULT_XWECHAT_FILES = (
     Path.home()
     / "Library"
@@ -43,20 +46,24 @@ class WeChatEnvironment:
     data_root_exists: bool
     data_accessible: bool = True
     error_code: str = ""
+    current_account_id: str = ""
 
 
 def detect_environment(
     *,
     app_path: Path = DEFAULT_WECHAT_APP,
     data_root: Path = DEFAULT_XWECHAT_FILES,
+    process_runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
 ) -> WeChatEnvironment:
     data_root_exists = data_root.exists() and data_root.is_dir()
     try:
         accounts = discover_accounts(data_root)
+        current_account_id = detect_current_account(accounts, runner=process_runner)
         data_accessible = True
         error_code = ""
     except PermissionError:
         accounts = ()
+        current_account_id = ""
         data_accessible = False
         error_code = "full_disk_access_required"
     return WeChatEnvironment(
@@ -65,7 +72,57 @@ def detect_environment(
         data_root_exists=data_root_exists,
         data_accessible=data_accessible,
         error_code=error_code,
+        current_account_id=current_account_id,
     )
+
+
+def detect_current_account(
+    accounts: tuple[WeChatAccount, ...],
+    *,
+    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> str:
+    """仅在一个账号有数据库被微信主进程打开时返回它。"""
+    if not accounts:
+        return ""
+    try:
+        process_result = runner(
+            ["/usr/bin/pgrep", "-x", "WeChat"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if process_result.returncode != 0:
+        return ""
+    pids = [line for line in process_result.stdout.splitlines() if line.isdigit() and int(line) > 1]
+    open_database_counts = {account.account_id: 0 for account in accounts}
+    for pid in pids:
+        try:
+            files_result = runner(
+                ["/usr/sbin/lsof", "-n", "-p", pid, "-Fn"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        for line in files_result.stdout.splitlines():
+            if not line.startswith("n"):
+                continue
+            open_path = Path(line[1:])
+            for account in accounts:
+                try:
+                    relative = open_path.relative_to(account.db_storage)
+                except ValueError:
+                    continue
+                if relative.parts:
+                    open_database_counts[account.account_id] += 1
+                break
+    active_accounts = [account_id for account_id, count in open_database_counts.items() if count > 0]
+    return active_accounts[0] if len(active_accounts) == 1 else ""
 
 
 def read_wechat_version(app_path: Path = DEFAULT_WECHAT_APP) -> str:

@@ -140,8 +140,54 @@ def test_local_export_page_disables_start_when_no_account_is_found():
 
     page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
 
-    assert "if(!environment.accounts.length)" in page.text
+    assert "else{elements.prepare.disabled=true" in page.text
     assert "请先安装并登录微信 4.1.12" in page.text
+
+
+def test_local_export_page_auto_selects_the_detected_current_wechat_account():
+    app = create_helper_app(
+        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+    )
+    helper = TestClient(app)
+    task = app.state.tasks.create()
+    ticket = app.state.tickets.issue()
+
+    page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
+
+    assert "environment.current_account_id" in page.text
+    assert "当前登录" in page.text
+    assert "elements.account.value=environment.current_account_id" in page.text
+
+
+def test_local_export_page_keeps_account_selection_recoverable_after_validation_errors():
+    app = create_helper_app(
+        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+    )
+    helper = TestClient(app)
+    task = app.state.tasks.create()
+    ticket = app.state.tickets.issue()
+
+    page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
+
+    assert "if(!elements.account.value)" in page.text
+    assert "请先选择当前登录的微信账号" in page.text
+    assert "if(fatal)" in page.text
+    assert "renderRequestFailure(new Error('本地助手没有“完全磁盘访问”权限。'),true)" in page.text
+
+
+def test_local_export_page_stops_before_sip_steps_for_an_unsupported_wechat_version():
+    app = create_helper_app(
+        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+    )
+    helper = TestClient(app)
+    task = app.state.tasks.create()
+    ticket = app.state.tickets.issue()
+
+    page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
+
+    assert "environment.supported_wechat_versions.includes(environment.wechat_version)" in page.text
+    assert "尚未支持，为保护本机数据已停止" in page.text
+    assert "不要关闭 SIP" in page.text
 
 
 def test_local_export_page_uses_project_dark_theme():
@@ -278,6 +324,8 @@ def test_local_environment_requires_private_session():
         "platform",
         "sip_status",
         "wechat_version",
+        "supported_wechat_versions",
+        "current_account_id",
         "accounts",
         "data_accessible",
         "error_code",
@@ -349,6 +397,84 @@ def test_prepare_requires_explicit_per_account_key_confirmation(tmp_path: Path):
 
     assert rejected.status_code == 409
     assert "每个微信账号密钥不同" in rejected.json()["detail"]
+
+
+def test_prepare_rejects_an_empty_account_selection_with_actionable_guidance(tmp_path: Path):
+    app = create_helper_app(
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}),
+            open_browser_on_launch=False,
+            workflow_root=tmp_path / "tasks",
+        )
+    )
+    helper = TestClient(app)
+    task = app.state.tasks.create()
+    ticket = app.state.tickets.issue()
+    page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
+
+    response = helper.post(
+        "/local/api/expert/prepare",
+        headers={"x-ex-memory-csrf": page.headers["x-ex-memory-csrf"]},
+        json={"account_id": "", "key_rules_confirmed": True},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "请先选择当前登录的微信账号"
+
+
+def test_prepare_stops_an_unsupported_wechat_version_before_creating_a_workflow(tmp_path: Path):
+    account_root = tmp_path / "account"
+    storage = account_root / "db_storage"
+    storage.mkdir(parents=True)
+    database = storage / "message.db"
+    database.write_bytes(bytes(4096))
+    account = WeChatAccount("wxid_account", account_root, storage, (database,), "fingerprint")
+    app = create_helper_app(
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}),
+            open_browser_on_launch=False,
+            workflow_root=tmp_path / "tasks",
+        )
+    )
+    app.state.environment_provider = lambda: WeChatEnvironment("4.1.13", (account,), True)
+    helper = TestClient(app)
+    task = app.state.tasks.create()
+    ticket = app.state.tickets.issue()
+    page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
+
+    response = helper.post(
+        "/local/api/expert/prepare",
+        headers={"x-ex-memory-csrf": page.headers["x-ex-memory-csrf"]},
+        json={"account_id": account.account_id, "key_rules_confirmed": True},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "当前微信 4.1.13 尚未支持；此助手仅验证 4.1.12"
+    assert not (tmp_path / "tasks").exists()
+
+
+def test_prepare_explains_when_a_previously_listed_account_directory_changed(tmp_path: Path):
+    app = create_helper_app(
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}),
+            open_browser_on_launch=False,
+            workflow_root=tmp_path / "tasks",
+        )
+    )
+    app.state.environment_provider = lambda: WeChatEnvironment("4.1.12", (), True)
+    helper = TestClient(app)
+    task = app.state.tasks.create()
+    ticket = app.state.tickets.issue()
+    page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
+
+    response = helper.post(
+        "/local/api/expert/prepare",
+        headers={"x-ex-memory-csrf": page.headers["x-ex-memory-csrf"]},
+        json={"account_id": "previous-account", "key_rules_confirmed": True},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "所选微信账号目录已变化，请刷新本地页面后重新选择"
 
 
 def test_local_user_can_delete_safe_task_data(tmp_path: Path):

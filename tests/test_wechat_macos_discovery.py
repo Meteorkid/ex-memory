@@ -1,4 +1,5 @@
 import plistlib
+import subprocess
 from pathlib import Path
 
 from local_helper.wechat_macos.discovery import detect_environment, discover_accounts
@@ -61,3 +62,26 @@ def test_detect_environment_reports_full_disk_access_denied(tmp_path: Path, monk
     assert environment.accounts == ()
     assert environment.data_accessible is False
     assert environment.error_code == "full_disk_access_required"
+
+
+def test_detect_environment_identifies_the_only_account_with_open_wechat_databases(tmp_path: Path):
+    data_root = tmp_path / "xwechat_files"
+    first_db = data_root / "wxid_first_abcd" / "db_storage" / "message" / "message.db"
+    second_db = data_root / "wxid_second_ef01" / "db_storage" / "message" / "message.db"
+    first_db.parent.mkdir(parents=True)
+    second_db.parent.mkdir(parents=True)
+    first_db.write_bytes(b"0123456789abcdef")
+    second_db.write_bytes(b"0123456789abcdef")
+
+    def runner(command, **_kwargs):
+        if command[:3] == ["/usr/bin/pgrep", "-x", "WeChat"]:
+            return subprocess.CompletedProcess(command, 0, stdout="42\n", stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout=f"p42\nn{second_db}\n", stderr="")
+
+    environment = detect_environment(
+        app_path=tmp_path / "WeChat.app",
+        data_root=data_root,
+        process_runner=runner,
+    )
+
+    assert environment.current_account_id == "wxid_second_ef01"
