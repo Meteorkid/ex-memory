@@ -3,7 +3,8 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 COPY requirements.lock .
-RUN pip install --no-cache-dir --user -r requirements.lock
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir --user --index-url "$PIP_INDEX_URL" -r requirements.lock
 
 # Runtime stage
 FROM python:3.11-slim
@@ -17,10 +18,11 @@ WORKDIR /app
 
 COPY --from=builder /root/.local /home/app/.local
 ENV PATH=/home/app/.local/bin:$PATH
+ENV PYTHONPATH=/home/app/.local/lib/python3.11/site-packages
 
 COPY . .
 
-RUN mkdir -p /app/data/exes /app/data/logs && chown -R app:app /app/data
+RUN mkdir -p /app/data/exes /app/data/logs /app/logs && chown -R app:app /app/data /app/logs
 VOLUME /app/data
 
 USER app

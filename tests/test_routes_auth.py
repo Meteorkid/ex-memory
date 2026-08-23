@@ -65,3 +65,36 @@ def test_forbidden_other_user_exe(client, tmp_path):
     headers = {"Authorization": f"Bearer {token}"}
     r = client.get("/api/exes/owned/wallet", headers=headers)
     assert r.status_code == 403
+
+
+def test_meteor_store_proxy_identity_uses_external_mapping(client, monkeypatch):
+    monkeypatch.setattr("config.METEOR_STORE_SSO_ENABLED", True)
+    monkeypatch.setattr("config.METEOR_STORE_PROXY_TOKEN", "proxy-secret")
+
+    headers = {
+        "X-Ex-Memory-User-Id": "store-user-1",
+        "X-Ex-Memory-Proxy-Token": "proxy-secret",
+    }
+    response = client.get("/api/exes", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()[0]["slug"] == "owned"
+
+
+def test_proxy_mode_never_falls_back_to_bearer_token(client, monkeypatch):
+    token = _register_and_login(client)
+    monkeypatch.setattr("config.METEOR_STORE_SSO_ENABLED", True)
+    monkeypatch.setattr("config.METEOR_STORE_PROXY_TOKEN", "proxy-secret")
+
+    response = client.get("/api/exes", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+
+
+def test_proxy_mode_disables_native_login_and_registration(client, monkeypatch):
+    monkeypatch.setattr("config.METEOR_STORE_SSO_ENABLED", True)
+    monkeypatch.setattr("config.METEOR_STORE_PROXY_TOKEN", "proxy-secret")
+
+    payload = {"username": "u1", "password": "pass1234"}
+    assert client.post("/api/auth/login", json=payload).status_code == 404
+    assert client.post("/api/auth/register", json=payload).status_code == 404

@@ -194,6 +194,9 @@ def _invalidate_engine(slug: str):
 @router.post("/auth/register", response_model=StatusResponse)
 def register(req: AuthRequest, request: Request = None):
     """注册新用户。"""
+    import config
+    if config.METEOR_STORE_SSO_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
     if DISABLE_REGISTRATION:
         raise HTTPException(status_code=403, detail="注册已关闭")
     client_ip = _get_client_ip(request) if request else "unknown"
@@ -210,6 +213,9 @@ def register(req: AuthRequest, request: Request = None):
 @router.post("/auth/login")
 def login(req: AuthRequest, request: Request = None):
     """登录获取 token。"""
+    import config
+    if config.METEOR_STORE_SSO_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
     client_ip = _get_client_ip(request) if request else "unknown"
     _get_login_limiter().check(req.username, client_ip)
 
@@ -228,6 +234,9 @@ def logout(
     user_id: int = Depends(require_auth),
 ):
     """注销当前 Bearer token。"""
+    import config
+    if config.METEOR_STORE_SSO_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
     from server.auth import revoke_token
     if credentials:
         revoke_token(credentials.credentials)

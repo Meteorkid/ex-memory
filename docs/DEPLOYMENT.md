@@ -85,6 +85,27 @@ server {
 }
 ```
 
+### Meteor Store 同源 SSO 模式
+
+线上体验使用 `docker-compose.production.yml`，服务仅监听 `127.0.0.1:18000`，不能把
+该端口直接暴露到公网。需要配置：
+
+| 变量 | 值 |
+|------|----|
+| `METEOR_STORE_SSO_ENABLED` | `true` |
+| `METEOR_STORE_PROXY_TOKEN` | 与 Meteor Store/Nginx 一致的随机令牌 |
+| `PUBLIC_BASE_PATH` | `/ex-memory-runtime` |
+
+代理模式下原生注册、登录和退出接口返回 404，所有业务 API 必须同时收到可信代理写入的
+`X-Ex-Memory-User-Id` 与 `X-Ex-Memory-Proxy-Token`。Nginx 必须覆盖而不是透传浏览器提供的
+同名请求头，并在转发前通过 Meteor Store `auth_request` 校验 session。
+
+```bash
+docker compose -f docker-compose.production.yml build
+docker compose -f docker-compose.production.yml up -d
+curl http://127.0.0.1:18000/health/ready
+```
+
 ### HTTPS 配置
 
 ```bash
@@ -114,6 +135,9 @@ sudo certbot --nginx -d your-domain.com
 | `LOCAL_WECHAT_HELPER_ARM64_SHA256` | 空 | 否 | DMG SHA-256，用于网页校验展示 |
 | `DISABLE_REGISTRATION` | `false` | 否 | 关闭开放注册 |
 | `TRUSTED_PROXY` | `false` | 否 | 反向代理后信任 `X-Forwarded-For` |
+| `METEOR_STORE_SSO_ENABLED` | `false` | 否 | 启用 Meteor Store 代理身份模式 |
+| `METEOR_STORE_PROXY_TOKEN` | 空 | SSO 模式必需 | Nginx 与服务之间的共享令牌 |
+| `PUBLIC_BASE_PATH` | 空 | 否 | 同源子路径，例如 `/ex-memory-runtime` |
 | `LOG_LEVEL` | `INFO` | 否 | 日志级别 |
 | `LOG_FORMAT` | `text` | 否 | 日志格式 (text/json) |
 

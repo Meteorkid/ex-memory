@@ -144,3 +144,22 @@ class TestCleanExpiredTokens:
         clean_expired_tokens()
         user_id = validate_token(token)
         assert user_id is not None
+
+
+class TestExternalIdentity:
+    def test_get_or_create_is_stable_and_separates_users(self):
+        from server.auth import get_or_create_external_user_id
+
+        first = get_or_create_external_user_id("meteor-store", "store-user-1")
+        repeated = get_or_create_external_user_id("meteor-store", "store-user-1")
+        another = get_or_create_external_user_id("meteor-store", "store-user-2")
+
+        assert isinstance(first, int)
+        assert repeated == first
+        assert another != first
+
+    def test_rejects_empty_external_identity(self):
+        from server.auth import get_or_create_external_user_id
+
+        with pytest.raises(ValueError):
+            get_or_create_external_user_id("meteor-store", "")

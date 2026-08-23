@@ -1,5 +1,6 @@
 """FastAPI 中间件：CORS、限流、认证、请求日志。"""
 
+import hmac
 import os
 import time
 import uuid
@@ -26,8 +27,32 @@ def setup_cors(app):
     )
 
 
-def require_auth(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """认证依赖项：验证 Bearer token。"""
+def _proxy_user_id(request: Request) -> int:
+    """验证反向代理身份头，并映射为本地整数用户 ID。"""
+    import config
+
+    expected = config.METEOR_STORE_PROXY_TOKEN
+    actual = request.headers.get("X-Ex-Memory-Proxy-Token", "")
+    external_user_id = request.headers.get("X-Ex-Memory-User-Id", "")
+    if not expected or not hmac.compare_digest(actual, expected) or not external_user_id:
+        raise HTTPException(status_code=401, detail="需要 Meteor Store 登录")
+
+    from server.auth import get_or_create_external_user_id
+    try:
+        return get_or_create_external_user_id("meteor-store", external_user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="代理身份无效") from exc
+
+
+def require_auth(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """认证依赖项：代理模式与 Bearer 模式严格二选一。"""
+    import config
+
+    if config.METEOR_STORE_SSO_ENABLED:
+        return _proxy_user_id(request)
     if credentials is None:
         raise HTTPException(status_code=401, detail="需要认证")
     token = credentials.credentials
@@ -38,8 +63,18 @@ def require_auth(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return user_id
 
 
-def optional_auth(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def optional_auth(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
     """可选认证：不强制，但如果有 token 则验证。"""
+    import config
+
+    if config.METEOR_STORE_SSO_ENABLED:
+        try:
+            return _proxy_user_id(request)
+        except HTTPException:
+            return None
     if credentials is None:
         return None
     from server.auth import validate_token

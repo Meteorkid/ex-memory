@@ -1,6 +1,7 @@
 """全局配置：从 .env 加载，启动校验，隐私提示。"""
 
 import os
+import re
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -65,6 +66,12 @@ DISABLE_REGISTRATION = os.getenv("DISABLE_REGISTRATION", "false").lower() in ("1
 TRUSTED_PROXY = os.getenv("TRUSTED_PROXY", "false").lower() in ("1", "true", "yes")
 _trusted_ips_str = os.getenv("TRUSTED_PROXY_IPS", "")
 TRUSTED_PROXY_IPS = {ip.strip() for ip in _trusted_ips_str.split(",") if ip.strip()} if _trusted_ips_str else set()
+METEOR_STORE_SSO_ENABLED = os.getenv("METEOR_STORE_SSO_ENABLED", "false").lower() in ("1", "true", "yes")
+METEOR_STORE_PROXY_TOKEN = os.getenv("METEOR_STORE_PROXY_TOKEN", "")
+_public_base_path = os.getenv("PUBLIC_BASE_PATH", "").strip("/")
+if _public_base_path and not re.fullmatch(r"[A-Za-z0-9/_-]+", _public_base_path):
+    raise ValueError("PUBLIC_BASE_PATH 只能包含字母、数字、/、_ 和 -")
+PUBLIC_BASE_PATH = f"/{_public_base_path}" if _public_base_path else ""
 
 # macOS 本地微信导出助手发布信息（安装包由站点自己的 HTTPS 地址提供）
 LOCAL_WECHAT_HELPER_ENABLED = os.getenv("LOCAL_WECHAT_HELPER_ENABLED", "false").lower() in ("1", "true", "yes")

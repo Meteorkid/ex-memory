@@ -95,7 +95,65 @@ def _bootstrap_tables():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS external_identities (
+                provider TEXT NOT NULL,
+                external_user_id TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (provider, external_user_id),
+                UNIQUE (provider, user_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
         conn.commit()
+
+
+def get_or_create_external_user_id(provider: str, external_user_id: str) -> int:
+    """把可信外部身份稳定映射到现有整数用户主键。"""
+    provider = provider.strip()
+    external_user_id = external_user_id.strip()
+    if not provider or not external_user_id:
+        raise ValueError("外部身份不能为空")
+    if len(provider) > 64 or len(external_user_id) > 255:
+        raise ValueError("外部身份过长")
+
+    with _get_conn() as conn:
+        # SQLite 的写事务串行化首次创建，避免两个并发请求生成两名影子用户。
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT user_id FROM external_identities
+            WHERE provider = ? AND external_user_id = ?
+            """,
+            (provider, external_user_id),
+        ).fetchone()
+        if row:
+            conn.commit()
+            return int(row["user_id"])
+
+        identity_hash = hashlib.sha256(
+            f"{provider}:{external_user_id}".encode("utf-8")
+        ).hexdigest()[:24]
+        username = f"external_{identity_hash}"
+        password_hash, salt = _hash_password(secrets.token_urlsafe(32))
+        cursor = conn.execute(
+            """
+            INSERT INTO users (username, password_hash, salt)
+            VALUES (?, ?, ?)
+            """,
+            (username, password_hash, salt),
+        )
+        user_id = int(cursor.lastrowid)
+        conn.execute(
+            """
+            INSERT INTO external_identities (provider, external_user_id, user_id)
+            VALUES (?, ?, ?)
+            """,
+            (provider, external_user_id, user_id),
+        )
+        conn.commit()
+        return user_id
 
 
 def _hash_password(password: str, salt: str = None) -> tuple[str, str]:

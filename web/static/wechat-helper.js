@@ -84,7 +84,8 @@
     async function loadRelease() {
         if (release) return;
         try {
-            const response = await fetch('/api/local-helper/config', { cache: 'no-store' });
+            const basePath = document.documentElement.dataset.basePath || '';
+            const response = await fetch(`${basePath}/api/local-helper/config`, { cache: 'no-store' });
             if (response.ok) release = await response.json();
         } catch {
             release = null;

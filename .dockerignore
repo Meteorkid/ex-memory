@@ -10,6 +10,7 @@ build/
 .env
 *.key
 *.pem
+*.db
 
 # 运行时数据
 exes/
@@ -29,6 +30,10 @@ htmlcov/
 .idea/
 *.iml
 .DS_Store
+.codegraph/
+.serena/
+tests/
+*申请材料/
 
 # Git
 .git/
@@ -42,3 +47,4 @@ docker-compose.yml
 # 文档
 *.md
 !requirements.txt
+!prompts/*.md

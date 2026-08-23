@@ -1,7 +1,7 @@
 """FastAPI 应用入口。"""
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -12,6 +12,10 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "web" / "static"
 
 
 def create_app() -> FastAPI:
+    import config
+    if config.METEOR_STORE_SSO_ENABLED and not config.METEOR_STORE_PROXY_TOKEN:
+        raise RuntimeError("METEOR_STORE_PROXY_TOKEN is required in proxy SSO mode")
+
     from server.auth import init_db
     init_db()
 
@@ -42,7 +46,16 @@ def create_app() -> FastAPI:
         """Web 客户端首页。"""
         html = STATIC_DIR / "index.html"
         if html.exists():
-            return FileResponse(str(html), media_type="text/html")
+            import config
+            document = html.read_text(encoding="utf-8")
+            auth_mode = "proxy" if config.METEOR_STORE_SSO_ENABLED else "native"
+            document = document.replace(
+                '<html lang="zh-CN">',
+                f'<html lang="zh-CN" data-base-path="{config.PUBLIC_BASE_PATH}" '
+                f'data-auth-mode="{auth_mode}">',
+                1,
+            )
+            return HTMLResponse(document, headers={"Cache-Control": "no-store"})
         return {"message": "ex-memory API", "docs": "/api/docs"}
 
     @app.get("/health")

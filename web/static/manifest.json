@@ -2,20 +2,20 @@
     "name": "ex-memory",
     "short_name": "ex-memory",
     "description": "把一段记忆，变成可以对话的人",
-    "start_url": "/",
+    "start_url": "../",
     "display": "standalone",
     "background_color": "#0a0a12",
     "theme_color": "#7c6cff",
     "orientation": "portrait",
     "icons": [
         {
-            "src": "/static/icon-192.svg",
+            "src": "icon-192.svg",
             "sizes": "192x192",
             "type": "image/svg+xml",
             "purpose": "any maskable"
         },
         {
-            "src": "/static/icon-512.svg",
+            "src": "icon-512.svg",
             "sizes": "512x512",
             "type": "image/svg+xml",
             "purpose": "any maskable"

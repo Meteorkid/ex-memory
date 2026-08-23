@@ -1,7 +1,10 @@
 /* ex-memory 微信模拟器 SPA */
 
-const API = '/api';
-let token = localStorage.getItem('ex-memory-token') || '';
+const BASE_PATH = document.documentElement.dataset.basePath || '';
+const PROXY_AUTH = document.documentElement.dataset.authMode === 'proxy';
+const API = `${BASE_PATH}/api`;
+const staticUrl = path => `${BASE_PATH}/static/${path.replace(/^\/+/, '')}`;
+let token = PROXY_AUTH ? '' : (localStorage.getItem('ex-memory-token') || '');
 let currentSlug = '';
 let currentName = '';
 let tabHistory = [];
@@ -49,7 +52,7 @@ const LazyLoader = {
 };
 
 // 预加载关键资源
-LazyLoader.preload(['/static/style.css']);
+LazyLoader.preload([staticUrl('style.css')]);
 
 // ═══════════════════════════════════════
 // 内存管理
@@ -258,7 +261,7 @@ function authHeaders(json = true) {
 
 function safeStickerUrl(url) {
     if (!url || typeof url !== 'string') return '';
-    if (url.startsWith('/static/')) return url;
+    if (url.startsWith('/static/')) return `${BASE_PATH}${url}`;
     return '';
 }
 
@@ -702,8 +705,8 @@ async function flushOfflineQueue() {
 
 // ── Service Worker ──
 function registerSW() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js').then(reg => {
+    if (!PROXY_AUTH && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.register(staticUrl('sw.js')).then(reg => {
             // 检查更新
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
@@ -731,7 +734,7 @@ function requestNotificationPermission() {
 
 function showDesktopNotification(title, body, slug) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const notif = new Notification(title, { body, icon: '/static/icon-192.svg', tag: slug || 'ex-memory' });
+    const notif = new Notification(title, { body, icon: staticUrl('icon-192.svg'), tag: slug || 'ex-memory' });
     notif.onclick = () => {
         window.focus();
         if (slug) enterChat(slug, slug);
@@ -916,6 +919,10 @@ async function api(method, path, body, retries = 2) {
 }
 
 function logout() {
+    if (PROXY_AUTH) {
+        window.parent.postMessage({type: 'ex-memory:session-expired'}, window.location.origin);
+        return;
+    }
     if (token) {
         fetch(`${API}/auth/logout`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
@@ -1398,7 +1405,7 @@ $('sticker-file-input').addEventListener('change', async (e) => {
     formData.append('label', file.name.replace(/\.[^.]+$/, ''));
     formData.append('category', 'custom');
     try {
-        const resp = await fetch('/api/stickers/upload', {
+        const resp = await fetch(`${API}/stickers/upload`, {
             method: 'POST',
             headers: authHeaders(false),
             body: formData,
@@ -2961,7 +2968,7 @@ $('chat-msgs').addEventListener('click', () => {
 
 // ── 初始化 ──
 initTheme();
-if (token) {
+if (PROXY_AUTH || token) {
     showMain();
     // 恢复上次聊天状态
     try {
@@ -2980,3 +2987,4 @@ initSearch();
 registerSW();
 requestNotificationPermission();
 initMobileGestures();
+window.parent.postMessage({type: 'ex-memory:ready'}, window.location.origin);
