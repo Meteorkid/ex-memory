@@ -1,7 +1,6 @@
 """记忆重要度评分：基于规则的消息重要性评估（不依赖外部 API）。"""
 
 import re
-from typing import Optional
 
 
 # ── 情感词（强度分级）──

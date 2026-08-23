@@ -3,7 +3,6 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
 
 from core.message_format import UnifiedMessage
 

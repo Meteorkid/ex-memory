@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from core.path_safety import resolve_under, safe_filename
+from core.path_safety import resolve_under
 
 logger = logging.getLogger("ex-memory")
 

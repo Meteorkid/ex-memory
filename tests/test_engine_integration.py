@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 
 def _create_test_engine(tmpdir):

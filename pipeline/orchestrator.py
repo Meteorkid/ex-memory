@@ -51,7 +51,7 @@ def run_create_flow(slug: str = None):
             existing_meta = json.loads(meta_path.read_text(encoding="utf-8"))
             if existing_meta.get("pipeline_state") == "failed" and existing_meta.get("failed_step"):
                 failed_step = existing_meta["failed_step"]
-                print(f"\n=== 恢复创建流程 ===")
+                print("\n=== 恢复创建流程 ===")
                 print(f"镜像 [{existing_meta['name']}] 上次在 [{failed_step}] 步骤失败")
                 print(f"错误信息: {existing_meta.get('error', '未知')}")
                 confirm = pt_prompt("从失败步骤继续？(y/n): ").strip().lower()
@@ -81,16 +81,16 @@ def run_create_flow(slug: str = None):
 
         slug = name.lower().replace(" ", "_")
 
-        print(f"\n一句话介绍一下？（在一起多久、分手多久、ta做什么的）")
+        print("\n一句话介绍一下？（在一起多久、分手多久、ta做什么的）")
         print("示例：在一起两年 分手半年 互联网产品经理 上海")
         basic_info = pt_prompt("基本信息（可跳过）: ").strip()
 
-        print(f"\n用一句话描述ta的性格？（MBTI、星座、性格标签）")
+        print("\n用一句话描述ta的性格？（MBTI、星座、性格标签）")
         print("示例：ENFP 双子座 话很多 永远在社交 但深夜会突然emo")
         personality = pt_prompt("性格画像（可跳过）: ").strip()
 
         # 汇总确认
-        print(f"\n=== 信息确认 ===")
+        print("\n=== 信息确认 ===")
         print(f"  代号：{name}")
         print(f"  基本信息：{basic_info or '（未填写）'}")
         print(f"  性格画像：{personality or '（未填写）'}")
@@ -141,7 +141,7 @@ def run_create_flow(slug: str = None):
 
     # ===== Step 2: 数据源导入 =====
     if start_idx <= 0:
-        print(f"\n=== 数据源导入 ===")
+        print("\n=== 数据源导入 ===")
         print("回忆越多，还原度越高。")
         print("[A] 微信聊天记录导出")
         print("[B] 直接粘贴/口述")
@@ -181,7 +181,7 @@ def run_create_flow(slug: str = None):
         return
 
     if start_idx <= 1:
-        print(f"\n=== 开始蒸馏 ===")
+        print("\n=== 开始蒸馏 ===")
         print("正在生成 Relationship Memory...")
         try:
             memory_content = build_memory(slug, materials_summary)
@@ -227,7 +227,7 @@ def run_create_flow(slug: str = None):
     atomic_write_json(ex_dir / "meta.json", meta)
 
     # 展示摘要
-    print(f"\n=== 创建完成！===")
+    print("\n=== 创建完成！===")
     print(f"前任 [{name}] 的数字镜像已就绪。")
     print(f"输入 /{slug} 开始对话。\n")
 

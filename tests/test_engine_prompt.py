@@ -1,7 +1,6 @@
 """ChatEngine system prompt 截断测试。"""
 
 import pytest
-from unittest.mock import MagicMock, patch
 from core.engine import ChatEngine
 
 

@@ -2,9 +2,8 @@
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from core.memory_scorer import calculate_importance, should_keep_memory, get_decay_info
 
@@ -136,7 +135,6 @@ def run_decay_cycle(ex_dir: Path) -> dict:
     index_path = ex_dir / MEMORY_INDEX_FILE
     index = MemoryIndex(index_path)
 
-    stats_before = index.get_stats()
     expired = index.cleanup_expired()
     stats_after = index.get_stats()
 

@@ -4,8 +4,6 @@ import json
 import logging
 from collections import Counter
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger("ex-memory")
 
@@ -125,7 +123,7 @@ def calculate_relationship_temperature(slug: str, messages: list[dict]) -> dict:
             last_time = datetime.fromisoformat(messages[-1].get("created_at", ""))
             days = (last_time - first_time).days
             time_score = min(days / 30, 1.0) * 10  # 最高10分
-        except:
+        except (TypeError, ValueError):
             time_score = 5
     else:
         time_score = 5

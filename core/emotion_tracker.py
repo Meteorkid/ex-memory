@@ -1,9 +1,5 @@
 """情感分析模块：基于关键词匹配的聊天记录情感倾向分析。"""
 
-import re
-from collections import defaultdict
-from datetime import datetime
-from typing import Optional
 
 # ── 情感词典 ──
 

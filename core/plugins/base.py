@@ -1,7 +1,7 @@
 """插件基类和元数据定义。"""
 
-from dataclasses import dataclass, field
-from typing import Optional, Any
+from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass

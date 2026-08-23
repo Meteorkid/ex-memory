@@ -2,13 +2,11 @@
 
 import hashlib
 import hmac
-import os
 import secrets
 import sqlite3
 import time
 import logging
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Optional
 from pathlib import Path
 

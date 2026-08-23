@@ -1,9 +1,7 @@
 """API 路由冒烟测试。"""
 
 import json
-import os
 import pytest
-from pathlib import Path
 from fastapi.testclient import TestClient
 
 

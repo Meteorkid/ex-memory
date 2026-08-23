@@ -1,6 +1,6 @@
 """统一消息格式：跨平台消息标准化。"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 

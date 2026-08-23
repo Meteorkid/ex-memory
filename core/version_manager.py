@@ -3,7 +3,6 @@
 import shutil
 import json
 from datetime import datetime
-from pathlib import Path
 from config import get_ex_dir
 from core.path_safety import safe_version_name, resolve_under
 

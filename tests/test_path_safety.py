@@ -1,7 +1,6 @@
 """路径安全工具测试。"""
 
 import pytest
-from pathlib import Path
 from core.path_safety import safe_filename, safe_version_name, resolve_under
 
 
