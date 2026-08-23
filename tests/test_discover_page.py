@@ -83,6 +83,36 @@ def test_wechat_helper_launches_installed_app_before_retrying_health_check():
     assert "await waitForHelperReady()" in helper_js
 
 
+def test_wechat_helper_failure_never_blocks_manual_file_import():
+    html = (ROOT / "web/static/index.html").read_text(encoding="utf-8")
+    helper_js = (ROOT / "web/static/wechat-helper.js").read_text(encoding="utf-8")
+
+    assert 'id="wechat-helper-skip"' in html
+    assert "已有导出文件？直接导入" in html
+    assert 'aria-live="polite"' in html
+    assert "window.switchTab('create')" in helper_js
+    assert "首次使用，只需安装一次" in helper_js
+
+
+def test_wechat_helper_network_waits_always_finish_in_a_recoverable_state():
+    helper_js = (ROOT / "web/static/wechat-helper.js").read_text(encoding="utf-8")
+
+    assert "async function fetchWithTimeout" in helper_js
+    assert helper_js.count("await fetch(") == 1
+    assert "正在检测本机助手，最多等待 6 秒" in helper_js
+    assert "本地导出不会中断" in helper_js
+    assert "launch.disabled = false" in helper_js
+
+
+def test_wechat_helper_progress_retry_reuses_the_existing_local_task():
+    helper_js = (ROOT / "web/static/wechat-helper.js").read_text(encoding="utf-8")
+
+    assert "let activeTaskId = null" in helper_js
+    assert "if (activeTaskId)" in helper_js
+    assert "pollTask(activeTaskId)" in helper_js
+    assert "重新读取进度" in helper_js
+
+
 def test_frontend_initializes_after_runtime_helpers_are_declared():
     app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
 
@@ -94,8 +124,8 @@ def test_frontend_release_busts_cached_startup_script():
     service_worker = (ROOT / "web/static/sw.js").read_text(encoding="utf-8")
 
     assert 'src="static/app.js?v=20260823e"' in html
-    assert 'src="static/wechat-helper.js?v=20260824"' in html
-    assert "const CACHE_VERSION = 'v12'" in service_worker
+    assert 'src="static/wechat-helper.js?v=20260824b"' in html
+    assert "const CACHE_VERSION = 'v13'" in service_worker
 
 
 def test_frontend_request_dedup_cleanup_does_not_leak_rejections():

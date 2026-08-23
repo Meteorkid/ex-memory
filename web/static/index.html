@@ -223,9 +223,12 @@
                                 <div><span class="wechat-helper-kicker">LOCAL EXPORT</span><h2>本机微信 4.1.12 导出</h2><p>聊天正文、联系人、媒体和数据库密钥只在你的 Mac 上处理，不上传到本站。</p></div>
                                 <span class="wechat-helper-private"><span aria-hidden="true"></span>仅在本机处理</span>
                             </header>
-                            <div id="wechat-helper-state" class="wechat-helper-state">尚未检测本地助手</div>
-                            <button id="wechat-helper-launch" class="wechat-helper-launch" type="button">检测并启动本地助手<span aria-hidden="true">→</span></button>
-                            <a id="wechat-helper-open" class="wechat-helper-open" href="#" target="_blank" rel="noopener" style="display:none">打开本地安全页面继续<span aria-hidden="true">→</span></a>
+                            <div id="wechat-helper-state" class="wechat-helper-state" role="status" aria-live="polite">尚未检测本地助手</div>
+                            <div class="wechat-helper-actions">
+                                <button id="wechat-helper-launch" class="wechat-helper-launch" type="button">检测并启动本地助手<span aria-hidden="true">→</span></button>
+                                <a id="wechat-helper-open" class="wechat-helper-open" href="#" target="_blank" rel="noopener" style="display:none">打开本地安全页面继续<span aria-hidden="true">→</span></a>
+                                <button id="wechat-helper-skip" class="wechat-helper-skip" type="button">已有导出文件？直接导入</button>
+                            </div>
                             <div class="wechat-helper-steps" aria-label="导出流程">
                                 <div><span>01</span><strong>连接助手</strong><small>只连接本机 localhost</small></div>
                                 <div><span>02</span><strong>本机解密</strong><small>聊天数据不上传</small></div>
@@ -385,6 +388,6 @@
 
 <script src="static/effects.js"></script>
 <script src="static/app.js?v=20260823e"></script>
-<script src="static/wechat-helper.js?v=20260824"></script>
+<script src="static/wechat-helper.js?v=20260824b"></script>
 </body>
 </html>

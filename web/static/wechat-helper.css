@@ -114,13 +114,19 @@
 
 .wechat-helper-launch:disabled { cursor: wait; opacity: 0.55; }
 
+.wechat-helper-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
 .wechat-helper-open {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 12px;
     min-height: 44px;
-    margin-left: 8px;
     padding: 0 20px;
     border: 1px solid rgba(124, 108, 255, 0.5);
     border-radius: var(--radius-sm);
@@ -131,6 +137,18 @@
     transition: background 0.18s ease, border-color 0.18s ease;
 }
 
+.wechat-helper-skip {
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font: 500 13px var(--font-body);
+}
+
+.wechat-helper-skip:hover { color: var(--text-primary); }
+
 .wechat-helper-open:hover {
     background: rgba(124, 108, 255, 0.2);
     border-color: rgba(124, 108, 255, 0.72);
@@ -138,7 +156,8 @@
 
 .wechat-helper-launch:focus-visible,
 .wechat-helper-download:focus-visible,
-.wechat-helper-open:focus-visible {
+.wechat-helper-open:focus-visible,
+.wechat-helper-skip:focus-visible {
     outline: 2px solid var(--accent-hover);
     outline-offset: 3px;
 }
@@ -207,6 +226,16 @@
 
 .wechat-helper-downloads > strong { display: block; margin-bottom: 10px; color: var(--text-primary); font-size: 13px; }
 
+.wechat-helper-install-steps {
+    margin: 0 0 14px;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.8;
+}
+
+.wechat-helper-download-version { margin: 0 0 8px; color: var(--text-primary); font-size: 13px; font-weight: 600; }
+
 .wechat-helper-download {
     display: block;
     margin: 8px 0;
@@ -235,13 +264,15 @@
     .wechat-helper-header { flex-direction: column; gap: 14px; }
     .wechat-helper-steps { grid-template-columns: 1fr; }
     .wechat-helper-launch,
-    .wechat-helper-open { width: 100%; margin-left: 0; margin-top: 8px; }
+    .wechat-helper-open,
+    .wechat-helper-skip { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .wechat-helper-panel { animation: none; }
     .wechat-helper-launch,
     .wechat-helper-download,
-    .wechat-helper-open { transition: none; }
+    .wechat-helper-open,
+    .wechat-helper-skip { transition: none; }
     .wechat-helper-launch:hover:not(:disabled) { transform: none; }
 }

@@ -8,11 +8,13 @@
     const state = document.getElementById('wechat-helper-state');
     const launch = document.getElementById('wechat-helper-launch');
     const open = document.getElementById('wechat-helper-open');
+    const skip = document.getElementById('wechat-helper-skip');
     const downloads = document.getElementById('wechat-helper-downloads');
-    if (!entry || !panel || !state || !launch || !open || !downloads) return;
+    if (!entry || !panel || !state || !launch || !open || !skip || !downloads) return;
 
     let release = null;
     let pollingTimer = null;
+    let activeTaskId = null;
     let helperCompatible = true;
     let helperDetected = false;
     let detectedArchitecture = '';
@@ -22,8 +24,14 @@
         const timeline = document.getElementById('moments-timeline');
         if (timeline) timeline.style.display = 'none';
         if (window.setDiscoverFeature) window.setDiscoverFeature(entry.id);
+        launch.disabled = true;
+        state.textContent = '正在检测本机助手，最多等待 6 秒……';
         await loadRelease();
         await detectHelper();
+    });
+
+    skip.addEventListener('click', () => {
+        if (typeof window.switchTab === 'function') window.switchTab('create');
     });
 
     launch.addEventListener('click', async () => {
@@ -31,6 +39,11 @@
         launch.disabled = true;
         state.textContent = '正在连接本地助手……';
         try {
+            if (activeTaskId) {
+                state.textContent = '正在重新读取本地导出进度……';
+                pollTask(activeTaskId);
+                return;
+            }
             if (!helperDetected) {
                 window.top.location.href = HELPER_LAUNCH_URL;
                 state.textContent = '正在启动已安装的本地助手……';
@@ -39,18 +52,36 @@
                     return;
                 }
             }
-            const response = await fetch(`${HELPER_BASE}/v1/control/launch`, { method: 'POST' });
+            state.textContent = '助手已连接，正在创建本地导出任务……';
+            const response = await fetchWithTimeout(`${HELPER_BASE}/v1/control/launch`, { method: 'POST' }, 5000);
             if (!response.ok) throw new Error('launch_failed');
             const task = await response.json();
+            activeTaskId = task.task_id;
             renderLocalLink(task.local_url);
             state.textContent = '本地安全页面已就绪，点击下方链接继续。';
+            launch.textContent = '刷新本地任务状态';
             pollTask(task.task_id);
         } catch {
-            await renderDetectionFailure();
+            if (helperDetected) {
+                state.textContent = '助手已连接，但创建导出任务超时。请点击“重新连接助手”；你也可以直接导入已有聊天文件。';
+                launch.textContent = '重新连接助手';
+            } else {
+                await renderDetectionFailure();
+            }
         } finally {
             launch.disabled = !helperCompatible;
         }
     });
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } finally {
+            window.clearTimeout(timeout);
+        }
+    }
 
     function renderLocalLink(url) {
         if (!url) return;
@@ -68,18 +99,11 @@
     }
 
     async function fetchHelperHealth(timeoutMs) {
-        const controller = new AbortController();
-        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-        try {
-            const response = await fetch(`${HELPER_BASE}/v1/control/health`, {
-                cache: 'no-store',
-                signal: controller.signal,
-            });
-            if (!response.ok) throw new Error('unavailable');
-            return await response.json();
-        } finally {
-            window.clearTimeout(timeout);
-        }
+        const response = await fetchWithTimeout(`${HELPER_BASE}/v1/control/health`, {
+            cache: 'no-store',
+        }, timeoutMs);
+        if (!response.ok) throw new Error('unavailable');
+        return await response.json();
     }
 
     function applyHelperHealth(health) {
@@ -125,19 +149,14 @@
     }
 
     async function probeHelperPresence() {
-        const controller = new AbortController();
-        const timeout = window.setTimeout(() => controller.abort(), 1000);
         try {
-            await fetch(`${HELPER_BASE}/v1/control/health`, {
+            await fetchWithTimeout(`${HELPER_BASE}/v1/control/health`, {
                 mode: 'no-cors',
                 cache: 'no-store',
-                signal: controller.signal,
-            });
+            }, 1000);
             return true;
         } catch {
             return false;
-        } finally {
-            window.clearTimeout(timeout);
         }
     }
 
@@ -153,8 +172,8 @@
             state.textContent = '检测到本机助手正在运行，但当前进程未授权此网站。请完全退出助手后重新打开；仍失败时请安装最新版。';
             launch.textContent = '重新检测';
         } else {
-            state.textContent = '本地助手未运行。安装或启动后，再点击下方按钮。';
-            launch.textContent = '重新检测并启动';
+            state.textContent = '尚未连接本地助手。如果已经安装，点击“打开已安装助手”；没有安装可在下方下载。';
+            launch.textContent = '打开已安装助手';
         }
         renderDownloads();
     }
@@ -163,7 +182,7 @@
         if (release) return;
         try {
             const basePath = document.documentElement.dataset.basePath || '';
-            const response = await fetch(`${basePath}/api/local-helper/config`, { cache: 'no-store' });
+            const response = await fetchWithTimeout(`${basePath}/api/local-helper/config`, { cache: 'no-store' }, 2500);
             if (response.ok) release = await response.json();
         } catch {
             release = null;
@@ -172,14 +191,28 @@
 
     function renderDownloads() {
         downloads.replaceChildren();
+        const title = document.createElement('strong');
+        title.textContent = '首次使用，只需安装一次';
+        downloads.append(title);
+        const steps = document.createElement('ol');
+        steps.className = 'wechat-helper-install-steps';
+        for (const copy of ['下载助手并拖入“应用程序”', '首次在 Finder 中右键选择“打开”', '回到此页点击“打开已安装助手”']) {
+            const item = document.createElement('li');
+            item.textContent = copy;
+            steps.append(item);
+        }
+        downloads.append(steps);
         if (!release || !release.enabled || !release.downloads.length) {
             downloads.style.display = 'block';
-            downloads.textContent = '本站暂未发布可校验的 macOS 安装包。';
+            const unavailable = document.createElement('p');
+            unavailable.textContent = '安装包配置暂时不可用，请稍后重新检测；也可以直接导入已有聊天文件。';
+            downloads.append(unavailable);
             return;
         }
-        const title = document.createElement('strong');
-        title.textContent = `下载 macOS 助手 ${release.version || 'Beta'}`;
-        downloads.append(title);
+        const version = document.createElement('p');
+        version.className = 'wechat-helper-download-version';
+        version.textContent = `下载 macOS 助手 ${release.version || 'Beta'}`;
+        downloads.append(version);
         for (const item of release.downloads) {
             const link = document.createElement('a');
             link.className = 'wechat-helper-download';
@@ -198,15 +231,29 @@
 
     function pollTask(taskId) {
         window.clearTimeout(pollingTimer);
+        activeTaskId = taskId;
+        let consecutiveFailures = 0;
         const poll = async () => {
             try {
-                const response = await fetch(`${HELPER_BASE}/v1/control/tasks/${encodeURIComponent(taskId)}`);
-                if (!response.ok) return;
+                const response = await fetchWithTimeout(`${HELPER_BASE}/v1/control/tasks/${encodeURIComponent(taskId)}`, {}, 3000);
+                if (!response.ok) throw new Error('status_unavailable');
                 const task = await response.json();
+                consecutiveFailures = 0;
                 state.textContent = publicStatus(task);
-                if (['success', 'partial', 'failed', 'cancelled'].includes(task.status)) return;
+                if (['success', 'partial', 'failed', 'cancelled'].includes(task.status)) {
+                    activeTaskId = null;
+                    launch.textContent = '开始新的本地导出';
+                    launch.disabled = false;
+                    return;
+                }
             } catch {
-                return;
+                consecutiveFailures += 1;
+                if (consecutiveFailures >= 3) {
+                    state.textContent = '网站暂时无法读取进度，但本地导出不会中断。请在已打开的本地安全页面继续。';
+                    launch.textContent = '重新读取进度';
+                    launch.disabled = false;
+                    return;
+                }
             }
             pollingTimer = window.setTimeout(poll, 1500);
         };
