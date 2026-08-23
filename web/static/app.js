@@ -230,24 +230,30 @@ function exportErrorLog() {
     URL.revokeObjectURL(url);
 }
 
-// 离线检测
-window.addEventListener('offline', () => {
-    showToast('网络连接已断开', 'warning', 5000);
+// 离线状态只由真实 API 请求结果驱动，不信任浏览器的 offline 事件。
+let networkOffline = false;
+
+function markNetworkOffline() {
+    if (PROXY_AUTH) return;
+    if (networkOffline) return;
+    networkOffline = true;
     const banner = $('offline-banner');
     if (banner) banner.classList.add('visible');
-});
-window.addEventListener('online', () => {
-    showToast('网络已恢复', 'success');
+    showToast('网络连接已断开', 'warning', 5000);
+}
+
+function markNetworkOnline() {
+    const recovered = networkOffline;
+    networkOffline = false;
     const banner = $('offline-banner');
     if (banner) banner.classList.remove('visible');
-    flushOfflineQueue();
-});
-
-// 初始检查离线状态
-if (false) {
-    const banner = $('offline-banner');
-    if (banner) banner.classList.add('visible');
+    if (recovered) {
+        showToast('网络已恢复', 'success');
+        flushOfflineQueue();
+    }
 }
+
+window.addEventListener('online', markNetworkOnline);
 
 // ── 快捷引用 ──
 const $ = id => document.getElementById(id);
@@ -871,6 +877,10 @@ $('reg-password2').onkeydown = e => { if(e.key==='Enter') doRegister(); };
 // 请求去重
 const pendingRequests = new Map();
 
+function isNetworkFailure(error) {
+    return ['AbortError', 'TimeoutError', 'TypeError'].includes(error?.name);
+}
+
 async function api(method, path, body, retries = 2) {
     if (false) {
         showToast('网络连接已断开，请检查网络', 'warning');
@@ -898,12 +908,15 @@ async function api(method, path, body, retries = 2) {
                 if (res.status === 401) { logout(); throw new Error('登录已过期'); }
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.detail || `请求失败 (${res.status})`);
+                markNetworkOnline();
                 return data;
             } catch(e) {
-                if (i < retries && (e.name === 'AbortError' || e.message.includes('网络'))) {
+                const networkFailure = isNetworkFailure(e);
+                if (i < retries && networkFailure) {
                     await new Promise(r => setTimeout(r, 1000 * (i + 1)));
                     continue;
                 }
+                if (networkFailure) markNetworkOffline();
                 throw e;
             }
         }

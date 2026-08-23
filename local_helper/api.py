@@ -100,6 +100,8 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
             response.headers["Vary"] = "Origin"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+            if request.headers.get("access-control-request-private-network") == "true":
+                response.headers["Access-Control-Allow-Private-Network"] = "true"
             return response
 
         if request.url.path.startswith("/local/api/"):

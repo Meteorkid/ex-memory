@@ -2,6 +2,7 @@
     'use strict';
 
     const HELPER_BASE = 'http://127.0.0.1:17653';
+    const HELPER_LAUNCH_URL = 'ex-memory-helper://launch';
     const entry = document.getElementById('wechat-helper-entry');
     const panel = document.getElementById('wechat-helper-panel');
     const state = document.getElementById('wechat-helper-state');
@@ -13,6 +14,7 @@
     let release = null;
     let pollingTimer = null;
     let helperCompatible = true;
+    let helperDetected = false;
     let detectedArchitecture = '';
 
     entry.addEventListener('click', async () => {
@@ -29,6 +31,14 @@
         launch.disabled = true;
         state.textContent = '正在连接本地助手……';
         try {
+            if (!helperDetected) {
+                window.top.location.href = HELPER_LAUNCH_URL;
+                state.textContent = '正在启动已安装的本地助手……';
+                if (!await waitForHelperReady()) {
+                    if (!helperDetected) await renderDetectionFailure();
+                    return;
+                }
+            }
             const response = await fetch(`${HELPER_BASE}/v1/control/launch`, { method: 'POST' });
             if (!response.ok) throw new Error('launch_failed');
             const task = await response.json();
@@ -36,10 +46,9 @@
             state.textContent = '本地安全页面已就绪，点击下方链接继续。';
             pollTask(task.task_id);
         } catch {
-            state.textContent = '未检测到本地助手。请下载并启动 macOS Beta 后重试。';
-            renderDownloads();
+            await renderDetectionFailure();
         } finally {
-            launch.disabled = false;
+            launch.disabled = !helperCompatible;
         }
     });
 
@@ -50,35 +59,104 @@
     }
 
     async function detectHelper() {
-        const controller = new AbortController();
-        const timeout = window.setTimeout(() => controller.abort(), 1600);
         try {
-            const response = await fetch(`${HELPER_BASE}/v1/control/health`, { signal: controller.signal });
-            if (!response.ok) throw new Error('unavailable');
-            const health = await response.json();
-            detectedArchitecture = health.architecture || '';
-            const minimumApiVersion = Number(release?.min_api_version || 1);
-            if (health.platform !== 'macos' || health.architecture !== 'arm64' || Number(health.api_version || 0) < minimumApiVersion) {
-                helperCompatible = false;
-                launch.disabled = true;
-                state.textContent = `本地助手 ${health.helper_version || '未知版本'} 与当前网站不兼容，请下载最新版后重试。`;
-                renderDownloads();
-                return;
-            }
-            helperCompatible = true;
-            launch.disabled = false;
-            const architecture = detectedArchitecture === 'arm64' ? 'Apple Silicon' : detectedArchitecture || '未知架构';
-            state.textContent = `本地助手 ${health.helper_version}（${architecture}）已连接，可以安全启动。`;
-            launch.textContent = '启动本地导出';
+            const health = await fetchHelperHealth(1600);
+            applyHelperHealth(health);
         } catch {
-            helperCompatible = true;
-            launch.disabled = false;
-            state.textContent = '本地助手未运行。安装或启动后，再点击下方按钮。';
-            launch.textContent = '重新检测并启动';
-            renderDownloads();
+            await renderDetectionFailure();
+        }
+    }
+
+    async function fetchHelperHealth(timeoutMs) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(`${HELPER_BASE}/v1/control/health`, {
+                cache: 'no-store',
+                signal: controller.signal,
+            });
+            if (!response.ok) throw new Error('unavailable');
+            return await response.json();
         } finally {
             window.clearTimeout(timeout);
         }
+    }
+
+    function applyHelperHealth(health) {
+        helperDetected = true;
+        detectedArchitecture = health.architecture || '';
+        const minimumApiVersion = Number(release?.min_api_version || 1);
+        if (health.platform !== 'macos' || health.architecture !== 'arm64' || Number(health.api_version || 0) < minimumApiVersion) {
+            helperCompatible = false;
+            launch.disabled = true;
+            state.textContent = `本地助手 ${health.helper_version || '未知版本'} 与当前网站不兼容，请下载最新版后重试。`;
+            renderDownloads();
+            return false;
+        }
+        helperCompatible = true;
+        launch.disabled = false;
+        const architecture = detectedArchitecture === 'arm64' ? 'Apple Silicon' : detectedArchitecture || '未知架构';
+        state.textContent = `本地助手 ${health.helper_version}（${architecture}）已连接，可以安全启动。`;
+        launch.textContent = '启动本地导出';
+        return true;
+    }
+
+    async function waitForHelperReady() {
+        const deadline = Date.now() + 8000;
+        while (Date.now() < deadline) {
+            try {
+                const health = await fetchHelperHealth(800);
+                return applyHelperHealth(health);
+            } catch {
+                await new Promise(resolve => window.setTimeout(resolve, 400));
+            }
+        }
+        return false;
+    }
+
+    async function localNetworkPermissionState() {
+        if (!navigator.permissions?.query) return 'unknown';
+        try {
+            const permission = await navigator.permissions.query({ name: 'local-network-access' });
+            return permission.state;
+        } catch {
+            return 'unknown';
+        }
+    }
+
+    async function probeHelperPresence() {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 1000);
+        try {
+            await fetch(`${HELPER_BASE}/v1/control/health`, {
+                mode: 'no-cors',
+                cache: 'no-store',
+                signal: controller.signal,
+            });
+            return true;
+        } catch {
+            return false;
+        } finally {
+            window.clearTimeout(timeout);
+        }
+    }
+
+    async function renderDetectionFailure() {
+        helperDetected = false;
+        helperCompatible = true;
+        launch.disabled = false;
+        const permissionState = await localNetworkPermissionState();
+        if (permissionState === 'denied') {
+            state.textContent = '浏览器已拒绝访问本机助手。请在地址栏的网站设置中允许“本地网络访问”，然后重新检测。';
+            launch.textContent = '重新检测';
+        } else if (await probeHelperPresence()) {
+            state.textContent = '检测到本机助手正在运行，但当前进程未授权此网站。请完全退出助手后重新打开；仍失败时请安装最新版。';
+            launch.textContent = '重新检测';
+        } else {
+            state.textContent = '本地助手未运行。安装或启动后，再点击下方按钮。';
+            launch.textContent = '重新检测并启动';
+        }
+        renderDownloads();
     }
 
     async function loadRelease() {

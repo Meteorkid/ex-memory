@@ -55,6 +55,13 @@ def create_app() -> FastAPI:
                 f'data-auth-mode="{auth_mode}">',
                 1,
             )
+            if config.METEOR_STORE_SSO_ENABLED:
+                document = document.replace(
+                    '<div id="offline-banner" class="offline-banner" role="alert">'
+                    '网络连接已断开，请检查网络设置</div>',
+                    '',
+                    1,
+                )
             return HTMLResponse(document, headers={"Cache-Control": "no-store"})
         return {"message": "ex-memory API", "docs": "/api/docs"}
 

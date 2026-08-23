@@ -22,11 +22,12 @@ python3.12 -m venv .venv-local-helper-package
 .venv-local-helper-package/bin/pip install -r requirements-local-helper.txt -r requirements-packaging.txt
 ```
 
-然后把正式网站的精确 Origin 写入安装包并构建：
+然后把正式网站所有实际入口的精确 Origin 写入安装包并构建。多个 Origin 用逗号分隔；
+例如站点同时接受根域名与 `www` 时必须全部列出，否则用户从另一个入口登录后无法连接本机助手：
 
 ```bash
-SITE_ORIGIN=https://你的域名 \
-RELEASE_VERSION=0.1.0-beta.1 \
+SITE_ORIGINS=https://你的域名,https://www.你的域名 \
+RELEASE_VERSION=0.1.0-beta.2 \
 PYTHON_BIN=.venv-local-helper-package/bin/python \
 bash packaging/macos/build_helper.sh
 ```
@@ -39,9 +40,9 @@ bash packaging/macos/build_helper.sh
 
 ```dotenv
 LOCAL_WECHAT_HELPER_ENABLED=true
-LOCAL_WECHAT_HELPER_VERSION=0.1.0-beta.1
+LOCAL_WECHAT_HELPER_VERSION=0.1.0-beta.2
 LOCAL_WECHAT_HELPER_MIN_API_VERSION=1
-LOCAL_WECHAT_HELPER_ARM64_URL=https://你的域名/downloads/ex-memory-wechat-helper-0.1.0-beta.1-macos-arm64.dmg
+LOCAL_WECHAT_HELPER_ARM64_URL=https://你的域名/downloads/ex-memory-wechat-helper-0.1.0-beta.2-macos-arm64.dmg
 LOCAL_WECHAT_HELPER_ARM64_SHA256=构建清单中的64位sha256
 ```
 

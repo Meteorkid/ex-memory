@@ -59,6 +59,30 @@ def test_wechat_helper_rejects_outdated_local_protocol():
     assert "health.architecture !== 'arm64'" in helper_js
 
 
+def test_wechat_helper_explains_denied_local_network_permission():
+    helper_js = (ROOT / "web/static/wechat-helper.js").read_text(encoding="utf-8")
+
+    assert "navigator.permissions.query({ name: 'local-network-access' })" in helper_js
+    assert "浏览器已拒绝访问本机助手" in helper_js
+    assert "允许“本地网络访问”" in helper_js
+
+
+def test_wechat_helper_distinguishes_running_incompatible_process_from_missing_app():
+    helper_js = (ROOT / "web/static/wechat-helper.js").read_text(encoding="utf-8")
+
+    assert "mode: 'no-cors'" in helper_js
+    assert "检测到本机助手正在运行" in helper_js
+    assert "请完全退出助手后重新打开" in helper_js
+
+
+def test_wechat_helper_launches_installed_app_before_retrying_health_check():
+    helper_js = (ROOT / "web/static/wechat-helper.js").read_text(encoding="utf-8")
+
+    assert "ex-memory-helper://launch" in helper_js
+    assert "window.top.location.href = HELPER_LAUNCH_URL" in helper_js
+    assert "await waitForHelperReady()" in helper_js
+
+
 def test_frontend_initializes_after_runtime_helpers_are_declared():
     app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
 
@@ -69,8 +93,8 @@ def test_frontend_release_busts_cached_startup_script():
     html = (ROOT / "web/static/index.html").read_text(encoding="utf-8")
     service_worker = (ROOT / "web/static/sw.js").read_text(encoding="utf-8")
 
-    assert 'src="static/app.js?v=20260823c"' in html
-    assert 'src="static/wechat-helper.js?v=20260823b"' in html
+    assert 'src="static/app.js?v=20260823e"' in html
+    assert 'src="static/wechat-helper.js?v=20260824"' in html
     assert "const CACHE_VERSION = 'v12'" in service_worker
 
 
@@ -79,3 +103,32 @@ def test_frontend_request_dedup_cleanup_does_not_leak_rejections():
 
     assert "promise.finally(() => pendingRequests.delete(requestKey))" not in app_js
     assert "promise.then(clearPendingRequest, clearPendingRequest)" in app_js
+
+
+def test_browser_offline_event_never_controls_persistent_banner():
+    app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
+    mark_offline = app_js.split("function markNetworkOffline()", 1)[1].split(
+        "function markNetworkOnline()", 1
+    )[0]
+
+    assert "window.addEventListener('offline'" not in app_js
+    assert "fetch(`${BASE_PATH}/health`" not in app_js
+    assert "if (PROXY_AUTH) return;" in mark_offline
+
+
+def test_successful_api_response_clears_stale_offline_state():
+    app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
+    api_wrapper = app_js.split("async function api", 1)[1].split("function logout", 1)[0]
+
+    assert "markNetworkOnline();" in api_wrapper
+
+
+def test_api_marks_offline_only_after_network_failure_retries_are_exhausted():
+    app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
+    api_wrapper = app_js.split("async function api", 1)[1].split("function logout", 1)[0]
+
+    assert "const networkFailure = isNetworkFailure(e);" in api_wrapper
+    assert "if (networkFailure) markNetworkOffline();" in api_wrapper
+    assert api_wrapper.index("if (i < retries && networkFailure)") < api_wrapper.index(
+        "if (networkFailure) markNetworkOffline();"
+    )

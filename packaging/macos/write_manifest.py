@@ -15,7 +15,7 @@ def main() -> None:
     parser.add_argument("--artifact", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--architecture", required=True)
-    parser.add_argument("--site-origin", required=True)
+    parser.add_argument("--site-origin", action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     artifact = args.artifact.resolve(strict=True)
@@ -26,7 +26,8 @@ def main() -> None:
         "platform": "macos",
         "architecture": args.architecture,
         "supported_wechat_versions": ["4.1.12"],
-        "site_origin": args.site_origin,
+        "site_origin": args.site_origin[0],
+        "site_origins": args.site_origin,
         "artifact": artifact.name,
         "size": artifact.stat().st_size,
         "sha256": _sha256(artifact),

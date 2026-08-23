@@ -3,16 +3,27 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-SITE_ORIGIN="${SITE_ORIGIN:-}"
+SITE_ORIGINS="${SITE_ORIGINS:-${SITE_ORIGIN:-}}"
 RELEASE_VERSION="${RELEASE_VERSION:-$(cd "$PROJECT_ROOT" && "$PYTHON_BIN" -c 'from local_helper import __version__; print(__version__)')}"
 SQLCIPHER_BIN="${SQLCIPHER_BIN:-/opt/homebrew/opt/sqlcipher/bin/sqlcipher}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-$PROJECT_ROOT/dist/local-helper/$RELEASE_VERSION}"
 
 HTTPS_ORIGIN_PATTERN='^https://[^/]+(:[0-9]+)?$'
 LOCAL_ORIGIN_PATTERN='^http://(127\.0\.0\.1|localhost)(:[0-9]+)?$'
-if [[ ! "$SITE_ORIGIN" =~ $HTTPS_ORIGIN_PATTERN ]] && \
-   [[ "${LOCAL_TEST_BUILD:-0}" != "1" || ! "$SITE_ORIGIN" =~ $LOCAL_ORIGIN_PATTERN ]]; then
-    echo "SITE_ORIGIN 必须是精确的 HTTPS Origin，例如 https://memory.example.com" >&2
+IFS=',' read -r -a RAW_SITE_ORIGINS <<< "$SITE_ORIGINS"
+SITE_ORIGIN_LIST=()
+for origin in "${RAW_SITE_ORIGINS[@]}"; do
+    origin="${origin#"${origin%%[![:space:]]*}"}"
+    origin="${origin%"${origin##*[![:space:]]}"}"
+    if [[ ! "$origin" =~ $HTTPS_ORIGIN_PATTERN ]] && \
+       [[ "${LOCAL_TEST_BUILD:-0}" != "1" || ! "$origin" =~ $LOCAL_ORIGIN_PATTERN ]]; then
+        echo "SITE_ORIGINS 中每项都必须是精确的 HTTPS Origin，例如 https://memory.example.com" >&2
+        exit 2
+    fi
+    SITE_ORIGIN_LIST+=("$origin")
+done
+if [[ "${#SITE_ORIGIN_LIST[@]}" -eq 0 ]]; then
+    echo "必须通过 SITE_ORIGINS 配置至少一个网站 Origin" >&2
     exit 2
 fi
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -51,7 +62,7 @@ fi
 BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/ex-memory-helper-build.XXXXXX")"
 trap 'rm -rf "$BUILD_ROOT"' EXIT
 mkdir -p "$BUILD_ROOT/runtime/local_helper/bin" "$BUILD_ROOT/runtime/local_helper/Frameworks" "$OUTPUT_ROOT"
-printf '%s\n' "$SITE_ORIGIN" > "$BUILD_ROOT/release-origin.txt"
+printf '%s\n' "${SITE_ORIGIN_LIST[@]}" > "$BUILD_ROOT/release-origin.txt"
 
 cp "$SQLCIPHER_BIN" "$BUILD_ROOT/runtime/local_helper/bin/sqlcipher"
 dylibbundler \
@@ -83,6 +94,11 @@ cd "$PROJECT_ROOT"
 APP="$BUILD_ROOT/dist/ex-memory 微信导出助手.app"
 PLIST_VERSION="${RELEASE_VERSION%%-*}"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $PLIST_VERSION" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string com.meteorkid.exmemory.wechat-helper" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string ex-memory-helper" "$APP/Contents/Info.plist"
 # ad-hoc 签名不需要付费证书，也不等于 Apple Developer ID 签名或公证。
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
@@ -96,12 +112,16 @@ hdiutil create \
     -ov \
     "$OUTPUT_ROOT/$DMG_NAME"
 
-shasum -a 256 "$OUTPUT_ROOT/$DMG_NAME" > "$OUTPUT_ROOT/$DMG_NAME.sha256"
+(cd "$OUTPUT_ROOT" && shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256")
+MANIFEST_ORIGIN_ARGS=()
+for origin in "${SITE_ORIGIN_LIST[@]}"; do
+    MANIFEST_ORIGIN_ARGS+=(--site-origin "$origin")
+done
 "$PYTHON_BIN" "$PROJECT_ROOT/packaging/macos/write_manifest.py" \
     --artifact "$OUTPUT_ROOT/$DMG_NAME" \
     --version "$RELEASE_VERSION" \
     --architecture "$ARCH" \
-    --site-origin "$SITE_ORIGIN" \
+    "${MANIFEST_ORIGIN_ARGS[@]}" \
     --output "$OUTPUT_ROOT/build-manifest.json"
 
 echo "构建完成：$OUTPUT_ROOT"

@@ -21,10 +21,10 @@ services:
       CORS_ORIGINS: https://imagentx.top
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOCAL_WECHAT_HELPER_ENABLED: ${LOCAL_WECHAT_HELPER_ENABLED:-true}
-      LOCAL_WECHAT_HELPER_VERSION: ${LOCAL_WECHAT_HELPER_VERSION:-0.1.0-beta.1}
+      LOCAL_WECHAT_HELPER_VERSION: ${LOCAL_WECHAT_HELPER_VERSION:-0.1.0-beta.2}
       LOCAL_WECHAT_HELPER_MIN_API_VERSION: ${LOCAL_WECHAT_HELPER_MIN_API_VERSION:-1}
-      LOCAL_WECHAT_HELPER_ARM64_URL: ${LOCAL_WECHAT_HELPER_ARM64_URL:-https://imagentx.top/downloads/ex-memory/0.1.0-beta.1/ex-memory-wechat-helper-0.1.0-beta.1-macos-arm64.dmg}
-      LOCAL_WECHAT_HELPER_ARM64_SHA256: ${LOCAL_WECHAT_HELPER_ARM64_SHA256:-db2c029bf47a4cf841050804cfabebafbf6e83a568ca33f64a93d9e949a0b58f}
+      LOCAL_WECHAT_HELPER_ARM64_URL: ${LOCAL_WECHAT_HELPER_ARM64_URL:-https://imagentx.top/downloads/ex-memory/0.1.0-beta.2/ex-memory-wechat-helper-0.1.0-beta.2-macos-arm64.dmg}
+      LOCAL_WECHAT_HELPER_ARM64_SHA256: ${LOCAL_WECHAT_HELPER_ARM64_SHA256:-5f02e2e622329396ccd3e433642f8f542df903528863d377e5106fd79d99019f}
     volumes:
       - ./data:/app/data
       - ./exes:/app/exes

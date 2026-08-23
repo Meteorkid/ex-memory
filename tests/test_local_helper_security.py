@@ -66,6 +66,23 @@ def test_control_api_cors_and_public_status_are_privacy_safe():
     assert set(status.json()) == {"task_id", "status", "phase", "progress", "error_code"}
 
 
+def test_control_api_accepts_private_network_preflight_for_allowed_origin():
+    helper = client()
+
+    response = helper.options(
+        "/v1/control/health",
+        headers={
+            "origin": SITE_ORIGIN,
+            "access-control-request-method": "GET",
+            "access-control-request-private-network": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == SITE_ORIGIN
+    assert response.headers["access-control-allow-private-network"] == "true"
+
+
 def test_local_ticket_is_one_time():
     app = create_helper_app(
         HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
