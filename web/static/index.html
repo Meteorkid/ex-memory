@@ -16,8 +16,12 @@
 </head>
 <body>
 
-<!-- 离线横幅 -->
-<div id="offline-banner" class="offline-banner" role="alert">网络连接已断开，请检查网络设置</div>
+<!-- 网络状态 -->
+<div id="offline-banner" class="offline-banner" role="alert">
+    <span class="offline-status-dot" aria-hidden="true"></span>
+    <span class="offline-status-copy"><strong>连接已中断</strong><small>请检查网络后重试</small></span>
+    <button id="offline-retry" class="offline-retry" type="button">重试</button>
+</div>
 
 <!-- ── 登录页 ── -->
 <main id="page-auth" role="main">
@@ -135,7 +139,7 @@
                         <input type="text" id="search-input" placeholder="搜索镜像">
                     </div>
                     <div id="contact-list" class="contact-list">
-                        <p class="list-empty">暂无镜像，去「创建」一个吧</p>
+                        <p class="list-empty">暂无镜像。先导入聊天记录，再创建镜像。</p>
                     </div>
                 </div>
 
@@ -143,7 +147,7 @@
                 <div id="tab-chat-detail" class="tab-page" style="display:none">
                     <div class="chat-empty-hint" id="chat-empty-hint">
                         <div class="chat-empty-icon">💬</div>
-                        <div class="chat-empty-text">选择一个镜像开始对话</div>
+                        <div class="chat-empty-text"><strong>还没有可对话的镜像</strong><span>导入记录 → 创建镜像，然后从左侧选择开始对话</span></div>
                     </div>
                     <div id="chat-msgs" class="chat-msgs" style="display:none" role="log" aria-live="polite" aria-label="聊天消息"></div>
                     <div id="chat-loading" class="chat-loading" style="display:none">

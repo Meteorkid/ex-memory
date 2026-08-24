@@ -4,6 +4,7 @@ const BASE_PATH = document.documentElement.dataset.basePath || '';
 const PROXY_AUTH = document.documentElement.dataset.authMode === 'proxy';
 const API = `${BASE_PATH}/api`;
 const staticUrl = path => `${BASE_PATH}/static/${path.replace(/^\/+/, '')}`;
+document.documentElement.classList.toggle('web-runtime', PROXY_AUTH);
 let token = PROXY_AUTH ? '' : (localStorage.getItem('ex-memory-token') || '');
 let currentSlug = '';
 let currentName = '';
@@ -257,6 +258,28 @@ window.addEventListener('online', markNetworkOnline);
 
 // ── 快捷引用 ──
 const $ = id => document.getElementById(id);
+
+async function retryNetwork() {
+    const button = $('offline-retry');
+    if (button) {
+        button.disabled = true;
+        button.textContent = '检查中…';
+    }
+    try {
+        // 直接重试实际业务接口，避免“健康检查成功但体验服务仍不可用”的假恢复。
+        await api('GET', '/exes', undefined, 0);
+        if ($('page-main')?.style.display !== 'none') await loadContactList();
+    } catch (error) {
+        showToast('仍无法连接服务，请稍后重试', 'warning');
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = '重试';
+        }
+    }
+}
+
+$('offline-retry')?.addEventListener('click', retryNetwork);
 
 function authHeaders(json = true) {
     const h = {};
@@ -1178,7 +1201,10 @@ async function loadContactList() {
                 <div class="onboarding-card">
                     <div class="onboarding-icon">💬</div>
                     <h3 class="onboarding-title">创建你的第一个镜像</h3>
-                    <p class="onboarding-desc">导入聊天记录，让 TA 重新和你对话</p>
+                    <ol class="onboarding-steps" aria-label="创建镜像的两个步骤">
+                        <li><span>1</span><div><strong>导入聊天记录</strong><small>选择微信导出记录或已有文本</small></div></li>
+                        <li><span>2</span><div><strong>创建镜像</strong><small>确认资料后即可开始对话</small></div></li>
+                    </ol>
                     <button class="btn onboarding-btn" onclick="switchTab('create')">立即创建</button>
                 </div>`;
             PerfMonitor.end('loadContactList');

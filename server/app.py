@@ -58,7 +58,11 @@ def create_app() -> FastAPI:
             if config.METEOR_STORE_SSO_ENABLED:
                 document = document.replace(
                     '<div id="offline-banner" class="offline-banner" role="alert">'
-                    '网络连接已断开，请检查网络设置</div>',
+                    '\n    <span class="offline-status-dot" aria-hidden="true"></span>'
+                    '\n    <span class="offline-status-copy"><strong>连接已中断</strong>'
+                    '<small>请检查网络后重试</small></span>'
+                    '\n    <button id="offline-retry" class="offline-retry" type="button">重试</button>'
+                    '\n</div>',
                     '',
                     1,
                 )
