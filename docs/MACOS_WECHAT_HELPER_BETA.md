@@ -27,7 +27,7 @@ python3.12 -m venv .venv-local-helper-package
 
 ```bash
 SITE_ORIGINS=https://你的域名,https://www.你的域名 \
-RELEASE_VERSION=0.1.0-beta.3 \
+RELEASE_VERSION=0.1.0-beta.4 \
 PYTHON_BIN=.venv-local-helper-package/bin/python \
 bash packaging/macos/build_helper.sh
 ```
@@ -40,9 +40,9 @@ bash packaging/macos/build_helper.sh
 
 ```dotenv
 LOCAL_WECHAT_HELPER_ENABLED=true
-LOCAL_WECHAT_HELPER_VERSION=0.1.0-beta.3
+LOCAL_WECHAT_HELPER_VERSION=0.1.0-beta.4
 LOCAL_WECHAT_HELPER_MIN_API_VERSION=1
-LOCAL_WECHAT_HELPER_ARM64_URL=https://你的域名/downloads/ex-memory-wechat-helper-0.1.0-beta.3-macos-arm64.dmg
+LOCAL_WECHAT_HELPER_ARM64_URL=https://你的域名/downloads/ex-memory-wechat-helper-0.1.0-beta.4-macos-arm64.dmg
 LOCAL_WECHAT_HELPER_ARM64_SHA256=构建清单中的64位sha256
 ```
 

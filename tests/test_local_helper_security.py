@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi.testclient import TestClient
 
@@ -95,6 +96,57 @@ def test_local_ticket_is_one_time():
     assert response.status_code == 200
     assert response.cookies.get("ex_memory_local_session")
     assert helper.get(path).status_code == 403
+
+
+def test_local_page_can_be_reopened_with_a_fresh_one_time_ticket_for_the_same_task():
+    app = create_helper_app(
+        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+    )
+    helper = TestClient(app)
+    headers = {"origin": SITE_ORIGIN}
+    launched = helper.post("/v1/control/launch", headers=headers).json()
+    first_url = urlsplit(launched["local_url"])
+    first_path = f"{first_url.path}?{first_url.query}"
+
+    assert helper.get(first_path).status_code == 200
+    assert helper.get(first_path).status_code == 403
+
+    reopened = helper.post(
+        f"/v1/control/tasks/{launched['task_id']}/reopen",
+        headers=headers,
+    )
+
+    assert reopened.status_code == 200
+    assert reopened.json()["task_id"] == launched["task_id"]
+    assert reopened.json()["local_url"] != launched["local_url"]
+    second_url = urlsplit(reopened.json()["local_url"])
+    second_path = f"{second_url.path}?{second_url.query}"
+    assert helper.get(second_path).status_code == 200
+    assert helper.get(second_path).status_code == 403
+
+
+def test_reopening_the_local_page_invokes_the_browser_with_a_fresh_url(monkeypatch):
+    opened_urls = []
+    monkeypatch.setattr(
+        "local_helper.api.webbrowser.open",
+        lambda url, new: opened_urls.append((url, new)),
+    )
+    app = create_helper_app(HelperSettings(allowed_origins=frozenset({SITE_ORIGIN})))
+    helper = TestClient(app)
+    headers = {"origin": SITE_ORIGIN}
+    launched = helper.post("/v1/control/launch", headers=headers).json()
+
+    reopened = helper.post(
+        f"/v1/control/tasks/{launched['task_id']}/reopen",
+        headers=headers,
+    )
+
+    assert reopened.status_code == 200
+    assert opened_urls == [
+        (launched["local_url"], 2),
+        (reopened.json()["local_url"], 2),
+    ]
+    assert opened_urls[0][0] != opened_urls[1][0]
 
 
 def test_local_export_page_includes_request_failure_permission_steps():

@@ -15,6 +15,8 @@
     let release = null;
     let pollingTimer = null;
     let activeTaskId = null;
+    let localTaskId = null;
+    let reopeningLocalPage = false;
     let helperCompatible = true;
     let helperDetected = false;
     let detectedArchitecture = '';
@@ -32,6 +34,38 @@
 
     skip.addEventListener('click', () => {
         if (typeof window.switchTab === 'function') window.switchTab('create');
+    });
+
+    open.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (!localTaskId || reopeningLocalPage) return;
+        reopeningLocalPage = true;
+        open.setAttribute('aria-disabled', 'true');
+        state.textContent = '正在重新打开本地安全页面……';
+        try {
+            const response = await fetchWithTimeout(
+                `${HELPER_BASE}/v1/control/tasks/${encodeURIComponent(localTaskId)}/reopen`,
+                { method: 'POST' },
+                5000,
+            );
+            if (response.status === 404) {
+                activeTaskId = null;
+                localTaskId = null;
+                open.style.display = 'none';
+                launch.textContent = '重新连接助手';
+                state.textContent = '本地助手已重启，原网页任务已失效。请重新连接；已有本地任务可在新页面恢复。';
+                return;
+            }
+            if (!response.ok) throw new Error('reopen_failed');
+            const task = await response.json();
+            localTaskId = task.task_id;
+            state.textContent = '本地安全页面已重新打开；本地导出任务保持不变。';
+        } catch {
+            state.textContent = '未能重新打开本地安全页面，请确认助手仍在运行后重试。';
+        } finally {
+            reopeningLocalPage = false;
+            open.removeAttribute('aria-disabled');
+        }
     });
 
     launch.addEventListener('click', async () => {
@@ -57,8 +91,9 @@
             if (!response.ok) throw new Error('launch_failed');
             const task = await response.json();
             activeTaskId = task.task_id;
-            renderLocalLink(task.local_url);
-            state.textContent = '本地安全页面已就绪，点击下方链接继续。';
+            localTaskId = task.task_id;
+            renderLocalLink();
+            state.textContent = '本地安全页面已打开；关闭后可用下方按钮重新打开。';
             launch.textContent = '刷新本地任务状态';
             pollTask(task.task_id);
         } catch {
@@ -83,9 +118,8 @@
         }
     }
 
-    function renderLocalLink(url) {
-        if (!url) return;
-        open.href = url;
+    function renderLocalLink() {
+        open.href = '#';
         open.style.display = '';
     }
 

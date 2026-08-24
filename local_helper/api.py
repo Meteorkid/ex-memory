@@ -83,6 +83,14 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
     app.state.workflow = None
     app.state.public_task_aliases = {}
 
+    def issue_local_url(task_id: str) -> str:
+        ticket = tickets.issue()
+        query = urlencode({"ticket": ticket.token, "task": task_id})
+        local_url = f"{settings.local_base_url}/local/export?{query}"
+        if settings.open_browser_on_launch:
+            webbrowser.open(local_url, new=2)
+        return local_url
+
     @app.middleware("http")
     async def enforce_loopback_and_origin(request: Request, call_next):
         if not is_loopback_host(request.headers.get("host", "")):
@@ -123,13 +131,19 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
 
     @app.post("/v1/control/launch")
     def launch():
-        ticket = tickets.issue()
         task = tasks.create()
-        query = urlencode({"ticket": ticket.token, "task": task.task_id})
-        local_url = f"{settings.local_base_url}/local/export?{query}"
-        if settings.open_browser_on_launch:
-            webbrowser.open(local_url, new=2)
+        local_url = issue_local_url(task.task_id)
         return {"task_id": task.task_id, "launched": True, "local_url": local_url}
+
+    @app.post("/v1/control/tasks/{task_id}/reopen")
+    def reopen_local_page(task_id: str):
+        try:
+            task = tasks.get(task_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="任务不存在") from exc
+        return {"task_id": task.task_id, "reopened": True, "local_url": issue_local_url(task.task_id)}
 
     @app.get("/v1/control/tasks/{task_id}")
     def task_status(task_id: str):

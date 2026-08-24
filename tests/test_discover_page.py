@@ -113,6 +113,17 @@ def test_wechat_helper_progress_retry_reuses_the_existing_local_task():
     assert "重新读取进度" in helper_js
 
 
+def test_wechat_helper_reopens_the_local_page_with_a_fresh_ticket_for_the_same_task():
+    html = (ROOT / "web/static/index.html").read_text(encoding="utf-8")
+    helper_js = (ROOT / "web/static/wechat-helper.js").read_text(encoding="utf-8")
+
+    assert "重新打开本地安全页面" in html
+    assert "let localTaskId = null" in helper_js
+    assert "open.addEventListener('click'" in helper_js
+    assert "/reopen`" in helper_js
+    assert "localTaskId = task.task_id" in helper_js
+
+
 def test_frontend_initializes_after_runtime_helpers_are_declared():
     app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
 
@@ -124,8 +135,8 @@ def test_frontend_release_busts_cached_startup_script():
     service_worker = (ROOT / "web/static/sw.js").read_text(encoding="utf-8")
 
     assert 'src="static/app.js?v=20260823e"' in html
-    assert 'src="static/wechat-helper.js?v=20260824b"' in html
-    assert "const CACHE_VERSION = 'v13'" in service_worker
+    assert 'src="static/wechat-helper.js?v=20260824c"' in html
+    assert "const CACHE_VERSION = 'v14'" in service_worker
 
 
 def test_frontend_request_dedup_cleanup_does_not_leak_rejections():
