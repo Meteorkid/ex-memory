@@ -47,7 +47,7 @@ def parse_whatsapp_txt(file_path: str | Path) -> list[UnifiedMessage]:
     messages = []
     current_sender = ""
     current_time = None
-    current_content = []
+    current_content: list[str] = []
 
     for line in lines:
         line = line.rstrip("\n")

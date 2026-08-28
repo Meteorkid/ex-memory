@@ -128,7 +128,7 @@ def run_retrieval_eval(
 
     ts_to_id = {m["timestamp"]: m["msg_id"] for m in corpus}
     own_tmp = persist_dir is None
-    if own_tmp:
+    if persist_dir is None:
         persist_dir = tempfile.mkdtemp(prefix="exmem_eval_chroma_")
 
     chunker = Chunker()

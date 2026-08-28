@@ -73,7 +73,7 @@ def run_generation_eval(
 
     items = sample_golden(golden, limit)
     own_tmp = persist_dir is None
-    if own_tmp:
+    if persist_dir is None:
         persist_dir = tempfile.mkdtemp(prefix="exmem_eval_gen_")
 
     results: dict = {

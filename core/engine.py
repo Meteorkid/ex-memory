@@ -78,7 +78,7 @@ class ChatEngine:
         self._turn_since_last_rag_attempt = 0
 
         self.skill_content = ""
-        self.session_summaries = []
+        self.session_summaries: list[str] = []
         self.corrections = ""
         self.relationship_stage = "dating"  # 默认热恋期
 

@@ -70,7 +70,7 @@ def _save_custom_meta(items: list[dict], user_id: Optional[int] = None):
 
 
 def _scan_builtin() -> list[dict]:
-    result = []
+    result: list[dict] = []
     if not BUILTIN_DIR.exists():
         return result
     try:

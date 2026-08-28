@@ -147,7 +147,7 @@ def generate_emotion_curve(history: list[dict], bucket_size: int = 10) -> list[d
     if not messages:
         return []
 
-    buckets = []
+    buckets: list[dict] = []
     for i in range(0, len(messages), bucket_size):
         chunk = messages[i:i + bucket_size]
         scores = []

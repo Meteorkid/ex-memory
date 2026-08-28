@@ -829,7 +829,7 @@ def build() -> tuple[list[dict], list[dict]]:
     rng = random.Random(SEED)
 
     # 事实簇与闲聊按块混排（块内顺序不变），模拟真实聊天时间线
-    blocks: list[tuple[str, object]] = [("fact", c) for c in FACT_CLUSTERS]
+    blocks: list[tuple[str, FactCluster | tuple]] = [("fact", c) for c in FACT_CLUSTERS]
     blocks += [("filler", d) for d in FILLER_DIALOGUES]
     rng.shuffle(blocks)
 
@@ -839,7 +839,7 @@ def build() -> tuple[list[dict], list[dict]]:
 
     for kind, block in blocks:
         cursor += timedelta(hours=rng.randint(5, 50), minutes=rng.randint(0, 59))
-        if kind == "fact":
+        if isinstance(block, FactCluster):
             lines = [(sp, text, gold) for sp, text, gold in block.dialogue]
         else:
             lines = [(sp, text, False) for sp, text in block]
@@ -858,7 +858,7 @@ def build() -> tuple[list[dict], list[dict]]:
                 }
             )
             if gold:
-                if kind != "fact":
+                if not isinstance(block, FactCluster):
                     raise AssertionError("闲聊消息不应标记 gold")
                 gold_ids_by_fid.setdefault(block.fid, []).append(msg_id)
 

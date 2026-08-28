@@ -6,7 +6,7 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 from config import get_ex_dir
 from core.file_utils import atomic_write_json, locked_update_json
@@ -15,7 +15,7 @@ logger = logging.getLogger("ex-memory")
 
 # ── 红包触发条件 ──
 
-RED_PACKET_TRIGGERS = {
+RED_PACKET_TRIGGERS: dict[str, dict[str, Any]] = {
     "sentimental": {
         "keywords": ["想你", "以前", "记得", "那时候", "回忆", "如果", "后悔", "对不起", "谢谢"],
         "amount_range": (0.52, 5.20),

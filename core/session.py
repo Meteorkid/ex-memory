@@ -1,5 +1,6 @@
 """ChatSession：CLI 主循环、指令分发、轮次计数、归档触发。"""
 
+from typing import Callable
 import json
 import logging
 import sys
@@ -32,10 +33,10 @@ class ChatSession:
         self.running = True
         self.slug = ""
         self.turn_count = 0
-        self.commands: dict[str, callable] = {}
+        self.commands: dict[str, Callable[[str], None]] = {}
         self.relationship_stage = "dating"  # 默认热恋期
 
-    def register_command(self, name: str, func: callable, doc: str = ""):
+    def register_command(self, name: str, func: Callable[[str], None], doc: str = ""):
         self.commands[name] = func
         func.__doc__ = doc
 

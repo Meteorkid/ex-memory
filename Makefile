@@ -1,4 +1,4 @@
-.PHONY: install test lint run dev docker-build clean unlock eval eval-corpus eval-retrieval eval-generation eval-report
+.PHONY: install test lint typecheck check run dev docker-build clean unlock eval eval-corpus eval-retrieval eval-generation eval-report
 
 # 可用 make <target> PYTHON=.venv/bin/python 等指定解释器，默认沿用 PATH
 PYTHON ?= python
@@ -16,6 +16,12 @@ test-verbose:
 
 lint:
 	ruff check .
+
+typecheck:
+	mypy
+
+# 提交前的完整检查
+check: lint typecheck test
 
 lint-fix:
 	ruff check --fix .

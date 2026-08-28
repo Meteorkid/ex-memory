@@ -48,8 +48,8 @@ class Chunker:
                 break
 
             # 判定 dominant_speaker
-            speaker_counts = Counter()
-            speaker_chars = Counter()
+            speaker_counts: Counter[str] = Counter()
+            speaker_chars: Counter[str] = Counter()
             for msg in window:
                 sender = msg.get("sender", "unknown")
                 speaker_counts[sender] += 1

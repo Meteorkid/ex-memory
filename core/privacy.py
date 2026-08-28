@@ -81,8 +81,8 @@ def scan_conversation(slug: str) -> dict:
     if not conv_file.exists():
         return {"found": False, "types": [], "count": {}}
 
-    total_found = {}
-    total_count = {}
+    total_found: dict[str, list] = {}
+    total_count: dict[str, int] = {}
 
     with open(conv_file, "r", encoding="utf-8") as f:
         for line in f:

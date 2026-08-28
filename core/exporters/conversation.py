@@ -151,7 +151,7 @@ def _load_cli_session_messages(slug: str) -> list[dict]:
     if not sessions_dir.exists():
         return []
 
-    messages = []
+    messages: list[dict] = []
     for path in sorted(sessions_dir.glob("session_*.md")):
         if path.name.endswith("_summary.md"):
             continue

@@ -1,0 +1,18 @@
+[tool.mypy]
+# 不锁 python_version：numpy 的 stub 需要 3.12 语法，交由运行时解释器决定
+warn_unused_ignores = true
+warn_redundant_casts = true
+# 逐步收紧：先保证「不存在的属性/方法」这类真 bug 被拦住，
+# 严格模式（disallow_untyped_defs 等）待存量注解补齐后再开。
+files = ["config.py", "core", "server", "pipeline", "parsers", "memory", "evals"]
+exclude = "(^|/)(third_party|dist|build|htmlcov)/"
+
+# chromadb 自带的类型标注与其运行时接受的入参不一致（list[list[float]] 等），
+# 是第三方 stub 问题而非本项目缺陷，单独放行。
+[[tool.mypy.overrides]]
+module = "memory.vector_store"
+disable_error_code = ["arg-type"]
+
+[[tool.mypy.overrides]]
+module = ["chromadb.*", "gradio.*", "prompt_toolkit.*", "matplotlib.*"]
+ignore_missing_imports = true
