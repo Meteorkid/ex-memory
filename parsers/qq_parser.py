@@ -7,8 +7,13 @@
 标准输出：list[dict]，每条含 timestamp, sender, content, is_target
 """
 
+import logging
 import re
+from email.message import EmailMessage
 from pathlib import Path
+from typing import cast
+
+logger = logging.getLogger("ex-memory")
 
 
 # ── QQ TXT 格式正则 ──
@@ -180,8 +185,12 @@ def _parse_mht(file_path: str, target_name: str) -> list[dict]:
 
     # MHT 是 MIME 格式，尝试解析
     try:
-        msg = email.message_from_string(content, policy=policy.default)
-    except Exception:
+        # policy.default 下实际返回 EmailMessage，但 typeshed 仍标注为 Message
+        msg = cast(EmailMessage, email.message_from_string(
+            content, policy=policy.default,  # type: ignore[arg-type]  # typeshed 重载缺失
+        ))
+    except (ValueError, TypeError) as e:
+        logger.warning("MHT 解析失败 %s: %s", file_path, e)
         return []
 
     # 找到 HTML 部分并提取文本
@@ -201,8 +210,8 @@ def _parse_mht(file_path: str, target_name: str) -> list[dict]:
                     text = re.sub(r"&nbsp;", " ", text)
                     text = re.sub(r"&[a-z]+;", "", text)
                     text_parts.append(text)
-            except Exception:
-                pass
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.debug("跳过无法解析的 QQ 消息片段: %s", e)
 
     if not text_parts:
         return []

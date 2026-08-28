@@ -30,8 +30,9 @@ def get_key(account: str) -> Optional[str]:
         if result.returncode == 0 and result.stdout.strip():
             logger.info("从 Keychain 读取密钥: %s", account)
             return result.stdout.strip()
-    except Exception:
-        pass
+    except (OSError, subprocess.SubprocessError) as e:
+        # 非 macOS 或 security 不可用是预期路径，调用方会回退到环境变量
+        logger.debug("Keychain 读取失败 account=%s: %s", account, e)
     return None
 
 

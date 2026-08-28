@@ -1,5 +1,6 @@
 """全局配置：从 .env 加载，启动校验，隐私提示。"""
 
+import logging
 import os
 import re
 import sys
@@ -22,8 +23,9 @@ try:
     _kc_llm = get_key("llm_api_key")
     if _kc_llm:
         _LLM_API_KEY = _kc_llm
-except Exception:
-    pass
+except ImportError as e:
+    # Keychain 不可用时回退到环境变量；此处早于日志初始化，只能用 root logger
+    logging.getLogger("ex-memory").debug("Keychain 模块不可用，回退环境变量: %s", e)
 LLM_API_KEY = _LLM_API_KEY
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
@@ -40,8 +42,8 @@ try:
     _kc_emb = _kc_get_key("embedding_api_key")
     if _kc_emb:
         _EMBEDDING_API_KEY = _kc_emb
-except Exception:
-    pass
+except ImportError as e:
+    logging.getLogger("ex-memory").debug("Keychain 模块不可用，回退环境变量: %s", e)
 EMBEDDING_API_KEY = _EMBEDDING_API_KEY
 EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "https://api.siliconflow.cn/v1")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")

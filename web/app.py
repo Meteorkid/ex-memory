@@ -2,6 +2,7 @@
 
 import sys
 import json
+import logging
 from pathlib import Path
 
 import gradio as gr
@@ -13,6 +14,8 @@ from core.validation import validate_slug, validate_user_input
 from core.factory import create_engine_and_store
 from core.sticker_selector import STICKERS
 from core.token_counter import TokenCounter
+
+logger = logging.getLogger("ex-memory")
 
 
 # --- 状态管理 ---
@@ -47,8 +50,8 @@ def list_exes() -> list[list]:
                 meta.get("pipeline_state", "unknown"),
                 meta.get("created_at", "")[:10],
             ])
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning("跳过损坏的 meta.json slug=%s: %s", d.name, e)
     return rows
 
 

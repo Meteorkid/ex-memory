@@ -15,22 +15,55 @@ def make_app():
     return app
 
 
+def _make_request(xff: bytes | None = None, client=("127.0.0.1", 12345)):
+    """构造一个带/不带 X-Forwarded-For 的 Request。"""
+    from fastapi import Request as FR
+
+    async def dummy_receive():
+        return {"type": "http.request"}
+
+    headers = [(b"x-forwarded-for", xff)] if xff else []
+    return FR({"type": "http", "headers": headers, "client": client}, dummy_receive)
+
+
 class TestGetClientIP:
     def test_x_forwarded_for(self, monkeypatch):
+        """直连来源在白名单内时，采信 XFF 的第一跳。"""
         monkeypatch.setattr("config.TRUSTED_PROXY", True)
+        monkeypatch.setattr("config.TRUSTED_PROXY_IPS", {"127.0.0.1"})
         from server.middleware import _get_client_ip
-        from fastapi import Request as FR
 
-        async def dummy_receive():
-            return {"type": "http.request"}
+        assert _get_client_ip(_make_request(b"10.0.0.1, 10.0.0.2")) == "10.0.0.1"
 
-        scope = {
-            "type": "http",
-            "headers": [(b"x-forwarded-for", b"10.0.0.1, 10.0.0.2")],
-            "client": ("127.0.0.1", 12345),
-        }
-        request = FR(scope, dummy_receive)
-        assert _get_client_ip(request) == "10.0.0.1"
+    def test_empty_whitelist_ignores_forwarded_header(self, monkeypatch):
+        """回归：TRUSTED_PROXY 开启但白名单为空时必须 fail-closed。
+
+        旧实现会无条件采信 XFF，攻击者轮换该头即可绕过全部限流。
+        """
+        monkeypatch.setattr("config.TRUSTED_PROXY", True)
+        monkeypatch.setattr("config.TRUSTED_PROXY_IPS", set())
+        import server.middleware as mw
+        monkeypatch.setattr(mw, "_warned_empty_proxy_whitelist", False)
+
+        # 无论伪造成什么，限流 key 都应回落到真实直连 IP
+        for spoof in (b"1.1.1.1", b"2.2.2.2", b"3.3.3.3"):
+            assert mw._get_client_ip(_make_request(spoof)) == "127.0.0.1"
+
+    def test_untrusted_direct_source_ignores_forwarded_header(self, monkeypatch):
+        """回归：请求绕过代理直连时，其 XFF 不可信。"""
+        monkeypatch.setattr("config.TRUSTED_PROXY", True)
+        monkeypatch.setattr("config.TRUSTED_PROXY_IPS", {"10.9.9.9"})
+        from server.middleware import _get_client_ip
+
+        req = _make_request(b"1.1.1.1", client=("203.0.113.7", 4444))
+        assert _get_client_ip(req) == "203.0.113.7"
+
+    def test_trusted_proxy_disabled_ignores_forwarded_header(self, monkeypatch):
+        """未开启 TRUSTED_PROXY 时永不采信 XFF。"""
+        monkeypatch.setattr("config.TRUSTED_PROXY", False)
+        from server.middleware import _get_client_ip
+
+        assert _get_client_ip(_make_request(b"1.1.1.1")) == "127.0.0.1"
 
     def test_direct_client(self):
         from server.middleware import _get_client_ip

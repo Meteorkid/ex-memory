@@ -48,6 +48,10 @@ class TransferRequest(BaseModel):
 class TransferConfirmRequest(BaseModel):
     action: str = Field(default="receive", pattern=r"^(receive|return)$")
 
+class FeedbackRequest(BaseModel):
+    feedback_type: str = Field(..., min_length=1, max_length=32, description="反馈类型")
+    content: str = Field(..., min_length=1, max_length=2000, description="反馈正文")
+
 
 # --- 响应模型 ---
 

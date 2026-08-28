@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from typing import Optional
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Query
 from fastapi.responses import StreamingResponse
@@ -25,6 +26,7 @@ from server.models import (
     CreateRequest,
     DeleteRequest,
     ExeInfo,
+    FeedbackRequest,
     ResumeRequest,
     RollbackRequest,
     StatusResponse,
@@ -107,6 +109,14 @@ _login_limiter = None
 _audit_logger = None
 
 
+def _load_history(slug: str, *, with_time: bool = False) -> list[dict]:
+    """读取对话历史并归一化为 {role, content[, created_at]} 列表。"""
+    from core.conversation_store import load_jsonl_messages
+
+    keys = ("role", "content", "created_at") if with_time else ("role", "content")
+    return [{k: m.get(k, "") for k in keys} for m in load_jsonl_messages(slug)]
+
+
 @router.get("/local-helper/config")
 def get_local_helper_config():
     """返回不含本机隐私数据的助手版本和本站下载信息。"""
@@ -139,8 +149,9 @@ def _audit(event: str, username: str = "", client_ip: str = "", detail: str = ""
             "ip": client_ip,
             "detail": detail,
         }, ensure_ascii=False))
-    except Exception:
-        pass
+    except (OSError, TypeError, ValueError) as e:
+        # 审计写入失败不阻断主流程，但必须留痕，否则审计缺口无人察觉
+        logger.warning("审计日志写入失败 event=%s: %s", event, e)
 
 
 def _get_engine(slug: str):
@@ -192,14 +203,14 @@ def _invalidate_engine(slug: str):
 # --- 用户认证 ---
 
 @router.post("/auth/register", response_model=StatusResponse)
-def register(req: AuthRequest, request: Request = None):
+def register(req: AuthRequest, request: Request):
     """注册新用户。"""
     import config
     if config.METEOR_STORE_SSO_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
     if DISABLE_REGISTRATION:
         raise HTTPException(status_code=403, detail="注册已关闭")
-    client_ip = _get_client_ip(request) if request else "unknown"
+    client_ip = _get_client_ip(request)
     _get_login_limiter().check(req.username, client_ip)
     from server.auth import register_user
     error = register_user(req.username, req.password)
@@ -211,12 +222,12 @@ def register(req: AuthRequest, request: Request = None):
 
 
 @router.post("/auth/login")
-def login(req: AuthRequest, request: Request = None):
+def login(req: AuthRequest, request: Request):
     """登录获取 token。"""
     import config
     if config.METEOR_STORE_SSO_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
-    client_ip = _get_client_ip(request) if request else "unknown"
+    client_ip = _get_client_ip(request)
     _get_login_limiter().check(req.username, client_ip)
 
     from server.auth import login_user
@@ -260,8 +271,8 @@ def list_exes(user_id: int = Depends(require_auth)):
                 created_at=meta.get("created_at", ""),
                 updated_at=meta.get("updated_at"),
             ))
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning("跳过损坏的 meta.json slug=%s: %s", d.name, e)
     return sorted(exes, key=lambda e: e.created_at, reverse=True)
 
 
@@ -285,8 +296,10 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
         raise HTTPException(status_code=500, detail=result["error"])
     try:
         set_owner_user_id(slug, user_id)
-    except Exception:
-        pass
+    except (OSError, ValueError, FileNotFoundError) as e:
+        # 绑定失败会让镜像在多用户模式下永久不可访问，必须显式暴露
+        logger.error("镜像 [%s] 绑定 owner 失败: %s", slug, e)
+        raise HTTPException(status_code=500, detail="镜像创建成功但归属绑定失败，请联系管理员")
     return StatusResponse(message=f"镜像 [{slug}] 创建成功")
 
 
@@ -443,7 +456,7 @@ async def upload_sticker(
         raise HTTPException(status_code=400, detail=f"不支持的文件类型: {ext}")
     content = await file.read()
     try:
-        result = _upload(content, file.filename, label, category, user_id)
+        result = _upload(content, file.filename or "sticker", label, category, user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return result
@@ -604,8 +617,9 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
         try:
             from core.conversation_store import append_turn
             append_turn(slug, user_id, message, reply, stickers=stickers, source="web")
-        except Exception:
-            pass
+        except (OSError, ValueError) as e:
+            # 持久化失败不影响本次回复，但会造成搜索/统计缺数据
+            logger.warning("对话持久化失败 slug=%s: %s", slug, e)
 
         return ChatResponse(reply=reply, stickers=stickers, tokens=token_info)
     except Exception as e:
@@ -740,7 +754,7 @@ def generate_moment(slug: str, user_id: int = Depends(require_auth)):
 # --- 版本管理 ---
 
 @router.post("/exes/{slug}/backup", response_model=StatusResponse)
-def backup_exe(slug: str, req: BackupRequest = None, user_id: int = Depends(require_auth)):
+def backup_exe(slug: str, req: Optional[BackupRequest] = None, user_id: int = Depends(require_auth)):
     """备份版本。"""
     slug = _check_exe_access(slug, user_id)
     from core.version_manager import backup
@@ -828,8 +842,8 @@ def get_stats(slug: str, user_id: int = Depends(require_auth)):
     assistant_msgs = [m for m in messages if m.get("role") == "assistant"]
 
     # 按日期统计消息频率
-    daily = Counter()
-    hourly = Counter()
+    daily: Counter[str] = Counter()
+    hourly: Counter[int] = Counter()
     for m in messages:
         ts = m.get("created_at", "")
         if ts:
@@ -872,11 +886,9 @@ def get_stats(slug: str, user_id: int = Depends(require_auth)):
 def get_emotion(slug: str, user_id: int = Depends(require_auth)):
     """对话情感分析：整体情感倾向 + 情感曲线。"""
     slug = _check_exe_access(slug, user_id)
-    from core.conversation_store import load_jsonl_messages
     from core.emotion_tracker import analyze_history, generate_emotion_curve
 
-    messages = load_jsonl_messages(slug)
-    history = [{"role": m.get("role", ""), "content": m.get("content", "")} for m in messages]
+    history = _load_history(slug)
     analysis = analyze_history(history)
     curve = generate_emotion_curve(history)
     return {"analysis": analysis, "curve": curve}
@@ -923,17 +935,10 @@ def set_group(slug: str, group: str = Query(...), user_id: int = Depends(require
 @router.get("/exes/groups")
 def list_groups(user_id: int = Depends(require_auth)):
     """获取所有分组列表。"""
-    exes_dir = PROJECT_DIR / "exes"
-    if not exes_dir.exists():
-        return {"groups": {}}
-
-    groups = {}
-    for exe_dir in exes_dir.iterdir():
-        if not exe_dir.is_dir():
-            continue
+    groups: dict[str, list] = {}
+    # 必须按归属过滤：镜像 slug/name 是前任昵称，泄露给其他用户属于越权信息暴露
+    for exe_dir in iter_accessible_exes(user_id):
         meta_file = exe_dir / "meta.json"
-        if not meta_file.exists():
-            continue
         try:
             meta = json.loads(meta_file.read_text(encoding="utf-8"))
             group = meta.get("group", "默认")
@@ -943,8 +948,8 @@ def list_groups(user_id: int = Depends(require_auth)):
                 "slug": exe_dir.name,
                 "name": meta.get("name", exe_dir.name),
             })
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning("跳过损坏的 meta.json slug=%s: %s", exe_dir.name, e)
 
     return {"groups": groups}
 
@@ -976,17 +981,14 @@ def set_stage(slug: str, stage: str = Query(...), user_id: int = Depends(require
 def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
     """根据对话情感趋势建议阶段变化。"""
     slug = _check_exe_access(slug, user_id)
-    from core.conversation_store import load_jsonl_messages
     from core.emotion_tracker import analyze_history
 
-    messages = load_jsonl_messages(slug)
-    if len(messages) < 10:
+    history = _load_history(slug)
+    if len(history) < 10:
         return {"suggestion": None, "reason": "对话记录不足"}
 
     # 分析最近 20 条消息的情感
-    recent = messages[-20:]
-    history = [{"role": m.get("role", ""), "content": m.get("content", "")} for m in recent]
-    analysis = analyze_history(history)
+    analysis = analyze_history(history[-20:])
 
     overall = analysis["overall"]["score"]
     user_score = analysis["user_sentiment"]["score"]
@@ -1029,30 +1031,20 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
 @router.get("/stats/usage")
 def get_usage_stats(user_id: int = Depends(require_auth)):
     """获取用户使用统计。"""
-    exes_dir = PROJECT_DIR / "exes"
     total_exes = 0
     total_messages = 0
 
-    if exes_dir.exists():
-        for exe_dir in exes_dir.iterdir():
-            if not exe_dir.is_dir():
-                continue
-            # 检查访问权限
-            try:
-                from core.exe_access import check_access
-                if not check_access(exe_dir.name, user_id):
-                    continue
-            except Exception:
-                continue
-
-            total_exes += 1
-            conv_file = exe_dir / "conversations" / "conversation.jsonl"
-            if conv_file.exists():
-                try:
-                    with open(conv_file, "r", encoding="utf-8") as f:
-                        total_messages += sum(1 for _ in f)
-                except Exception:
-                    pass
+    # 直接复用统一的归属过滤，避免和 list_exes 出现两套访问控制逻辑
+    for exe_dir in iter_accessible_exes(user_id):
+        total_exes += 1
+        conv_file = exe_dir / "conversations" / "conversation.jsonl"
+        if not conv_file.exists():
+            continue
+        try:
+            with open(conv_file, "r", encoding="utf-8") as f:
+                total_messages += sum(1 for _ in f)
+        except OSError as e:
+            logger.warning("统计对话数失败 slug=%s: %s", exe_dir.name, e)
 
     return {
         "total_exes": total_exes,
@@ -1063,24 +1055,24 @@ def get_usage_stats(user_id: int = Depends(require_auth)):
 
 
 @router.post("/feedback")
-def submit_feedback(
-    feedback_type: str = Query(...),
-    content: str = Query(...),
-    user_id: int = Depends(require_auth),
-):
+def submit_feedback(req: FeedbackRequest, user_id: int = Depends(require_auth)):
     """提交用户反馈。"""
     feedback_file = PROJECT_DIR / "data" / "feedback.jsonl"
     feedback_file.parent.mkdir(parents=True, exist_ok=True)
 
     entry = {
         "user_id": user_id,
-        "type": feedback_type,
-        "content": content,
+        "type": req.feedback_type,
+        "content": req.content,
         "timestamp": datetime.now().isoformat(),
     }
 
-    with open(feedback_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    try:
+        with open(feedback_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as e:
+        logger.error("写入反馈失败: %s", e)
+        raise HTTPException(status_code=500, detail="反馈提交失败")
 
     return {"ok": True, "message": "感谢你的反馈"}
 
@@ -1100,11 +1092,9 @@ def get_emotional_memories(slug: str, user_id: int = Depends(require_auth)):
 def extract_memories(slug: str, user_id: int = Depends(require_auth)):
     """从对话历史中提取情感记忆。"""
     slug = _check_exe_access(slug, user_id)
-    from core.conversation_store import load_jsonl_messages
     from core.emotional_memory import extract_emotional_memories, save_emotional_memories
 
-    messages = load_jsonl_messages(slug)
-    history = [{"role": m.get("role", ""), "content": m.get("content", ""), "created_at": m.get("created_at", "")} for m in messages]
+    history = _load_history(slug, with_time=True)
 
     memories = extract_emotional_memories(history)
     save_emotional_memories(slug, memories)
@@ -1127,11 +1117,9 @@ def get_user_profile(slug: str, user_id: int = Depends(require_auth)):
 def analyze_user_profile(slug: str, user_id: int = Depends(require_auth)):
     """分析用户对话风格。"""
     slug = _check_exe_access(slug, user_id)
-    from core.conversation_store import load_jsonl_messages
     from core.personalization import analyze_user_style, calculate_relationship_temperature, save_user_profile
 
-    messages = load_jsonl_messages(slug)
-    history = [{"role": m.get("role", ""), "content": m.get("content", ""), "created_at": m.get("created_at", "")} for m in messages]
+    history = _load_history(slug, with_time=True)
 
     style = analyze_user_style(history)
     temperature = calculate_relationship_temperature(slug, history)
@@ -1150,11 +1138,9 @@ def analyze_user_profile(slug: str, user_id: int = Depends(require_auth)):
 def get_relationship_temperature(slug: str, user_id: int = Depends(require_auth)):
     """获取关系温度。"""
     slug = _check_exe_access(slug, user_id)
-    from core.conversation_store import load_jsonl_messages
     from core.personalization import calculate_relationship_temperature
 
-    messages = load_jsonl_messages(slug)
-    history = [{"role": m.get("role", ""), "content": m.get("content", ""), "created_at": m.get("created_at", "")} for m in messages]
+    history = _load_history(slug, with_time=True)
 
     temperature = calculate_relationship_temperature(slug, history)
     return {"temperature": temperature}

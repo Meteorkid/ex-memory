@@ -18,6 +18,9 @@ services:
       DISABLE_REGISTRATION: "true"
       SINGLE_USER_MODE: "false"
       TRUSTED_PROXY: "true"
+      # 必须与 TRUSTED_PROXY 配套：只有来自这些直连 IP 的 X-Forwarded-For 才被采信。
+      # 留空会让限流退化为按直连 IP 计（fail-closed），而不是信任伪造头。
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.17.0.1,127.0.0.1}
       CORS_ORIGINS: https://imagentx.top
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOCAL_WECHAT_HELPER_ENABLED: ${LOCAL_WECHAT_HELPER_ENABLED:-true}

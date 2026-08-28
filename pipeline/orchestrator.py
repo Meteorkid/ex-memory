@@ -2,6 +2,7 @@
 
 import json
 import logging
+from typing import Optional
 from datetime import datetime
 from pathlib import Path
 from prompt_toolkit import prompt as pt_prompt
@@ -36,7 +37,7 @@ def _save_failed_state(ex_dir: Path, step: str, error: Exception):
     atomic_write_json(meta_path, meta)
 
 
-def run_create_flow(slug: str = None):
+def run_create_flow(slug: Optional[str] = None):
     """执行完整的创建流程。
 
     slug: 恢复已有镜像的创建流程（从失败步骤继续）
@@ -64,8 +65,8 @@ def run_create_flow(slug: str = None):
     # ===== Step 1: 基础信息录入 =====
     if existing_meta:
         # 恢复模式：从 meta.json 读取已有信息
-        name = existing_meta["name"]
-        slug = existing_meta["slug"]
+        name = str(existing_meta["name"])
+        slug = str(existing_meta["slug"])
         basic_info = existing_meta.get("profile", {}).get("basic_info", "")
         personality = existing_meta.get("profile", {}).get("personality", "")
         ex_dir = get_ex_dir(slug)
@@ -74,7 +75,7 @@ def run_create_flow(slug: str = None):
         # 全新模式
         print("\n=== 前任记忆智能体 — 创建向导 ===\n")
 
-        name = pt_prompt("给ta起个代号（昵称/备注名/外号）: ").strip()
+        name = str(pt_prompt("给ta起个代号（昵称/备注名/外号）: ")).strip()
         if not name:
             print("错误：代号不能为空")
             return
@@ -121,10 +122,15 @@ def run_create_flow(slug: str = None):
         # 事前备份
         try:
             version_backup(slug, "pre_create", include_chroma=True)
-        except Exception:
-            pass
+        except Exception as e:
+            # 事前备份失败不阻断创建，但失去回滚点，必须留痕
+            logger.warning("镜像 [%s] 事前备份失败，本次无回滚点: %s", slug, e)
 
     # 判断从哪一步开始
+    # 上面两个分支都已确定 slug；显式收敛类型，避免下游反复出现 Optional
+    if slug is None:
+        raise RuntimeError("内部错误：镜像 slug 未能确定")
+
     failed_step = existing_meta.get("failed_step") if existing_meta else None
     steps = ["import", "distill_memory", "distill_persona", "skill"]
     start_idx = steps.index(failed_step) if failed_step in steps else 0
@@ -170,8 +176,9 @@ def run_create_flow(slug: str = None):
             materials_summary += "\n## 聊天记录样本\n"
             for r in sample_results[:10]:
                 materials_summary += f"- {r.get('display_text', '')[:200]}\n"
-    except Exception:
-        pass
+    except Exception as e:
+        # 样本检索失败只是少了参考素材，蒸馏仍可继续
+        logger.warning("检索聊天记录样本失败 slug=%s: %s", slug, e)
 
     # ===== Step 3: 蒸馏 =====
     llm_cfg = get_llm_config()
@@ -344,8 +351,8 @@ def run_create_flow_api(
             # 事前备份
             try:
                 version_backup(slug, "pre_create", include_chroma=True)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("镜像 [%s] 事前备份失败，本次无回滚点: %s", slug, e)
 
         materials_summary = f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
 

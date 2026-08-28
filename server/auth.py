@@ -156,7 +156,7 @@ def get_or_create_external_user_id(provider: str, external_user_id: str) -> int:
         return user_id
 
 
-def _hash_password(password: str, salt: str = None) -> tuple[str, str]:
+def _hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
     if salt is None:
         salt = secrets.token_hex(16)
     h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 200000)
@@ -187,6 +187,16 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _utc_now_str() -> str:
+    """当前 UTC 时间串，与 SQLite datetime('now') 口径一致。"""
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+
+
+def _utc_after_str(seconds: int) -> str:
+    """seconds 秒之后的 UTC 时间串。"""
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(time.time() + seconds))
+
+
 def login_user(username: str, password: str) -> Optional[str]:
     """验证登录，返回 token 或 None。"""
     with _get_conn() as conn:
@@ -204,7 +214,7 @@ def login_user(username: str, password: str) -> Optional[str]:
 
         # 生成 token
         token = secrets.token_urlsafe(32)
-        expires = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() + TOKEN_EXPIRY_SECONDS))
+        expires = _utc_after_str(TOKEN_EXPIRY_SECONDS)
         conn.execute(
             "INSERT INTO tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
             (_token_hash(token), row["id"], expires),
@@ -226,7 +236,7 @@ def validate_token(token: str) -> Optional[int]:
             return None
 
         expires = row["expires_at"]
-        if expires and expires < time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()):
+        if expires and expires < _utc_now_str():
             conn.execute("DELETE FROM tokens WHERE token = ?", (token_key,))
             conn.commit()
             return None

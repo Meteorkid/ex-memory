@@ -81,20 +81,37 @@ def optional_auth(
     return validate_token(credentials.credentials)
 
 
+# 白名单缺失的告警只打一次，避免每个请求刷屏
+_warned_empty_proxy_whitelist = False
+
+
 def _get_client_ip(request: Request) -> str:
-    """获取客户端 IP；仅在 TRUSTED_PROXY 时信任 X-Forwarded-For。"""
+    """获取客户端 IP；仅当 TRUSTED_PROXY 开启且直连来源在白名单内才信任 X-Forwarded-For。"""
+    global _warned_empty_proxy_whitelist
     from config import TRUSTED_PROXY, TRUSTED_PROXY_IPS
-    if TRUSTED_PROXY:
-        # 验证请求来源是否在可信代理IP列表中
-        if request.client and TRUSTED_PROXY_IPS:
-            if request.client.host not in TRUSTED_PROXY_IPS:
-                return request.client.host
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return "unknown"
+
+    direct_ip = request.client.host if request.client else "unknown"
+    if not TRUSTED_PROXY:
+        return direct_ip
+
+    # fail-closed：白名单为空说明配置不完整，此时信任 XFF 会让任何人伪造头绕过限流
+    if not TRUSTED_PROXY_IPS:
+        if not _warned_empty_proxy_whitelist:
+            logger.warning(
+                "TRUSTED_PROXY 已启用但 TRUSTED_PROXY_IPS 为空，"
+                "已忽略 X-Forwarded-For 并按直连 IP 限流；请补齐白名单"
+            )
+            _warned_empty_proxy_whitelist = True
+        return direct_ip
+
+    # 直连来源不是可信代理，说明请求绕过了代理，其 XFF 不可信
+    if direct_ip not in TRUSTED_PROXY_IPS:
+        return direct_ip
+
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return direct_ip
 
 
 class RateLimiter:
