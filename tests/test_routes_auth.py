@@ -28,8 +28,9 @@ def client(tmp_path, monkeypatch):
     )
     (ex_dir / "SKILL.md").write_text("# skill", encoding="utf-8")
 
+    # 只 patch EXES_DIR：get_ex_dir 调用时才读它，跟随且与执行顺序无关。
+    # patch get_ex_dir 本身会被 routes 的 from-import 首次导入时永久捕获。
     monkeypatch.setattr("config.EXES_DIR", exes)
-    monkeypatch.setattr("config.get_ex_dir", lambda s: exes / s)
     monkeypatch.setattr("config.SINGLE_USER_MODE", False)
 
     from server.app import create_app

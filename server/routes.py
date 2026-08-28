@@ -80,7 +80,7 @@ cache = SimpleCache(default_ttl=30)  # 30秒 TTL
 
 def _load_meta(slug: str) -> dict:
     """读取镜像 meta.json，不存在则抛 404。"""
-    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    meta_file = get_ex_dir(slug) / "meta.json"
     if not meta_file.exists():
         raise HTTPException(status_code=404, detail="镜像不存在")
     return json.loads(meta_file.read_text(encoding="utf-8"))
@@ -88,7 +88,7 @@ def _load_meta(slug: str) -> dict:
 
 def _save_meta(slug: str, meta: dict) -> None:
     """写入镜像 meta.json。"""
-    meta_file = PROJECT_DIR / "exes" / slug / "meta.json"
+    meta_file = get_ex_dir(slug) / "meta.json"
     meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
 

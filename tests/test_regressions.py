@@ -4,6 +4,7 @@
 """
 
 import json
+import pathlib
 import time
 import pytest
 from fastapi.testclient import TestClient
@@ -47,8 +48,10 @@ def client(tmp_path, monkeypatch):
             encoding="utf-8",
         )
 
+    # 只 patch EXES_DIR：get_ex_dir 在调用时才读它，因此天然跟随。
+    # 若改为 patch get_ex_dir 本身，会被 routes 的 from-import 在首次导入时
+    # 永久捕获，导致后续用例的重定向全部失效（与执行顺序耦合）。
     monkeypatch.setattr("config.EXES_DIR", exes)
-    monkeypatch.setattr("config.get_ex_dir", lambda s: exes / s)
     monkeypatch.setattr("config.SINGLE_USER_MODE", False)
 
     # 登录限流器是模块级单例，用例间必须隔离，否则相互挤占配额
@@ -179,3 +182,40 @@ class TestGroupsOwnershipFilter:
 
     def test_requires_auth(self, client):
         assert client.get("/api/exes/groups").status_code == 401
+
+
+class TestMetaPathHonorsConfig:
+    """_load_meta / _save_meta 曾硬编码 PROJECT_DIR / "exes"。
+
+    get_ex_dir 在调用时读取 config.EXES_DIR，因此跟随配置；而 PROJECT_DIR
+    是常量，写死后这两个函数会绕开配置直接读写仓库里的真实 exes/ 目录，
+    与同文件其余 4 处调用及全仓其它模块的口径分裂。
+    """
+
+    def test_load_meta_reads_configured_dir(self, client):
+        """读路径：走 _load_meta 的端点必须能读到配置指向的镜像。"""
+        token = _login(client)
+        r = client.get(
+            "/api/exes/owned/stage", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert r.status_code == 200, "回归：_load_meta 未跟随 EXES_DIR 配置"
+        assert r.json()["stage"] == "dating"
+
+    def test_save_meta_writes_to_configured_dir(self, client, tmp_path):
+        """写路径：写入必须落在配置目录，且真实 exes/ 不被触碰。"""
+        import config
+
+        token = _login(client)
+        r = client.put(
+            "/api/exes/owned/stage?stage=healing",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+
+        written = json.loads(
+            (tmp_path / "exes" / "owned" / "meta.json").read_text(encoding="utf-8")
+        )
+        assert written["stage"] == "healing", "回归：_save_meta 未写入配置目录"
+
+        real = pathlib.Path(config.PROJECT_DIR) / "exes" / "owned"
+        assert not real.exists(), "回归：写到了仓库真实 exes/ 目录"
