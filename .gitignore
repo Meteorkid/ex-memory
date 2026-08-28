@@ -13,3 +13,19 @@ venv/
 *.tmp
 logs/
 .planning/
+
+# 测试与覆盖率产物
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
+# 本地工具索引（不进仓库）
+.codegraph/
+.serena/
+
+# 本地 SQLite（运行时数据都在 /data/，根目录不应出现 .db）
+/*.db
+
+# 软著申请材料（含个人信息，不进仓库）
+软著申请材料/

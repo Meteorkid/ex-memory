@@ -72,6 +72,11 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 必须清掉浏览器可能自带的身份头，否则任何用户都能伪造身份越权访问他人镜像。
+        # 空值会让 Nginx 不转发该头；SSO 模式下由下面的 auth_request 段重新写入可信值。
+        proxy_set_header X-Ex-Memory-User-Id "";
+        proxy_set_header X-Ex-Memory-Proxy-Token "";
     }
 
     # WebSocket 支持（SSE 流式对话需要）
@@ -135,6 +140,7 @@ sudo certbot --nginx -d your-domain.com
 | `LOCAL_WECHAT_HELPER_ARM64_SHA256` | 空 | 否 | DMG SHA-256，用于网页校验展示 |
 | `DISABLE_REGISTRATION` | `false` | 否 | 关闭开放注册 |
 | `TRUSTED_PROXY` | `false` | 否 | 反向代理后信任 `X-Forwarded-For` |
+| `TRUSTED_PROXY_IPS` | 空 | 启用 `TRUSTED_PROXY` 时必填 | 可信代理的直连 IP 白名单（逗号分隔）。留空时服务会忽略 `X-Forwarded-For` 并按直连 IP 限流 |
 | `METEOR_STORE_SSO_ENABLED` | `false` | 否 | 启用 Meteor Store 代理身份模式 |
 | `METEOR_STORE_PROXY_TOKEN` | 空 | SSO 模式必需 | Nginx 与服务之间的共享令牌 |
 | `PUBLIC_BASE_PATH` | 空 | 否 | 同源子路径，例如 `/ex-memory-runtime` |
@@ -163,7 +169,11 @@ sudo certbot --nginx -d your-domain.com
 - 对话 `history`：仅接受 `user`/`assistant` 角色。
 - Token：数据库中存储 SHA-256 哈希（非明文）。
 - 自定义贴纸：按用户分目录 `web/static/stickers/custom/u{user_id}/`。
-- 生产环境请将 `TRUSTED_PROXY=true` 且仅在内层 Nginx 剥离不可信的 `X-Forwarded-For`。
+- 生产环境启用 `TRUSTED_PROXY=true` 时，**必须同时配置 `TRUSTED_PROXY_IPS`**。
+  白名单为空会让服务无法判断 `X-Forwarded-For` 是否可信，此时它会 fail-closed
+  地忽略该头并按直连 IP 限流——这意味着所有请求会被算作同一个来源。
+- SSO 模式下 `X-Ex-Memory-User-Id` 是身份的唯一依据，Nginx 必须先清空再写入，
+  否则浏览器可自带该头冒充任意用户（见上方 Nginx 示例）。
 
 ## 数据备份
 

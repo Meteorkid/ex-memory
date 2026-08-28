@@ -1,3 +1,8 @@
+> **[已废弃]** 本文描述的 `core/wechat_export/` 模块从未被接入，且引用了不存在的配置项，
+> 已于 2026-08-29 删除。本机微信导出的实际实现是 `local_helper/wechat_macos/`，
+> 参见 [MACOS_WECHAT_HELPER_BETA.md](MACOS_WECHAT_HELPER_BETA.md)。
+> 本文仅作历史设计记录保留。
+
 # 本机微信导出向导执行文档
 
 ## 目标
