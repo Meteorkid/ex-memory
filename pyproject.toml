@@ -1,3 +1,9 @@
+[tool.ruff]
+# 沿用 ruff/black 默认值。实测放宽到 120 也只把待格式化文件从 107 降到 90，
+# 多数改动来自结构性排版而非行宽，因此不值得引入非默认配置。
+# 防止格式化结果漂移靠的是 requirements-dev.txt 里的 ruff 版本锁定。
+line-length = 88
+
 [tool.mypy]
 # 不锁 python_version：numpy 的 stub 需要 3.12 语法，交由运行时解释器决定
 warn_unused_ignores = true
