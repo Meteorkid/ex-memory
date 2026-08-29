@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck check run dev docker-build clean unlock eval eval-corpus eval-retrieval eval-generation eval-report
+.PHONY: install test lint typecheck check run dev push-all docker-build clean unlock eval eval-corpus eval-retrieval eval-generation eval-report
 
 # 可用 make <target> PYTHON=.venv/bin/python 等指定解释器，默认沿用 PATH
 PYTHON ?= python
@@ -47,6 +47,33 @@ eval-report:
 
 eval:
 	$(PYTHON) -m evals.run_eval all
+
+# --- 推送 ---
+# 三个远端必须保持同步；先校验每个远端都不领先本地，避免 push 被拒或误覆盖他人提交
+REMOTES ?= origin gitee gitlab
+BRANCH  ?= main
+
+push-all:
+	@git fetch --all --quiet
+	@fail=0; for r in $(REMOTES); do \
+	  if ! git rev-parse --verify --quiet $$r/$(BRANCH) >/dev/null; then \
+	    echo "  ? $$r/$(BRANCH) 不存在，将新建"; continue; \
+	  fi; \
+	  ahead=$$(git rev-list --count $(BRANCH)..$$r/$(BRANCH)); \
+	  if [ "$$ahead" != "0" ]; then \
+	    echo "  x $$r/$(BRANCH) 有 $$ahead 个本地没有的 commit"; fail=1; \
+	  else \
+	    echo "  v $$r/$(BRANCH) 可快进"; \
+	  fi; \
+	done; \
+	if [ $$fail = 1 ]; then \
+	  echo ""; \
+	  echo "中止：请先 git rebase 到对应远端，不要 force push"; exit 1; \
+	fi
+	@echo ""
+	@for r in $(REMOTES); do echo "-> $$r"; git push $$r $(BRANCH) || exit 1; done
+	@echo ""
+	@echo "三端已同步到 $$(git rev-parse --short $(BRANCH))"
 
 docker-build:
 	docker compose build
