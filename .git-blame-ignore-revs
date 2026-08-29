@@ -1,0 +1,8 @@
+# 此文件列出应在 git blame 中忽略的「纯格式化」提交。
+#
+# 本地启用（只需执行一次）：
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub / GitLab 会自动识别本文件，无需额外配置。
+
+# 格式：全仓统一 ruff format（107 个文件，AST 验证无语义变化）
+e24fdcb3a6ac28282b50255328531cba234a3d19
