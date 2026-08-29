@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from local_helper.api import HelperSettings, create_helper_app
 from local_helper.security import OneTimeTicketStore, is_loopback_host, validate_origin
 from local_helper.wechat_macos.discovery import WeChatAccount, WeChatEnvironment
+from local_helper.wechat_macos.sip import SIPStatus
 
 
 SITE_ORIGIN = "https://memory.example.com"
@@ -631,6 +632,10 @@ def test_local_user_can_delete_safe_task_data(tmp_path: Path):
     app.state.environment_provider = lambda: WeChatEnvironment(
         "4.1.12", (account,), True
     )
+    # SIP 是 macOS 独有机制：非 macOS 上探测不到 /usr/bin/csrutil 会返回 UNKNOWN，
+    # 导致 prepare 拒绝请求。本用例验证的是删除流程，与宿主机 SIP 状态无关，
+    # 因此显式注入，避免结果随运行平台变化。
+    app.state.sip_status_provider = lambda: SIPStatus.ENABLED
     helper = TestClient(app)
     task = app.state.tasks.create()
     ticket = app.state.tickets.issue()
