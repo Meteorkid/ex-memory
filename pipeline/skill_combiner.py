@@ -36,8 +36,12 @@ def combine(slug: str) -> str:
         desc_parts.append(profile["zodiac"])
     description = f"{name}，{'，'.join(desc_parts)}" if desc_parts else name
 
-    memory_content = memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
-    persona_content = persona_path.read_text(encoding="utf-8") if persona_path.exists() else ""
+    memory_content = (
+        memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
+    )
+    persona_content = (
+        persona_path.read_text(encoding="utf-8") if persona_path.exists() else ""
+    )
 
     skill_md = f"""# {name}
 

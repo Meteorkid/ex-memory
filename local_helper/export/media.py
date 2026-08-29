@@ -68,11 +68,15 @@ class MediaResolver:
         self.account_root = account_root.resolve(strict=True)
         self.export_root = export_root.resolve(strict=True)
         self.session_wxid = session_wxid
-        self.session_digest = hashlib.md5(session_wxid.encode("utf-8"), usedforsecurity=False).hexdigest()
+        self.session_digest = hashlib.md5(
+            session_wxid.encode("utf-8"), usedforsecurity=False
+        ).hexdigest()
         self.media_databases = tuple(_safe_database(path) for path in media_databases)
         self._cache: dict[tuple[str, str], ExportedMedia | MissingMedia] = {}
 
-    def export_for_message(self, message: Message) -> tuple[list[ExportedMedia], list[MissingMedia]]:
+    def export_for_message(
+        self, message: Message
+    ) -> tuple[list[ExportedMedia], list[MissingMedia]]:
         category = _category_for_kind(message.kind)
         if not category:
             return [], []
@@ -88,14 +92,23 @@ class MediaResolver:
             cached = self._cache.get(cache_key)
             if cached is None:
                 source = self._resolve_hint(hint, category)
-                cached = self._copy(source, category) if source else MissingMedia(hint=_safe_hint(hint), reason="not_found")
+                cached = (
+                    self._copy(source, category)
+                    if source
+                    else MissingMedia(hint=_safe_hint(hint), reason="not_found")
+                )
                 self._cache[cache_key] = cached
             if isinstance(cached, ExportedMedia):
                 exported.append(cached)
             else:
                 missing.append(cached)
         for item in exported:
-            if Path(item.relative_path).suffix.lower() in {".dat", ".silk", ".bin", ".aud"}:
+            if Path(item.relative_path).suffix.lower() in {
+                ".dat",
+                ".silk",
+                ".bin",
+                ".aud",
+            }:
                 missing.append(
                     MissingMedia(
                         hint=Path(item.relative_path).name,
@@ -107,7 +120,10 @@ class MediaResolver:
     def _export_voice(self, message: Message) -> ExportedMedia | None:
         for database in self.media_databases:
             with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
-                columns = {row[1] for row in connection.execute('PRAGMA table_info("VoiceInfo")')}
+                columns = {
+                    row[1]
+                    for row in connection.execute('PRAGMA table_info("VoiceInfo")')
+                }
                 required = {"chat_name_id", "local_id", "voice_data"}
                 if not required.issubset(columns):
                     continue
@@ -148,7 +164,9 @@ class MediaResolver:
 
     def _resolve_hint(self, hint: str, category: str) -> Path | None:
         normalized = hint.strip().replace("\\", "/")
-        if not normalized or normalized.startswith(("http://", "https://", "weixin://", "wxfile://")):
+        if not normalized or normalized.startswith(
+            ("http://", "https://", "weixin://", "wxfile://")
+        ):
             return None
         candidate = Path(normalized)
         if candidate.is_absolute():
@@ -171,7 +189,11 @@ class MediaResolver:
         basename = candidate.name
         if len(basename) < 6 or basename in {".", ".."}:
             return None
-        patterns = (basename, f"{basename}.*", f"{basename}_*") if _MD5_TOKEN.fullmatch(basename) else (basename,)
+        patterns = (
+            (basename, f"{basename}.*", f"{basename}_*")
+            if _MD5_TOKEN.fullmatch(basename)
+            else (basename,)
+        )
         for root in self._search_roots(category):
             if not root.is_dir() or root.is_symlink():
                 continue

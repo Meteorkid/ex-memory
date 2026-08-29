@@ -46,7 +46,9 @@ def export_conversation(
     output_root = output_root.resolve()
     safe_name = _safe_export_name(display_name)
     final_dir = _unique_output_dir(output_root, f"{safe_name}({session_wxid})")
-    temp_dir = Path(tempfile.mkdtemp(prefix=".ex-memory-export-", dir=output_root)).resolve()
+    temp_dir = Path(
+        tempfile.mkdtemp(prefix=".ex-memory-export-", dir=output_root)
+    ).resolve()
     try:
         for directory in RESOURCE_DIRECTORIES:
             (temp_dir / directory).mkdir()
@@ -69,7 +71,9 @@ def export_conversation(
                 exported, missing = resolver.export_for_message(message)
                 if message.kind is MessageKind.UNKNOWN:
                     unknown_count += 1
-                    raw_path = temp_dir / "raw" / f"{message.shard}-{message.local_id}.txt"
+                    raw_path = (
+                        temp_dir / "raw" / f"{message.shard}-{message.local_id}.txt"
+                    )
                     raw_path.write_text(message.content, encoding="utf-8")
                 record = {
                     "id": f"{message.shard}:{message.local_id}",

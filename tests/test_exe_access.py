@@ -30,6 +30,7 @@ def test_owner_access(exe_dir):
 def test_denied_without_owner(exe_dir, monkeypatch):
     monkeypatch.setattr("config.SINGLE_USER_MODE", False)
     from config import get_ex_dir
+
     meta_path = get_ex_dir(exe_dir) / "meta.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     meta.pop("owner_user_id")

@@ -9,7 +9,7 @@ from config import CHUNK_TURNS, CHUNK_OVERLAP
 def _split_sentences(text: str) -> list[str]:
     """按中英文句子边界切分文本。"""
     # 匹配中英文句号、问号、感叹号、分号后的断点
-    parts = re.split(r'(?<=[。！？；\.\!\?\;])\s*', text)
+    parts = re.split(r"(?<=[。！？；\.\!\?\;])\s*", text)
     return [p for p in parts if p.strip()]
 
 
@@ -57,7 +57,11 @@ class Chunker:
 
             # 判定 dominant_speaker：优先用 is_target 标记
             target_count = sum(1 for msg in window if msg.get("is_target"))
-            dominant = "target" if target_count > len(window) / 2 else speaker_counts.most_common(1)[0][0]
+            dominant = (
+                "target"
+                if target_count > len(window) / 2
+                else speaker_counts.most_common(1)[0][0]
+            )
 
             # 构建文本
             display_lines = []
@@ -85,19 +89,21 @@ class Chunker:
             start_ts = window[0].get("timestamp", "")
             end_ts = window[-1].get("timestamp", "")
 
-            chunks.append({
-                "id": chunk_id,
-                "text_for_embedding": text_for_embedding,
-                "display_text": display_text,
-                "metadata": {
-                    "source": source,
-                    "chat_id": chat_id,
-                    "dominant_speaker": dominant,
-                    "start_ts": start_ts,
-                    "end_ts": end_ts,
-                    "turn_count": len(window),
-                },
-            })
+            chunks.append(
+                {
+                    "id": chunk_id,
+                    "text_for_embedding": text_for_embedding,
+                    "display_text": display_text,
+                    "metadata": {
+                        "source": source,
+                        "chat_id": chat_id,
+                        "dominant_speaker": dominant,
+                        "start_ts": start_ts,
+                        "end_ts": end_ts,
+                        "turn_count": len(window),
+                    },
+                }
+            )
 
         return chunks
 
@@ -131,7 +137,7 @@ class Chunker:
                 # 如果没有句子边界（纯连续文本），回退到字符窗口
                 if len(sentences) <= 1:
                     for i in range(0, len(para), chunk_chars - overlap_chars):
-                        segment = para[i:i + chunk_chars].strip()
+                        segment = para[i : i + chunk_chars].strip()
                         if segment:
                             chunks.append(segment)
                     continue
@@ -143,7 +149,9 @@ class Chunker:
             elif len(current) + len(para) + 1 > chunk_chars:
                 if current.strip():
                     chunks.append(current.strip())
-                current = current[-overlap_chars:] + "\n" + para if overlap_chars else para
+                current = (
+                    current[-overlap_chars:] + "\n" + para if overlap_chars else para
+                )
             else:
                 current += "\n" + para if current else para
 
@@ -156,15 +164,17 @@ class Chunker:
             chunk_id = hashlib.md5(
                 f"{source}_text_{i}_{segment[:50]}".encode()
             ).hexdigest()
-            result.append({
-                "id": chunk_id,
-                "text_for_embedding": segment,
-                "display_text": segment,
-                "metadata": {
-                    "source": source,
-                    "dominant_speaker": "narrative",
-                    "chunk_index": i,
-                },
-            })
+            result.append(
+                {
+                    "id": chunk_id,
+                    "text_for_embedding": segment,
+                    "display_text": segment,
+                    "metadata": {
+                        "source": source,
+                        "dominant_speaker": "narrative",
+                        "chunk_index": i,
+                    },
+                }
+            )
 
         return result

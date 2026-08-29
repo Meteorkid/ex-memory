@@ -20,6 +20,7 @@ logger = logging.getLogger("ex-memory")
 
 # --- 状态管理 ---
 
+
 class AppState:
     def __init__(self):
         self.current_slug: str = ""
@@ -30,6 +31,7 @@ class AppState:
 
 
 # --- 镜像列表 ---
+
 
 def list_exes() -> list[list]:
     """获取所有镜像列表，用于 Gradio DataFrame。"""
@@ -44,12 +46,14 @@ def list_exes() -> list[list]:
             continue
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            rows.append([
-                meta.get("name", d.name),
-                d.name,
-                meta.get("pipeline_state", "unknown"),
-                meta.get("created_at", "")[:10],
-            ])
+            rows.append(
+                [
+                    meta.get("name", d.name),
+                    d.name,
+                    meta.get("pipeline_state", "unknown"),
+                    meta.get("created_at", "")[:10],
+                ]
+            )
         except (OSError, json.JSONDecodeError) as e:
             logger.warning("跳过损坏的 meta.json slug=%s: %s", d.name, e)
     return rows
@@ -66,6 +70,7 @@ def refresh_exe_list():
 
 # --- 创建向导 ---
 
+
 def create_exe(name: str, basic_info: str, personality: str, progress=gr.Progress()):
     if not name.strip():
         return "[错误] 代号不能为空"
@@ -77,6 +82,7 @@ def create_exe(name: str, basic_info: str, personality: str, progress=gr.Progres
         return f"[错误] {e}"
 
     from config import get_ex_dir
+
     ex_dir = get_ex_dir(slug)
     if ex_dir.exists():
         return f"[错误] 镜像 [{slug}] 已存在"
@@ -85,7 +91,9 @@ def create_exe(name: str, basic_info: str, personality: str, progress=gr.Progres
     from pipeline.orchestrator import run_create_flow_api
 
     progress(0.3, desc="生成记忆镜像...")
-    result = run_create_flow_api(slug=slug, name=name, answers=[basic_info, personality])
+    result = run_create_flow_api(
+        slug=slug, name=name, answers=[basic_info, personality]
+    )
 
     if result.get("error"):
         return f"[错误] {result['error']}"
@@ -95,6 +103,7 @@ def create_exe(name: str, basic_info: str, personality: str, progress=gr.Progres
 
 
 # --- 对话引擎 ---
+
 
 def load_exe(slug: str, session: AppState):
     """加载镜像引擎，返回欢迎消息。"""
@@ -106,6 +115,7 @@ def load_exe(slug: str, session: AppState):
         return [], "", f"错误: {e}", session
 
     from config import get_ex_dir
+
     ex_dir = get_ex_dir(slug)
     if not ex_dir.exists():
         return [], "", f"镜像 [{slug}] 不存在", session
@@ -131,9 +141,11 @@ def _token_status(session: AppState) -> str:
     c = session.counter
     if c.prompt_tokens == 0 and c.completion_tokens == 0:
         return "Token: 暂无消耗"
-    return (f"Token: {c.prompt_tokens + c.completion_tokens} "
-            f"(提示 {c.prompt_tokens} + 生成 {c.completion_tokens}) | "
-            f"轮次: {c.turns}")
+    return (
+        f"Token: {c.prompt_tokens + c.completion_tokens} "
+        f"(提示 {c.prompt_tokens} + 生成 {c.completion_tokens}) | "
+        f"轮次: {c.turns}"
+    )
 
 
 def _sticker_emoji(sticker_ids: list[str]) -> str:
@@ -170,12 +182,15 @@ def chat(message: str, history: list[list], session: AppState):
         reply, stickers, usage = session.engine.chat(message, parsed_history[-100:])
 
         sticker_text = _sticker_emoji(stickers)
-        display_reply = (reply + "\n\n" + sticker_text).strip() if sticker_text else reply
+        display_reply = (
+            (reply + "\n\n" + sticker_text).strip() if sticker_text else reply
+        )
 
         session.counter.update(usage)
         history.append([message, display_reply])
 
         from pipeline.correction_handler import detect_correction, handle_correction
+
         if detect_correction(message):
             result = handle_correction(
                 slug=session.current_slug,
@@ -228,10 +243,14 @@ def chat_stream(message: str, history: list[list], session: AppState):
                 sticker_ids.append(chunk["id"])
                 emoji = _sticker_emoji([chunk["id"]])
                 if emoji:
-                    history[last_idx][1] = full_reply + ("\n\n" + emoji if emoji else "")
+                    history[last_idx][1] = full_reply + (
+                        "\n\n" + emoji if emoji else ""
+                    )
                     yield history, _token_status(session), session
             elif chunk["type"] == "red_packet":
-                special_msgs.append(f"🧧 红包: {chunk['note']} (¥{chunk['amount']:.2f})")
+                special_msgs.append(
+                    f"🧧 红包: {chunk['note']} (¥{chunk['amount']:.2f})"
+                )
             elif chunk["type"] == "transfer":
                 special_msgs.append(f"💸 转账: ¥{chunk['amount']:.2f}")
 
@@ -239,6 +258,7 @@ def chat_stream(message: str, history: list[list], session: AppState):
             history[last_idx][1] += "\n\n" + "\n".join(special_msgs)
 
         from core.validation import estimate_tokens
+
         session.counter.prompt_tokens += estimate_tokens(message)
         session.counter.completion_tokens += estimate_tokens(full_reply)
         session.counter.turns += 1
@@ -250,7 +270,9 @@ def chat_stream(message: str, history: list[list], session: AppState):
         yield history, _token_status(session), session
 
 
-def _dispatch_chat(message: str, history: list[list], use_stream: bool, session: AppState):
+def _dispatch_chat(
+    message: str, history: list[list], use_stream: bool, session: AppState
+):
     """根据流式开关分发到 chat 或 chat_stream。"""
     if use_stream:
         return chat_stream(message, history, session)
@@ -259,6 +281,7 @@ def _dispatch_chat(message: str, history: list[list], use_stream: bool, session:
 
 
 # --- 镜像管理 ---
+
 
 def delete_exe(slug: str):
     if not slug.strip():
@@ -269,6 +292,7 @@ def delete_exe(slug: str):
         return f"[错误] {e}"
     import shutil
     from config import get_ex_dir
+
     ex_dir = get_ex_dir(slug)
     if not ex_dir.exists():
         return f"镜像 [{slug}] 不存在"
@@ -284,11 +308,13 @@ def backup_exe(slug: str):
     except ValueError as e:
         return f"[错误] {e}"
     from core.version_manager import backup
+
     version = backup(slug)
     return f"备份成功: {version}"
 
 
 # --- UI 构建 ---
+
 
 def build_ui():
     init_app()
@@ -301,9 +327,8 @@ def build_ui():
         .main-header h1 { font-size: 2em; margin-bottom: 0; }
         .main-header p { color: #666; font-size: 0.9em; }
         .warning-text { color: #e74c3c; font-size: 0.85em; }
-        """
+        """,
     ) as app:
-
         session_state = gr.State(AppState)
 
         gr.HTML("""
@@ -390,8 +415,10 @@ def build_ui():
                         scale=7,
                     )
                     stream_toggle = gr.Checkbox(
-                        label="流式", value=True,
-                        scale=1, min_width=60,
+                        label="流式",
+                        value=True,
+                        scale=1,
+                        min_width=60,
                     )
                     send_btn = gr.Button("发送", variant="primary", scale=1)
 
@@ -444,7 +471,11 @@ def build_ui():
                 manage_output = gr.Textbox(label="结果", lines=3)
 
                 refresh_btn.click(
-                    lambda: gr.Dataframe(value=list_exes(), headers=["名称", "Slug", "状态", "创建日期"], interactive=False),
+                    lambda: gr.Dataframe(
+                        value=list_exes(),
+                        headers=["名称", "Slug", "状态", "创建日期"],
+                        interactive=False,
+                    ),
                     outputs=[exe_list],
                 )
 
@@ -465,8 +496,14 @@ def build_ui():
 
                 llm_cfg = get_llm_config()
                 gr.Textbox(label="LLM Model", value=llm_cfg["model"], interactive=False)
-                gr.Textbox(label="LLM Base URL", value=llm_cfg["base_url"], interactive=False)
-                gr.Textbox(label="LLM API Key", value="***" if llm_cfg["api_key"] else "未配置", interactive=False)
+                gr.Textbox(
+                    label="LLM Base URL", value=llm_cfg["base_url"], interactive=False
+                )
+                gr.Textbox(
+                    label="LLM API Key",
+                    value="***" if llm_cfg["api_key"] else "未配置",
+                    interactive=False,
+                )
 
                 gr.Markdown("""
                 ### 密钥管理

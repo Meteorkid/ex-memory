@@ -34,7 +34,12 @@ class WeChatAccount:
     @property
     def owner_wxid(self) -> str:
         prefix, separator, suffix = self.account_id.rpartition("_")
-        if separator and prefix.startswith("wxid_") and len(suffix) == 4 and all(char in "0123456789abcdef" for char in suffix.lower()):
+        if (
+            separator
+            and prefix.startswith("wxid_")
+            and len(suffix) == 4
+            and all(char in "0123456789abcdef" for char in suffix.lower())
+        ):
             return prefix
         return self.account_id
 
@@ -96,7 +101,11 @@ def detect_current_account(
         return ""
     if process_result.returncode != 0:
         return ""
-    pids = [line for line in process_result.stdout.splitlines() if line.isdigit() and int(line) > 1]
+    pids = [
+        line
+        for line in process_result.stdout.splitlines()
+        if line.isdigit() and int(line) > 1
+    ]
     open_database_counts = {account.account_id: 0 for account in accounts}
     for pid in pids:
         try:
@@ -121,7 +130,9 @@ def detect_current_account(
                 if relative.parts:
                     open_database_counts[account.account_id] += 1
                 break
-    active_accounts = [account_id for account_id, count in open_database_counts.items() if count > 0]
+    active_accounts = [
+        account_id for account_id, count in open_database_counts.items() if count > 0
+    ]
     return active_accounts[0] if len(active_accounts) == 1 else ""
 
 
@@ -132,10 +143,14 @@ def read_wechat_version(app_path: Path = DEFAULT_WECHAT_APP) -> str:
             info = plistlib.load(stream)
     except (FileNotFoundError, PermissionError, plistlib.InvalidFileException):
         return ""
-    return str(info.get("CFBundleShortVersionString") or info.get("CFBundleVersion") or "")
+    return str(
+        info.get("CFBundleShortVersionString") or info.get("CFBundleVersion") or ""
+    )
 
 
-def discover_accounts(data_root: Path = DEFAULT_XWECHAT_FILES) -> tuple[WeChatAccount, ...]:
+def discover_accounts(
+    data_root: Path = DEFAULT_XWECHAT_FILES,
+) -> tuple[WeChatAccount, ...]:
     if not data_root.exists() or not data_root.is_dir():
         return ()
     root_resolved = data_root.resolve()
@@ -152,7 +167,9 @@ def discover_accounts(data_root: Path = DEFAULT_XWECHAT_FILES) -> tuple[WeChatAc
         databases = tuple(
             path
             for path in sorted(db_storage.rglob("*.db"))
-            if path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(db_storage.resolve())
+            if path.is_file()
+            and not path.is_symlink()
+            and path.resolve().is_relative_to(db_storage.resolve())
         )
         if not databases:
             continue

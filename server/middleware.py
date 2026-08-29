@@ -16,7 +16,9 @@ security = HTTPBearer(auto_error=False)
 
 
 def setup_cors(app):
-    origins_str = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://localhost:7860")
+    origins_str = os.getenv(
+        "CORS_ORIGINS", "http://localhost:8000,http://localhost:7860"
+    )
     allow_origins = [o.strip() for o in origins_str.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
@@ -34,10 +36,15 @@ def _proxy_user_id(request: Request) -> int:
     expected = config.METEOR_STORE_PROXY_TOKEN
     actual = request.headers.get("X-Ex-Memory-Proxy-Token", "")
     external_user_id = request.headers.get("X-Ex-Memory-User-Id", "")
-    if not expected or not hmac.compare_digest(actual, expected) or not external_user_id:
+    if (
+        not expected
+        or not hmac.compare_digest(actual, expected)
+        or not external_user_id
+    ):
         raise HTTPException(status_code=401, detail="需要 Meteor Store 登录")
 
     from server.auth import get_or_create_external_user_id
+
     try:
         return get_or_create_external_user_id("meteor-store", external_user_id)
     except ValueError as exc:
@@ -57,6 +64,7 @@ def require_auth(
         raise HTTPException(status_code=401, detail="需要认证")
     token = credentials.credentials
     from server.auth import validate_token
+
     user_id = validate_token(token)
     if user_id is None:
         raise HTTPException(status_code=401, detail="Token 无效或已过期")
@@ -78,6 +86,7 @@ def optional_auth(
     if credentials is None:
         return None
     from server.auth import validate_token
+
     return validate_token(credentials.credentials)
 
 
@@ -134,9 +143,7 @@ class RateLimiter:
 
         # 清理该 IP 的过期记录
         window_start = now - self.window
-        self._store[client_ip] = [
-            t for t in self._store[client_ip] if t > window_start
-        ]
+        self._store[client_ip] = [t for t in self._store[client_ip] if t > window_start]
 
         if len(self._store[client_ip]) >= self.max_requests:
             logger.warning("rate limit hit for %s", client_ip)
@@ -152,8 +159,11 @@ class RateLimiter:
     def _cleanup(self, now: float):
         """清除所有过期的 IP 条目。"""
         window_start = now - self.window
-        stale = [ip for ip, ts_list in self._store.items()
-                  if not any(t > window_start for t in ts_list)]
+        stale = [
+            ip
+            for ip, ts_list in self._store.items()
+            if not any(t > window_start for t in ts_list)
+        ]
         for ip in stale:
             del self._store[ip]
         if stale:
@@ -163,7 +173,9 @@ class RateLimiter:
 class LoginRateLimiter:
     """登录接口独立限流：5 次/分钟/用户名，15 次/分钟/IP。"""
 
-    def __init__(self, max_per_user: int = 5, max_per_ip: int = 15, window_seconds: int = 60):
+    def __init__(
+        self, max_per_user: int = 5, max_per_ip: int = 15, window_seconds: int = 60
+    ):
         self.max_per_user = max_per_user
         self.max_per_ip = max_per_ip
         self.window = window_seconds
@@ -201,8 +213,11 @@ class LoginRateLimiter:
     def _cleanup(self, now: float):
         window_start = now - self.window
         for store in (self._user_store, self._ip_store):
-            stale = [k for k, ts_list in store.items()
-                     if not any(t > window_start for t in ts_list)]
+            stale = [
+                k
+                for k, ts_list in store.items()
+                if not any(t > window_start for t in ts_list)
+            ]
             for k in stale:
                 del store[k]
 
@@ -220,7 +235,11 @@ class RequestLoggingMiddleware:
 
         logger.info(
             "request_id=%s method=%s path=%s status=%d duration_ms=%d",
-            request_id, request.method, request.url.path, response.status_code, duration_ms,
+            request_id,
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
         )
         response.headers["X-Request-ID"] = request_id
         return response

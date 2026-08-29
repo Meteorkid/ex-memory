@@ -47,13 +47,15 @@ def parse_telegram_json(file_path: str | Path) -> list[UnifiedMessage]:
         if not content and msg_type == "text":
             continue
 
-        messages.append(UnifiedMessage(
-            sender=sender,
-            content=content,
-            timestamp=timestamp,
-            msg_type=msg_type,
-            platform="telegram",
-        ))
+        messages.append(
+            UnifiedMessage(
+                sender=sender,
+                content=content,
+                timestamp=timestamp,
+                msg_type=msg_type,
+                platform="telegram",
+            )
+        )
 
     return messages
 

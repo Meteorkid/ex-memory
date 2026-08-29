@@ -17,7 +17,11 @@ def test_snapshot_copies_db_wal_and_shm_without_changing_source(tmp_path: Path):
 
     files = create_database_snapshot(db, tmp_path / "snapshot")
 
-    assert {item.snapshot.name for item in files} == {"message.db", "message.db-wal", "message.db-shm"}
+    assert {item.snapshot.name for item in files} == {
+        "message.db",
+        "message.db-wal",
+        "message.db-shm",
+    }
     assert hashlib.sha256(db.read_bytes()).hexdigest() == original_hash
     assert all(item.snapshot.read_bytes() == item.source.read_bytes() for item in files)
 

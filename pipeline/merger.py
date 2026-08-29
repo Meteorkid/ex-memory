@@ -41,14 +41,19 @@ def merge_new_material(
     memory_path = ex_dir / "memory.md"
     persona_path = ex_dir / "persona.md"
 
-    existing_memory = memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
-    existing_persona = persona_path.read_text(encoding="utf-8") if persona_path.exists() else ""
+    existing_memory = (
+        memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
+    )
+    existing_persona = (
+        persona_path.read_text(encoding="utf-8") if persona_path.exists() else ""
+    )
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # --- 自动备份 ---
     try:
         from core.version_manager import backup as do_backup
+
         do_backup(slug)
         logger.info("合并前自动备份完成: %s", slug)
     except Exception as e:
@@ -87,6 +92,7 @@ def merge_new_material(
 
     # 重新生成 SKILL.md
     from pipeline.skill_combiner import write_skill
+
     write_skill(slug)
 
     # 更新 meta.json

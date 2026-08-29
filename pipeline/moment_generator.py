@@ -45,7 +45,10 @@ def generate_moment(slug: str) -> str:
         model=cfg["model"],
         messages=[
             {"role": "system", "content": moment_prompt},
-            {"role": "user", "content": f"请根据以下人格画像生成一条朋友圈：\n\n{persona_content}"},
+            {
+                "role": "user",
+                "content": f"请根据以下人格画像生成一条朋友圈：\n\n{persona_content}",
+            },
         ],
         temperature=0.9,
     )
@@ -55,7 +58,9 @@ def generate_moment(slug: str) -> str:
     days_ago = random.randint(0, 7)
     hours_ago = random.randint(6, 23)
     minutes_ago = random.randint(0, 59)
-    post_time = datetime.now() - timedelta(days=days_ago, hours=hours_ago, minutes=minutes_ago)
+    post_time = datetime.now() - timedelta(
+        days=days_ago, hours=hours_ago, minutes=minutes_ago
+    )
 
     # 生成随机点赞（0-3 个）
     num_likes = random.randint(0, 3)
@@ -72,20 +77,28 @@ def generate_moment(slug: str) -> str:
             "你们说什么呢",
             "已阅",
         ]
-        comments.append({
-            "author": "自己",
-            "content": random.choice(self_comments),
-        })
+        comments.append(
+            {
+                "author": "自己",
+                "content": random.choice(self_comments),
+            }
+        )
 
     moments_path = ex_dir / "moments.json"
-    moments = json.loads(moments_path.read_text(encoding="utf-8")) if moments_path.exists() else []
-    moments.append({
-        "id": f"m{len(moments)+1}",
-        "content": content,
-        "created_at": post_time.isoformat(),
-        "likes": likes,
-        "comments": comments,
-    })
+    moments = (
+        json.loads(moments_path.read_text(encoding="utf-8"))
+        if moments_path.exists()
+        else []
+    )
+    moments.append(
+        {
+            "id": f"m{len(moments) + 1}",
+            "content": content,
+            "created_at": post_time.isoformat(),
+            "likes": likes,
+            "comments": comments,
+        }
+    )
     atomic_write_json(moments_path, moments)
     logger.info("朋友圈已生成: %s", slug)
     return content

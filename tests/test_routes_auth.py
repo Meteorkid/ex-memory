@@ -11,6 +11,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr("server.auth.DB_PATH", test_db)
     monkeypatch.setattr("server.auth.DB_DIR", test_db.parent)
     import server.auth as auth
+
     with auth._get_conn() as conn:
         conn.execute("DROP TABLE IF EXISTS tokens")
         conn.execute("DROP TABLE IF EXISTS users")
@@ -23,7 +24,9 @@ def client(tmp_path, monkeypatch):
     ex_dir = exes / slug
     ex_dir.mkdir()
     (ex_dir / "meta.json").write_text(
-        json.dumps({"name": "O", "slug": slug, "owner_user_id": 1, "created_at": "2024-01-01"}),
+        json.dumps(
+            {"name": "O", "slug": slug, "owner_user_id": 1, "created_at": "2024-01-01"}
+        ),
         encoding="utf-8",
     )
     (ex_dir / "SKILL.md").write_text("# skill", encoding="utf-8")
@@ -34,12 +37,15 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr("config.SINGLE_USER_MODE", False)
 
     from server.app import create_app
+
     return TestClient(create_app())
 
 
 def _register_and_login(client, username="u1", password="pass1234"):
     client.post("/api/auth/register", json={"username": username, "password": password})
-    r = client.post("/api/auth/login", json={"username": username, "password": password})
+    r = client.post(
+        "/api/auth/login", json={"username": username, "password": password}
+    )
     return r.json()["token"]
 
 
@@ -58,6 +64,7 @@ def test_list_exes_owner_filter(client):
 
 def test_forbidden_other_user_exe(client, tmp_path):
     from config import get_ex_dir
+
     meta_path = get_ex_dir("owned") / "meta.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     meta["owner_user_id"] = 999

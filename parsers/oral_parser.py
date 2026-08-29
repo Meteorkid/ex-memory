@@ -22,33 +22,40 @@ def parse(text: str, target_name: str = "") -> list[dict]:
 
     if has_dialog_format:
         import re
+
         pattern = re.compile(r"^(.+?)[：:]\s*(.+)$")
         for line in lines:
             match = pattern.match(line.strip())
             if match:
                 sender, content = match.groups()
                 is_me = sender.strip() in ("我", "我方", "user", "me")
-                messages.append({
-                    "timestamp": "",
-                    "sender": "我" if is_me else sender.strip(),
-                    "content": content.strip(),
-                    "is_target": not is_me,
-                })
+                messages.append(
+                    {
+                        "timestamp": "",
+                        "sender": "我" if is_me else sender.strip(),
+                        "content": content.strip(),
+                        "is_target": not is_me,
+                    }
+                )
             elif line.strip():
                 # 非对话行作为上下文补充
-                messages.append({
-                    "timestamp": "",
-                    "sender": target_name or "context",
-                    "content": line.strip(),
-                    "is_target": True,
-                })
+                messages.append(
+                    {
+                        "timestamp": "",
+                        "sender": target_name or "context",
+                        "content": line.strip(),
+                        "is_target": True,
+                    }
+                )
     else:
         # 整段作为一条消息
-        messages.append({
-            "timestamp": "",
-            "sender": target_name or "narrative",
-            "content": text.strip(),
-            "is_target": True,
-        })
+        messages.append(
+            {
+                "timestamp": "",
+                "sender": target_name or "narrative",
+                "content": text.strip(),
+                "is_target": True,
+            }
+        )
 
     return messages

@@ -20,6 +20,7 @@ EXES_DIR = PROJECT_DIR / "exes"
 _LLM_API_KEY = os.getenv("LLM_API_KEY", "") or os.getenv("DEEPSEEK_API_KEY", "")
 try:
     from core.keychain import get_key
+
     _kc_llm = get_key("llm_api_key")
     if _kc_llm:
         _LLM_API_KEY = _kc_llm
@@ -39,6 +40,7 @@ LLM_MAX_CONTEXT_CHARS = int(os.getenv("LLM_MAX_CONTEXT_CHARS", "50000"))
 _EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
 try:
     from core.keychain import get_key as _kc_get_key
+
     _kc_emb = _kc_get_key("embedding_api_key")
     if _kc_emb:
         _EMBEDDING_API_KEY = _kc_emb
@@ -63,12 +65,28 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_DIR = PROJECT_DIR / "logs"
 
 # 部署模式
-SINGLE_USER_MODE = os.getenv("SINGLE_USER_MODE", "false").lower() in ("1", "true", "yes")
-DISABLE_REGISTRATION = os.getenv("DISABLE_REGISTRATION", "false").lower() in ("1", "true", "yes")
+SINGLE_USER_MODE = os.getenv("SINGLE_USER_MODE", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+DISABLE_REGISTRATION = os.getenv("DISABLE_REGISTRATION", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 TRUSTED_PROXY = os.getenv("TRUSTED_PROXY", "false").lower() in ("1", "true", "yes")
 _trusted_ips_str = os.getenv("TRUSTED_PROXY_IPS", "")
-TRUSTED_PROXY_IPS = {ip.strip() for ip in _trusted_ips_str.split(",") if ip.strip()} if _trusted_ips_str else set()
-METEOR_STORE_SSO_ENABLED = os.getenv("METEOR_STORE_SSO_ENABLED", "false").lower() in ("1", "true", "yes")
+TRUSTED_PROXY_IPS = (
+    {ip.strip() for ip in _trusted_ips_str.split(",") if ip.strip()}
+    if _trusted_ips_str
+    else set()
+)
+METEOR_STORE_SSO_ENABLED = os.getenv("METEOR_STORE_SSO_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 METEOR_STORE_PROXY_TOKEN = os.getenv("METEOR_STORE_PROXY_TOKEN", "")
 _public_base_path = os.getenv("PUBLIC_BASE_PATH", "").strip("/")
 if _public_base_path and not re.fullmatch(r"[A-Za-z0-9/_-]+", _public_base_path):
@@ -76,9 +94,13 @@ if _public_base_path and not re.fullmatch(r"[A-Za-z0-9/_-]+", _public_base_path)
 PUBLIC_BASE_PATH = f"/{_public_base_path}" if _public_base_path else ""
 
 # macOS 本地微信导出助手发布信息（安装包由站点自己的 HTTPS 地址提供）
-LOCAL_WECHAT_HELPER_ENABLED = os.getenv("LOCAL_WECHAT_HELPER_ENABLED", "false").lower() in ("1", "true", "yes")
+LOCAL_WECHAT_HELPER_ENABLED = os.getenv(
+    "LOCAL_WECHAT_HELPER_ENABLED", "false"
+).lower() in ("1", "true", "yes")
 LOCAL_WECHAT_HELPER_VERSION = os.getenv("LOCAL_WECHAT_HELPER_VERSION", "")
-LOCAL_WECHAT_HELPER_MIN_API_VERSION = int(os.getenv("LOCAL_WECHAT_HELPER_MIN_API_VERSION", "1"))
+LOCAL_WECHAT_HELPER_MIN_API_VERSION = int(
+    os.getenv("LOCAL_WECHAT_HELPER_MIN_API_VERSION", "1")
+)
 LOCAL_WECHAT_HELPER_ARM64_URL = os.getenv("LOCAL_WECHAT_HELPER_ARM64_URL", "")
 LOCAL_WECHAT_HELPER_ARM64_SHA256 = os.getenv("LOCAL_WECHAT_HELPER_ARM64_SHA256", "")
 LOCAL_WECHAT_HELPER_X64_URL = os.getenv("LOCAL_WECHAT_HELPER_X64_URL", "")
@@ -162,6 +184,7 @@ def get_llm_client():
     global _llm_client
     if _llm_client is None:
         from openai import OpenAI
+
         _llm_client = OpenAI(
             api_key=LLM_API_KEY,
             base_url=LLM_BASE_URL,

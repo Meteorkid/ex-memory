@@ -25,7 +25,9 @@ def test_private_flow_lists_session_and_exports_html(tmp_path: Path):
     account_root = tmp_path / "account"
     storage = account_root / "db_storage"
     source = _sqlite(storage / "source.db", ("CREATE TABLE source(id INTEGER)",))
-    account = WeChatAccount("wxid_owner", account_root, storage, (source,), "fingerprint")
+    account = WeChatAccount(
+        "wxid_owner", account_root, storage, (source,), "fingerprint"
+    )
     environment = WeChatEnvironment("4.1.12", (account,), True)
     status = [SIPStatus.ENABLED]
     app = create_helper_app(
@@ -55,7 +57,9 @@ def test_private_flow_lists_session_and_exports_html(tmp_path: Path):
     status.append(SIPStatus.DISABLED)
     workflow = app.state.workflow
     session_wxid = "wxid_friend"
-    table = "Msg_" + hashlib.md5(session_wxid.encode(), usedforsecurity=False).hexdigest()
+    table = (
+        "Msg_" + hashlib.md5(session_wxid.encode(), usedforsecurity=False).hexdigest()
+    )
 
     def make_plain_databases(_keys, task_dir):
         contact = _sqlite(
@@ -88,7 +92,12 @@ def test_private_flow_lists_session_and_exports_html(tmp_path: Path):
         snapshot_and_decrypt=make_plain_databases,
     )
     status.append(SIPStatus.ENABLED)
-    assert client.post("/local/api/expert/authorize-export", headers=headers, json={}).status_code == 200
+    assert (
+        client.post(
+            "/local/api/expert/authorize-export", headers=headers, json={}
+        ).status_code
+        == 200
+    )
 
     sessions = client.get("/local/api/sessions").json()["sessions"]
     assert sessions[0]["display_name"] == "殆红尘一万次以上散尽NEP"

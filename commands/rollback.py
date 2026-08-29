@@ -1,4 +1,5 @@
 """/rollback — 回滚到指定版本。"""
+
 from commands import register
 
 
@@ -10,6 +11,7 @@ def cmd_rollback(args: str):
 
     slug, version = parts[0], parts[1]
     from core.version_manager import rollback as do_rollback, list_versions
+
     try:
         do_rollback(slug, version)
         print(f"已回滚 [{slug}] 到版本 {version}")

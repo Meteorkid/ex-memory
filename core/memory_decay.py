@@ -148,7 +148,8 @@ def run_decay_cycle(ex_dir: Path) -> dict:
     if expired:
         logger.info(
             "记忆衰减完成: 清理 %d 条，剩余 %d 条",
-            len(expired), stats_after["total"],
+            len(expired),
+            stats_after["total"],
         )
 
     return result

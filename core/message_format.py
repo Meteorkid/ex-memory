@@ -8,6 +8,7 @@ from typing import Optional
 @dataclass
 class UnifiedMessage:
     """统一消息格式，用于跨平台解析器。"""
+
     sender: str
     content: str
     timestamp: datetime

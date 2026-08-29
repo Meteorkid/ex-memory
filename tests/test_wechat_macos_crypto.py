@@ -21,7 +21,10 @@ from local_helper.wechat_macos.key_extractor import (
     extract_current_account_keys,
 )
 from local_helper.wechat_macos.lldb_key_capture import is_wechat_sqlcipher_kdf
-from local_helper.wechat_macos.page_verifier import derive_sqlcipher4_key, verify_sqlcipher4_page
+from local_helper.wechat_macos.page_verifier import (
+    derive_sqlcipher4_key,
+    verify_sqlcipher4_page,
+)
 from local_helper.wechat_macos.sip import SIPStatus, parse_sip_status
 
 
@@ -32,8 +35,14 @@ def _executable(path: Path) -> Path:
 
 
 def test_parse_sip_status():
-    assert parse_sip_status("System Integrity Protection status: enabled.") is SIPStatus.ENABLED
-    assert parse_sip_status("System Integrity Protection status: disabled.") is SIPStatus.DISABLED
+    assert (
+        parse_sip_status("System Integrity Protection status: enabled.")
+        is SIPStatus.ENABLED
+    )
+    assert (
+        parse_sip_status("System Integrity Protection status: disabled.")
+        is SIPStatus.DISABLED
+    )
     assert parse_sip_status("unexpected") is SIPStatus.UNKNOWN
 
 
@@ -64,11 +73,16 @@ def test_key_extraction_captures_password_and_verifies_all_salts(tmp_path: Path)
     module = tmp_path / "capture.py"
     module.write_text("", encoding="utf-8")
     password = bytes(range(32))
-    database = _encrypted_page(tmp_path / "message.db", password, bytes.fromhex("11" * 16))
+    database = _encrypted_page(
+        tmp_path / "message.db", password, bytes.fromhex("11" * 16)
+    )
 
     def runner(*args, **kwargs):
         return subprocess.CompletedProcess(
-            args[0], 0, f"noise\nWECHAT_PID 123\nWECHAT_PBKDF2_PASSWORD {password.hex()}\n", ""
+            args[0],
+            0,
+            f"noise\nWECHAT_PID 123\nWECHAT_PBKDF2_PASSWORD {password.hex()}\n",
+            "",
         )
 
     captured = extract_current_account_keys(
@@ -82,16 +96,23 @@ def test_key_extraction_captures_password_and_verifies_all_salts(tmp_path: Path)
     assert isinstance(captured, CapturedAccountKeys)
     assert captured.wechat_pid == 123
     assert captured.keys == (
-        WeChatKeyPair(key_hex=derive_sqlcipher4_key(password, bytes.fromhex("11" * 16)).hex(), salt_hex="11" * 16),
+        WeChatKeyPair(
+            key_hex=derive_sqlcipher4_key(password, bytes.fromhex("11" * 16)).hex(),
+            salt_hex="11" * 16,
+        ),
     )
 
 
-def test_key_extraction_rejects_account_mismatch_without_leaking_password(tmp_path: Path):
+def test_key_extraction_rejects_account_mismatch_without_leaking_password(
+    tmp_path: Path,
+):
     launcher = _executable(tmp_path / "launcher")
     module = tmp_path / "capture.py"
     module.write_text("", encoding="utf-8")
     password = bytes(range(32))
-    database = _encrypted_page(tmp_path / "message.db", password, bytes.fromhex("11" * 16))
+    database = _encrypted_page(
+        tmp_path / "message.db", password, bytes.fromhex("11" * 16)
+    )
     wrong_password = bytes(reversed(range(32)))
 
     def runner(*args, **kwargs):
@@ -140,7 +161,9 @@ def test_decrypt_database_validates_generated_sqlite(tmp_path: Path):
     def runner(command, **kwargs):
         assert "22" * 32 not in " ".join(command)
         with sqlite3.connect(output) as connection:
-            connection.execute("CREATE TABLE message(id INTEGER PRIMARY KEY, content TEXT)")
+            connection.execute(
+                "CREATE TABLE message(id INTEGER PRIMARY KEY, content TEXT)"
+            )
         return subprocess.CompletedProcess(command, 0, "", "")
 
     result = decrypt_database(
@@ -175,7 +198,9 @@ def test_decrypt_database_removes_invalid_output(tmp_path: Path):
     assert not output.exists()
 
 
-def test_virtual_table_database_accepts_extension_specific_integrity_error(monkeypatch, tmp_path: Path):
+def test_virtual_table_database_accepts_extension_specific_integrity_error(
+    monkeypatch, tmp_path: Path
+):
     database = tmp_path / "fts.db"
     database.write_bytes(b"SQLite format 3\x00")
 
@@ -188,10 +213,21 @@ def test_virtual_table_database_accepts_extension_specific_integrity_error(monke
 
         def execute(self, sql):
             if "sqlite_master" in sql:
-                return type("Cursor", (), {"fetchall": lambda self: [("CREATE VIRTUAL TABLE docs USING wcdb_fts",)]})()
+                return type(
+                    "Cursor",
+                    (),
+                    {
+                        "fetchall": lambda self: [
+                            ("CREATE VIRTUAL TABLE docs USING wcdb_fts",)
+                        ]
+                    },
+                )()
             raise sqlite3.OperationalError("SQL logic error")
 
-    monkeypatch.setattr("local_helper.wechat_macos.decryptor.sqlite3.connect", lambda *_args, **_kwargs: FakeConnection())
+    monkeypatch.setattr(
+        "local_helper.wechat_macos.decryptor.sqlite3.connect",
+        lambda *_args, **_kwargs: FakeConnection(),
+    )
 
     verify_plain_sqlite(database)
     assert database.exists()
@@ -239,7 +275,9 @@ def test_captured_password_derives_and_verifies_every_matching_database(tmp_path
     for index in range(2):
         salt = bytes([index + 1]) * 16
         raw_key = derive_sqlcipher4_key(password, salt)
-        encrypted_payload = bytes((offset * (index + 3)) % 256 for offset in range(4016))
+        encrypted_payload = bytes(
+            (offset * (index + 3)) % 256 for offset in range(4016)
+        )
         mac_salt = bytes(value ^ 0x3A for value in salt)
         mac_key = hashlib.pbkdf2_hmac("sha512", raw_key, mac_salt, 2, dklen=32)
         page_mac = hmac.new(mac_key, encrypted_payload, hashlib.sha512)

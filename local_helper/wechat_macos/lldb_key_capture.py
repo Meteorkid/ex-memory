@@ -11,7 +11,9 @@ _KDF_ITERATIONS = 256_000
 _captured_password: bytearray | None = None
 
 
-def is_wechat_sqlcipher_kdf(password_length: int, salt_length: int, rounds: int) -> bool:
+def is_wechat_sqlcipher_kdf(
+    password_length: int, salt_length: int, rounds: int
+) -> bool:
     return (
         password_length == _PASSWORD_LENGTH
         and salt_length == _SALT_LENGTH
@@ -60,12 +62,16 @@ def emit(_debugger, _command, result, _internal_dict) -> None:
     if _captured_password is None:
         result.SetError("matching PBKDF2 call not captured")
         return
-    result.AppendMessage("WECHAT_PBKDF2_PASSWORD " + binascii.hexlify(_captured_password).decode("ascii"))
+    result.AppendMessage(
+        "WECHAT_PBKDF2_PASSWORD " + binascii.hexlify(_captured_password).decode("ascii")
+    )
     for index in range(len(_captured_password)):
         _captured_password[index] = 0
     _captured_password = None
 
 
 def __lldb_init_module(debugger, _internal_dict) -> None:
-    debugger.HandleCommand(f"command script add -f {__name__}.install wechat-key-install")
+    debugger.HandleCommand(
+        f"command script add -f {__name__}.install wechat-key-install"
+    )
     debugger.HandleCommand(f"command script add -f {__name__}.emit wechat-key-emit")

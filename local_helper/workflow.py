@@ -65,7 +65,9 @@ class ExpertWorkflow:
         self._on_state_change = on_state_change
         self._lock = threading.RLock()
 
-    def prepare(self, *, task_id: str, account_id: str, account_root: Path) -> WorkflowState:
+    def prepare(
+        self, *, task_id: str, account_id: str, account_root: Path
+    ) -> WorkflowState:
         if self._sip_status() is not SIPStatus.ENABLED:
             raise WorkflowError("开始专家模式前必须保持开启 SIP")
         task_dir = self._task_dir(task_id)
@@ -106,7 +108,9 @@ class ExpertWorkflow:
                 keys = extract_keys()
                 if not keys:
                     raise WorkflowError("未取得可验证的数据库密钥")
-                self._save(self._replace(state, phase=WorkflowPhase.AWAITING_WECHAT_EXIT))
+                self._save(
+                    self._replace(state, phase=WorkflowPhase.AWAITING_WECHAT_EXIT)
+                )
                 if not wait_for_wechat_exit():
                     raise WorkflowError("取得密钥后必须先完全退出微信")
                 self._save(self._replace(state, phase=WorkflowPhase.DECRYPTING))
@@ -122,7 +126,13 @@ class ExpertWorkflow:
                 )
             except Exception:
                 self._clear_decryption_outputs(task_id)
-                self._save(self._replace(state, phase=WorkflowPhase.FAILED, error_code="decryption_failed"))
+                self._save(
+                    self._replace(
+                        state,
+                        phase=WorkflowPhase.FAILED,
+                        error_code="decryption_failed",
+                    )
+                )
                 raise
             finally:
                 keys = None
@@ -146,7 +156,9 @@ class ExpertWorkflow:
                 raise WorkflowError("SIP 未开启，拒绝导出")
             return self._save(self._replace(state, phase=WorkflowPhase.EXPORTING))
 
-    def finish_export(self, task_id: str, *, output_dir: Path, partial: bool = False) -> WorkflowState:
+    def finish_export(
+        self, task_id: str, *, output_dir: Path, partial: bool = False
+    ) -> WorkflowState:
         with self._lock:
             state = self.load(task_id)
             if state.phase is not WorkflowPhase.EXPORTING:
@@ -155,15 +167,24 @@ class ExpertWorkflow:
             resolved_output = output_dir.resolve(strict=True)
             if not resolved_output.is_dir():
                 raise WorkflowError("导出目录不存在")
-            return self._save(self._replace(state, phase=phase, output_dir=str(resolved_output)))
+            return self._save(
+                self._replace(state, phase=phase, output_dir=str(resolved_output))
+            )
 
-    def fail(self, task_id: str, *, error_code: str, error_detail: str = "") -> WorkflowState:
+    def fail(
+        self, task_id: str, *, error_code: str, error_detail: str = ""
+    ) -> WorkflowState:
         if not re.fullmatch(r"[a-z0-9_]{1,64}", error_code):
             raise ValueError("错误代码格式无效")
         with self._lock:
             state = self.load(task_id)
             return self._save(
-                self._replace(state, phase=WorkflowPhase.FAILED, error_code=error_code, error_detail=error_detail)
+                self._replace(
+                    state,
+                    phase=WorkflowPhase.FAILED,
+                    error_code=error_code,
+                    error_detail=error_detail,
+                )
             )
 
     def delete_task(self, task_id: str) -> None:
@@ -176,9 +197,13 @@ class ExpertWorkflow:
                 WorkflowPhase.DECRYPTING,
                 WorkflowPhase.EXPORTING,
             }:
-                raise WorkflowError("任务正在处理，不能删除；请等待当前步骤完成或超时清理")
+                raise WorkflowError(
+                    "任务正在处理，不能删除；请等待当前步骤完成或超时清理"
+                )
             task_dir = self._task_dir(task_id)
-            if task_dir.is_symlink() or not task_dir.resolve().is_relative_to(self.root):
+            if task_dir.is_symlink() or not task_dir.resolve().is_relative_to(
+                self.root
+            ):
                 raise WorkflowError("任务目录无效")
             shutil.rmtree(task_dir)
 
@@ -201,7 +226,13 @@ class ExpertWorkflow:
             if state.task_id != task_id:
                 raise WorkflowError("任务状态标识不匹配")
             return state
-        except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (
+            FileNotFoundError,
+            KeyError,
+            TypeError,
+            ValueError,
+            json.JSONDecodeError,
+        ) as exc:
             raise WorkflowError("任务状态不存在或已损坏") from exc
 
     def decrypted_paths(self, state: WorkflowState) -> tuple[Path, ...]:
@@ -210,8 +241,14 @@ class ExpertWorkflow:
 
     def list_states(self) -> tuple[WorkflowState, ...]:
         states: list[WorkflowState] = []
-        for task_dir in sorted(self.root.iterdir(), key=lambda path: path.stat().st_mtime, reverse=True):
-            if not task_dir.is_dir() or task_dir.is_symlink() or not re.fullmatch(r"[0-9a-f]{32}", task_dir.name):
+        for task_dir in sorted(
+            self.root.iterdir(), key=lambda path: path.stat().st_mtime, reverse=True
+        ):
+            if (
+                not task_dir.is_dir()
+                or task_dir.is_symlink()
+                or not re.fullmatch(r"[0-9a-f]{32}", task_dir.name)
+            ):
                 continue
             try:
                 states.append(self.load(task_dir.name))
@@ -236,7 +273,9 @@ class ExpertWorkflow:
             self._on_state_change(state)
         return state
 
-    def _validate_outputs(self, task_dir: Path, outputs: Iterable[Path]) -> tuple[str, ...]:
+    def _validate_outputs(
+        self, task_dir: Path, outputs: Iterable[Path]
+    ) -> tuple[str, ...]:
         relative: list[str] = []
         for output in outputs:
             if output.is_symlink():

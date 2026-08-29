@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 
-
 def _create_test_engine(tmpdir):
     """创建一个用于测试的 ChatEngine。"""
     tmpdir = Path(tmpdir)
@@ -13,14 +12,23 @@ def _create_test_engine(tmpdir):
     sessions_dir = tmpdir / "sessions"
     sessions_dir.mkdir()
 
-    with patch("core.engine.get_ex_dir", return_value=tmpdir), \
-         patch("core.engine.get_llm_config", return_value={
-             "model": "test", "temperature": 0.8, "top_p": 0.9,
-             "frequency_penalty": 0.6, "max_tokens": 4096
-         }), \
-         patch("core.engine.get_llm_client") as mock_client:
+    with (
+        patch("core.engine.get_ex_dir", return_value=tmpdir),
+        patch(
+            "core.engine.get_llm_config",
+            return_value={
+                "model": "test",
+                "temperature": 0.8,
+                "top_p": 0.9,
+                "frequency_penalty": 0.6,
+                "max_tokens": 4096,
+            },
+        ),
+        patch("core.engine.get_llm_client") as mock_client,
+    ):
         mock_client.return_value = MagicMock()
         from core.engine import ChatEngine
+
         engine = ChatEngine("test", vector_store=None, embedder=None)
         return engine, mock_client.return_value
 
@@ -62,7 +70,10 @@ def test_chat_stream_yields_text():
 def test_extract_sticker_tags():
     """提取贴纸标记。"""
     from core.engine import ChatEngine
-    text, ids = ChatEngine._extract_sticker_tags("哈哈哈 [sticker:happy_1] [sticker:sad_2]")
+
+    text, ids = ChatEngine._extract_sticker_tags(
+        "哈哈哈 [sticker:happy_1] [sticker:sad_2]"
+    )
     assert text == "哈哈哈"
     assert ids == ["happy_1", "sad_2"]
 
@@ -70,6 +81,7 @@ def test_extract_sticker_tags():
 def test_extract_sticker_tags_no_tags():
     """无贴纸标记时返回原文。"""
     from core.engine import ChatEngine
+
     text, ids = ChatEngine._extract_sticker_tags("普通回复")
     assert text == "普通回复"
     assert ids == []
@@ -99,9 +111,7 @@ def test_build_system_prompt_with_rag():
     """system prompt 包含 RAG 检索结果。"""
     with tempfile.TemporaryDirectory() as tmpdir:
         engine, _ = _create_test_engine(tmpdir)
-        rag_results = [
-            {"display_text": "ta 真实说过的话", "score": 0.9}
-        ]
+        rag_results = [{"display_text": "ta 真实说过的话", "score": 0.9}]
         prompt = engine._build_system_prompt(rag_results=rag_results)
         assert "ta 真实说过的话" in prompt
         assert "潜意识层" in prompt
@@ -112,9 +122,8 @@ def test_build_system_prompt_rag_below_threshold():
     with tempfile.TemporaryDirectory() as tmpdir:
         engine, _ = _create_test_engine(tmpdir)
         from config import RAG_THRESHOLD
-        rag_results = [
-            {"display_text": "低分结果", "score": RAG_THRESHOLD - 0.1}
-        ]
+
+        rag_results = [{"display_text": "低分结果", "score": RAG_THRESHOLD - 0.1}]
         prompt = engine._build_system_prompt(rag_results=rag_results)
         assert "低分结果" not in prompt
 

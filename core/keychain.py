@@ -17,16 +17,25 @@ def _run_security(args: list[str], timeout: int = 5) -> subprocess.CompletedProc
     """调用 macOS security 命令。"""
     return subprocess.run(
         ["security"] + args,
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
     )
 
 
 def get_key(account: str) -> Optional[str]:
     """从 Keychain 获取密钥。"""
     try:
-        result = _run_security([
-            "find-generic-password", "-s", SERVICE_NAME, "-a", account, "-w",
-        ])
+        result = _run_security(
+            [
+                "find-generic-password",
+                "-s",
+                SERVICE_NAME,
+                "-a",
+                account,
+                "-w",
+            ]
+        )
         if result.returncode == 0 and result.stdout.strip():
             logger.info("从 Keychain 读取密钥: %s", account)
             return result.stdout.strip()
@@ -41,13 +50,27 @@ def set_key(account: str, password: str) -> bool:
     try:
         existing = get_key(account)
         if existing:
-            _run_security([
-                "delete-generic-password", "-s", SERVICE_NAME, "-a", account,
-            ])
-        _run_security([
-            "add-generic-password", "-s", SERVICE_NAME, "-a", account,
-            "-w", password, "-U",
-        ])
+            _run_security(
+                [
+                    "delete-generic-password",
+                    "-s",
+                    SERVICE_NAME,
+                    "-a",
+                    account,
+                ]
+            )
+        _run_security(
+            [
+                "add-generic-password",
+                "-s",
+                SERVICE_NAME,
+                "-a",
+                account,
+                "-w",
+                password,
+                "-U",
+            ]
+        )
         logger.info("密钥已写入 Keychain: %s", account)
         return True
     except Exception as e:
@@ -58,9 +81,15 @@ def set_key(account: str, password: str) -> bool:
 def delete_key(account: str) -> bool:
     """从 Keychain 删除密钥。"""
     try:
-        _run_security([
-            "delete-generic-password", "-s", SERVICE_NAME, "-a", account,
-        ])
+        _run_security(
+            [
+                "delete-generic-password",
+                "-s",
+                SERVICE_NAME,
+                "-a",
+                account,
+            ]
+        )
         logger.info("密钥已从 Keychain 删除: %s", account)
         return True
     except Exception:

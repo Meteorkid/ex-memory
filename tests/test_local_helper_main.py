@@ -7,7 +7,9 @@ from local_helper.main import configured_origins, parse_args, runtime_resource
 
 def test_cli_origin_is_optional_for_packaged_release(monkeypatch, tmp_path: Path):
     monkeypatch.delenv("EX_MEMORY_ALLOWED_ORIGINS", raising=False)
-    monkeypatch.setattr("local_helper.main.runtime_resource", lambda _name: tmp_path / "missing")
+    monkeypatch.setattr(
+        "local_helper.main.runtime_resource", lambda _name: tmp_path / "missing"
+    )
 
     assert parse_args([]).allowed_origin is None
     with pytest.raises(SystemExit, match="Origin"):
@@ -51,12 +53,16 @@ def test_runtime_resource_finds_macos_bundle_frameworks(monkeypatch, tmp_path: P
     executable.touch()
     release.write_text("http://127.0.0.1:8000\n", encoding="utf-8")
     monkeypatch.setattr("local_helper.main.sys.executable", str(executable))
-    monkeypatch.setattr("local_helper.main.sys._MEIPASS", str(tmp_path / "missing"), raising=False)
+    monkeypatch.setattr(
+        "local_helper.main.sys._MEIPASS", str(tmp_path / "missing"), raising=False
+    )
 
     assert runtime_resource("release-origin.txt") == release
 
 
-def test_runtime_resource_resolves_pyinstaller_bundle_symlink(monkeypatch, tmp_path: Path):
+def test_runtime_resource_resolves_pyinstaller_bundle_symlink(
+    monkeypatch, tmp_path: Path
+):
     app_contents = tmp_path / "Helper.app" / "Contents"
     executable = app_contents / "MacOS" / "helper"
     resources = app_contents / "Resources"
@@ -69,6 +75,8 @@ def test_runtime_resource_resolves_pyinstaller_bundle_symlink(monkeypatch, tmp_p
     release.write_text("http://127.0.0.1:8000\n", encoding="utf-8")
     (frameworks / "release-origin.txt").symlink_to("../Resources/release-origin.txt")
     monkeypatch.setattr("local_helper.main.sys.executable", str(executable))
-    monkeypatch.setattr("local_helper.main.sys._MEIPASS", str(frameworks), raising=False)
+    monkeypatch.setattr(
+        "local_helper.main.sys._MEIPASS", str(frameworks), raising=False
+    )
 
     assert runtime_resource("release-origin.txt") == release

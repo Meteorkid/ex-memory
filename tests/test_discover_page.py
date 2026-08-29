@@ -159,14 +159,18 @@ def test_browser_offline_event_never_controls_persistent_banner():
 
 def test_successful_api_response_clears_stale_offline_state():
     app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
-    api_wrapper = app_js.split("async function api", 1)[1].split("function logout", 1)[0]
+    api_wrapper = app_js.split("async function api", 1)[1].split("function logout", 1)[
+        0
+    ]
 
     assert "markNetworkOnline();" in api_wrapper
 
 
 def test_api_marks_offline_only_after_network_failure_retries_are_exhausted():
     app_js = (ROOT / "web/static/app.js").read_text(encoding="utf-8")
-    api_wrapper = app_js.split("async function api", 1)[1].split("function logout", 1)[0]
+    api_wrapper = app_js.split("async function api", 1)[1].split("function logout", 1)[
+        0
+    ]
 
     assert "const networkFailure = isNetworkFailure(e);" in api_wrapper
     assert "if (networkFailure) markNetworkOffline();" in api_wrapper

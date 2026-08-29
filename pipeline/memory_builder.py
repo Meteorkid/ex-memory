@@ -27,7 +27,10 @@ def build_memory(slug: str, materials_summary: str) -> str:
         model=cfg["model"],
         messages=[
             {"role": "system", "content": analyzer_prompt},
-            {"role": "user", "content": f"请分析以下原材料，提取关系记忆：\n\n{materials_summary}"},
+            {
+                "role": "user",
+                "content": f"请分析以下原材料，提取关系记忆：\n\n{materials_summary}",
+            },
         ],
         temperature=0.7,
     )
@@ -38,7 +41,10 @@ def build_memory(slug: str, materials_summary: str) -> str:
         model=cfg["model"],
         messages=[
             {"role": "system", "content": builder_prompt},
-            {"role": "user", "content": f"请根据以下分析结果生成 memory.md：\n\n{analysis}"},
+            {
+                "role": "user",
+                "content": f"请根据以下分析结果生成 memory.md：\n\n{analysis}",
+            },
         ],
         temperature=0.7,
     )

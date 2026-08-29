@@ -27,7 +27,9 @@ def derive_sqlcipher4_key(password: bytes, salt: bytes) -> bytes:
     )
 
 
-def verify_sqlcipher4_page(raw_key: bytes, page: bytes, *, page_number: int = 1) -> bool:
+def verify_sqlcipher4_page(
+    raw_key: bytes, page: bytes, *, page_number: int = 1
+) -> bool:
     """验证 raw key 是否匹配 SQLCipher 4 页面，不解密或读取正文。"""
     if len(raw_key) != SQLCIPHER4_KEY_SIZE or len(page) != SQLCIPHER4_PAGE_SIZE:
         return False
@@ -38,7 +40,9 @@ def verify_sqlcipher4_page(raw_key: bytes, page: bytes, *, page_number: int = 1)
     encrypted_payload = page[SQLCIPHER4_SALT_SIZE:-SQLCIPHER4_RESERVE_SIZE]
     stored_mac = page[-SQLCIPHER4_RESERVE_SIZE:]
     mac_salt = bytes(value ^ 0x3A for value in salt)
-    mac_key = hashlib.pbkdf2_hmac("sha512", raw_key, mac_salt, 2, dklen=SQLCIPHER4_KEY_SIZE)
+    mac_key = hashlib.pbkdf2_hmac(
+        "sha512", raw_key, mac_salt, 2, dklen=SQLCIPHER4_KEY_SIZE
+    )
     expected_mac = hmac.new(mac_key, encrypted_payload, hashlib.sha512)
     expected_mac.update(struct.pack("<I", page_number))
     return hmac.compare_digest(expected_mac.digest(), stored_mac)

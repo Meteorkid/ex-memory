@@ -32,13 +32,15 @@ def parse_imessage_csv(file_path: str | Path) -> list[UnifiedMessage]:
             timestamp = _parse_timestamp(time_str)
             platform_type = _determine_type(msg_type)
 
-            messages.append(UnifiedMessage(
-                sender=sender,
-                content=content.strip(),
-                timestamp=timestamp,
-                msg_type=platform_type,
-                platform="imessage",
-            ))
+            messages.append(
+                UnifiedMessage(
+                    sender=sender,
+                    content=content.strip(),
+                    timestamp=timestamp,
+                    msg_type=platform_type,
+                    platform="imessage",
+                )
+            )
 
     return messages
 
@@ -92,7 +94,9 @@ def detect_imessage_format(file_path: str | Path) -> bool:
             header_lower = [h.lower().strip() for h in header]
             # iMessage CSV 通常包含 sender/date/text 等列
             has_sender = any(h in header_lower for h in ["sender", "from", "发送者"])
-            has_text = any(h in header_lower for h in ["text", "content", "内容", "message"])
+            has_text = any(
+                h in header_lower for h in ["text", "content", "内容", "message"]
+            )
             return has_sender and has_text
     except (csv.Error, UnicodeDecodeError, StopIteration):
         return False

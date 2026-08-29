@@ -87,7 +87,9 @@ def test_complete_decryption_waits_for_sip_reenable(tmp_path: Path):
     )
 
     assert state.phase is WorkflowPhase.AWAITING_SIP_ENABLED
-    persisted = json.loads((tmp_path / "tasks" / task_id / "state.json").read_text(encoding="utf-8"))
+    persisted = json.loads(
+        (tmp_path / "tasks" / task_id / "state.json").read_text(encoding="utf-8")
+    )
     assert "memory-only" not in json.dumps(persisted)
     with pytest.raises(WorkflowError, match="重新开启 SIP"):
         workflow.authorize_export(task_id)
@@ -110,7 +112,11 @@ def test_fail_records_error_detail(tmp_path: Path):
     task_id = "d" * 32
     workflow.prepare(task_id=task_id, account_id="account", account_root=tmp_path)
 
-    workflow.fail(task_id, error_code="decryption_failed", error_detail="未能从微信进程取得可验证的密钥候选")
+    workflow.fail(
+        task_id,
+        error_code="decryption_failed",
+        error_detail="未能从微信进程取得可验证的密钥候选",
+    )
 
     state = workflow.load(task_id)
     assert state.phase is WorkflowPhase.FAILED
@@ -134,7 +140,9 @@ def test_delete_task_rejects_active_phase(tmp_path: Path):
     status = [SIPStatus.ENABLED]
     workflow = _workflow(tmp_path, status)
     task_id = "f" * 32
-    state = workflow.prepare(task_id=task_id, account_id="account", account_root=tmp_path)
+    state = workflow.prepare(
+        task_id=task_id, account_id="account", account_root=tmp_path
+    )
     workflow._save(workflow._replace(state, phase=WorkflowPhase.DECRYPTING))
 
     with pytest.raises(WorkflowError, match="正在处理"):

@@ -124,6 +124,10 @@ class LocalSessionStore:
             return rebound
 
     def _purge(self, now: float) -> None:
-        expired = [token for token, session in self._sessions.items() if session.expires_at <= now]
+        expired = [
+            token
+            for token, session in self._sessions.items()
+            if session.expires_at <= now
+        ]
         for token in expired:
             self._sessions.pop(token, None)

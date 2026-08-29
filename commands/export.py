@@ -1,4 +1,5 @@
 """/export — 导出 ex-memory 对话记录。"""
+
 import shutil
 import shlex
 from pathlib import Path
@@ -16,6 +17,7 @@ def cmd_export(arg: str):
     fmt = parts[1] if len(parts) > 1 else "html"
     try:
         from core.exporters.conversation import export_ex_memory_conversation
+
         exported = export_ex_memory_conversation(slug, fmt)
     except Exception as e:
         print(f"导出失败: {e}")

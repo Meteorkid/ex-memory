@@ -7,7 +7,13 @@ from datetime import datetime
 from pathlib import Path
 from prompt_toolkit import prompt as pt_prompt
 
-from config import get_ex_dir, ensure_ex_dirs, get_embedding_config, get_llm_config, get_collection_name
+from config import (
+    get_ex_dir,
+    ensure_ex_dirs,
+    get_embedding_config,
+    get_llm_config,
+    get_collection_name,
+)
 from core.file_utils import atomic_write, atomic_write_json
 from core.version_manager import backup as version_backup
 from memory.embedder import Embedder
@@ -50,7 +56,9 @@ def run_create_flow(slug: Optional[str] = None):
         meta_path = ex_dir / "meta.json"
         if meta_path.exists():
             existing_meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            if existing_meta.get("pipeline_state") == "failed" and existing_meta.get("failed_step"):
+            if existing_meta.get("pipeline_state") == "failed" and existing_meta.get(
+                "failed_step"
+            ):
                 failed_step = existing_meta["failed_step"]
                 print("\n=== 恢复创建流程 ===")
                 print(f"镜像 [{existing_meta['name']}] 上次在 [{failed_step}] 步骤失败")
@@ -135,11 +143,15 @@ def run_create_flow(slug: Optional[str] = None):
     steps = ["import", "distill_memory", "distill_persona", "skill"]
     start_idx = steps.index(failed_step) if failed_step in steps else 0
 
-    materials_summary = f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
+    materials_summary = (
+        f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
+    )
 
     # 初始化向量库（import 步骤需要）
     emb_cfg = get_embedding_config()
-    embedder = Embedder(api_key=emb_cfg["api_key"], base_url=emb_cfg["base_url"], model=emb_cfg["model"])
+    embedder = Embedder(
+        api_key=emb_cfg["api_key"], base_url=emb_cfg["base_url"], model=emb_cfg["model"]
+    )
     chroma_dir = str(ex_dir / "chroma_db")
     collection_name = get_collection_name(slug)
     vector_store = VectorStore(persist_dir=chroma_dir, collection_name=collection_name)
@@ -204,7 +216,9 @@ def run_create_flow(slug: Optional[str] = None):
     if start_idx <= 2:
         print("正在生成 Persona（含原话样本抽取）...")
         try:
-            persona_content = build_persona(slug, materials_summary, vector_store, embedder)
+            persona_content = build_persona(
+                slug, materials_summary, vector_store, embedder
+            )
             atomic_write(ex_dir / "persona.md", persona_content)
             print("  persona.md 已生成")
         except Exception as e:
@@ -323,7 +337,11 @@ def run_create_flow_api(
             if meta.get("pipeline_state") != "failed":
                 return {"error": "该镜像未处于失败状态，无需恢复"}
             failed_step = meta.get("failed_step", "")
-            start_idx = PIPELINE_STEPS.index(failed_step) if failed_step in PIPELINE_STEPS else 0
+            start_idx = (
+                PIPELINE_STEPS.index(failed_step)
+                if failed_step in PIPELINE_STEPS
+                else 0
+            )
             basic_info = meta.get("profile", {}).get("basic_info", "")
             personality = meta.get("profile", {}).get("personality", "")
             name = meta.get("name", name)
@@ -354,7 +372,9 @@ def run_create_flow_api(
             except Exception as e:
                 logger.warning("镜像 [%s] 事前备份失败，本次无回滚点: %s", slug, e)
 
-        materials_summary = f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
+        materials_summary = (
+            f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
+        )
 
         # 初始化向量库和 embedder
         emb_cfg = get_embedding_config()
@@ -386,7 +406,9 @@ def run_create_flow_api(
 
         if start_idx <= 2:
             try:
-                persona_content = build_persona(slug, materials_summary, vector_store, embedder)
+                persona_content = build_persona(
+                    slug, materials_summary, vector_store, embedder
+                )
                 atomic_write(ex_dir / "persona.md", persona_content)
             except Exception as e:
                 _save_failed_state(ex_dir, "distill_persona", e)

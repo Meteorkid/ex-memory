@@ -90,15 +90,18 @@ def read_contacts(database: Path) -> dict[str, Contact]:
             type_column = _first_existing(columns, "local_type", "type")
             rows = connection.execute(
                 f'SELECT "username", {_quoted_or_default(nickname_column, "NULL")} AS nickname, '
-                f'{_quoted_or_default(remark_column, "NULL")} AS remark, '
-                f'{_quoted_or_default(alias_column, "NULL")} AS alias_name, '
-                f'{_quoted_or_default(type_column, "0")} AS local_type '
+                f"{_quoted_or_default(remark_column, 'NULL')} AS remark, "
+                f"{_quoted_or_default(alias_column, 'NULL')} AS alias_name, "
+                f"{_quoted_or_default(type_column, '0')} AS local_type "
                 'FROM "contact" WHERE "username" IS NOT NULL'
             )
             return {
                 row["username"]: Contact(
                     wxid=row["username"],
-                    display_name=row["remark"] or row["nickname"] or row["alias_name"] or row["username"],
+                    display_name=row["remark"]
+                    or row["nickname"]
+                    or row["alias_name"]
+                    or row["username"],
                     remark=row["remark"] or "",
                     nickname=row["nickname"] or "",
                     local_type=int(row["local_type"] or 0),
@@ -114,7 +117,14 @@ def read_contacts(database: Path) -> dict[str, Contact]:
 def read_sessions(database: Path, contacts: dict[str, Contact]) -> tuple[Session, ...]:
     with _connect_readonly(database) as connection:
         tables = _table_names(connection)
-        table = next((name for name in ("SessionTable", "SessionAbstract", "Session") if name in tables), None)
+        table = next(
+            (
+                name
+                for name in ("SessionTable", "SessionAbstract", "Session")
+                if name in tables
+            ),
+            None,
+        )
         if not table:
             raise UnsupportedSchemaError("未找到可支持的会话表")
         columns = _column_names(connection, table)
@@ -132,8 +142,8 @@ def read_sessions(database: Path, contacts: dict[str, Contact]) -> tuple[Session
             raise UnsupportedSchemaError("会话表缺少用户标识字段")
         select = (
             f'SELECT "{wxid_column}" AS wxid, '
-            f'{_quoted_or_default(timestamp_column, "0")} AS timestamp, '
-            f'{_quoted_or_default(count_column, "0")} AS message_count '
+            f"{_quoted_or_default(timestamp_column, '0')} AS timestamp, "
+            f"{_quoted_or_default(count_column, '0')} AS message_count "
             f'FROM "{table}"'
         )
         if timestamp_column:
@@ -173,7 +183,9 @@ def iter_messages(
     )
 
 
-def decode_message_content(raw: bytes | str | None, compression_type: int | None) -> str:
+def decode_message_content(
+    raw: bytes | str | None, compression_type: int | None
+) -> str:
     if raw is None:
         return ""
     payload = raw.encode("utf-8") if isinstance(raw, str) else bytes(raw)
@@ -185,7 +197,9 @@ def decode_message_content(raw: bytes | str | None, compression_type: int | None
         except ImportError as exc:
             raise MessageDecodeError("缺少 zstandard，无法解码微信压缩消息") from exc
         try:
-            payload = zstandard.ZstdDecompressor().decompress(payload, max_output_size=32 * 1024 * 1024)
+            payload = zstandard.ZstdDecompressor().decompress(
+                payload, max_output_size=32 * 1024 * 1024
+            )
         except zstandard.ZstdError as exc:
             raise MessageDecodeError("zstd 消息解压失败") from exc
     return payload.decode("utf-8", errors="replace")
@@ -241,10 +255,14 @@ def _read_message_table(
 ) -> Iterator[Message]:
     columns = _column_names(connection, table)
     if {"message_content", "local_type", "local_id", "create_time"}.issubset(columns):
-        yield from _read_v4_messages(connection, table, session_wxid, owner_wxid, shard, columns)
+        yield from _read_v4_messages(
+            connection, table, session_wxid, owner_wxid, shard, columns
+        )
         return
     if {"MesLocalID", "CreateTime", "Message", "Des", "Type"}.issubset(columns):
-        yield from _read_v3_messages(connection, table, session_wxid, owner_wxid, shard, columns)
+        yield from _read_v3_messages(
+            connection, table, session_wxid, owner_wxid, shard, columns
+        )
         return
     raise UnsupportedSchemaError(f"消息表 schema 未支持: {table}")
 
@@ -257,22 +275,30 @@ def _read_v4_messages(
     shard: str,
     columns: set[str],
 ) -> Iterator[Message]:
-    compression_column = '"WCDB_CT_message_content"' if "WCDB_CT_message_content" in columns else "NULL"
+    compression_column = (
+        '"WCDB_CT_message_content"' if "WCDB_CT_message_content" in columns else "NULL"
+    )
     sender_column = '"real_sender_id"' if "real_sender_id" in columns else "NULL"
     server_column = '"server_id"' if "server_id" in columns else "0"
     sort_column = '"sort_seq"' if "sort_seq" in columns else '"create_time"'
     resource_column = '"packed_info_data"' if "packed_info_data" in columns else "NULL"
-    resource_compression = '"WCDB_CT_packed_info_data"' if "WCDB_CT_packed_info_data" in columns else "NULL"
+    resource_compression = (
+        '"WCDB_CT_packed_info_data"'
+        if "WCDB_CT_packed_info_data" in columns
+        else "NULL"
+    )
     query = (
         f'SELECT "local_id", "local_type", "create_time", "message_content", '
-        f'{compression_column} AS compression_type, {sender_column} AS real_sender_id, '
-        f'{server_column} AS server_id, {sort_column} AS sort_seq, '
-        f'{resource_column} AS resource_content, {resource_compression} AS resource_compression '
+        f"{compression_column} AS compression_type, {sender_column} AS real_sender_id, "
+        f"{server_column} AS server_id, {sort_column} AS sort_seq, "
+        f"{resource_column} AS resource_content, {resource_compression} AS resource_compression "
         f'FROM "{table}" ORDER BY "create_time", {sort_column}, "local_id"'
     )
     is_group = session_wxid.endswith("@chatroom")
     for row in connection.execute(query):
-        content = decode_message_content(row["message_content"], row["compression_type"])
+        content = decode_message_content(
+            row["message_content"], row["compression_type"]
+        )
         sender_id = int(row["real_sender_id"] or 0)
         sent = sender_id == 2
         sender = owner_wxid if sent else session_wxid
@@ -280,7 +306,9 @@ def _read_v4_messages(
             prefixed_sender, content = _split_group_sender(content)
             if not sent:
                 sender = prefixed_sender or "unknown"
-        resource_content = decode_message_content(row["resource_content"], row["resource_compression"])
+        resource_content = decode_message_content(
+            row["resource_content"], row["resource_compression"]
+        )
         subtype = infer_app_subtype(content) if int(row["local_type"]) == 49 else None
         yield Message(
             local_id=int(row["local_id"]),
@@ -322,7 +350,11 @@ def _read_v3_messages(
             sender = sender or "unknown"
         else:
             sender = session_wxid
-        app_subtype = int(row["subtype"]) if row["subtype"] is not None else infer_app_subtype(content)
+        app_subtype = (
+            int(row["subtype"])
+            if row["subtype"] is not None
+            else infer_app_subtype(content)
+        )
         yield Message(
             local_id=int(row["MesLocalID"]),
             create_time=int(row["CreateTime"]),
@@ -354,13 +386,27 @@ def _iter_database_messages(
     owner_wxid: str,
 ) -> Iterator[Message]:
     with _connect_readonly(database) as connection:
-        table = next((candidate for candidate in candidates if candidate in _table_names(connection)), None)
+        table = next(
+            (
+                candidate
+                for candidate in candidates
+                if candidate in _table_names(connection)
+            ),
+            None,
+        )
         if table:
-            yield from _read_message_table(connection, table, session_wxid, owner_wxid, database.name)
+            yield from _read_message_table(
+                connection, table, session_wxid, owner_wxid, database.name
+            )
 
 
 def _table_names(connection: sqlite3.Connection) -> set[str]:
-    return {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    return {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+    }
 
 
 def _column_names(connection: sqlite3.Connection, table: str) -> set[str]:
@@ -371,7 +417,12 @@ def _column_names(connection: sqlite3.Connection, table: str) -> set[str]:
 
 def _message_table_candidates(wxid: str) -> tuple[str, ...]:
     digest = hashlib.md5(wxid.encode("utf-8"), usedforsecurity=False).hexdigest()
-    return (f"Msg_{digest}", f"Msg_{digest.upper()}", f"Chat_{digest}", f"Chat_{digest.upper()}")
+    return (
+        f"Msg_{digest}",
+        f"Msg_{digest.upper()}",
+        f"Chat_{digest}",
+        f"Chat_{digest.upper()}",
+    )
 
 
 def _split_group_sender(content: str) -> tuple[str, str]:
@@ -384,7 +435,12 @@ def _split_group_sender(content: str) -> tuple[str, str]:
 
 
 def _skip_session(wxid: str) -> bool:
-    return wxid in {"filehelper", "fmessage", "notifymessage", "weixin"} or wxid.startswith("gh_")
+    return wxid in {
+        "filehelper",
+        "fmessage",
+        "notifymessage",
+        "weixin",
+    } or wxid.startswith("gh_")
 
 
 def _first_existing(columns: set[str], *candidates: str) -> str | None:
@@ -406,6 +462,8 @@ def _read_v3_contacts(connection: sqlite3.Connection) -> dict[str, Contact]:
             display_name=row["userName"],
             local_type=int(row["type"] or 0),
         )
-        for row in connection.execute('SELECT "userName", "type" FROM "Friend" WHERE "userName" IS NOT NULL')
+        for row in connection.execute(
+            'SELECT "userName", "type" FROM "Friend" WHERE "userName" IS NOT NULL'
+        )
         if isinstance(row["userName"], str) and row["userName"]
     }

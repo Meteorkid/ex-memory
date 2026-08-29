@@ -17,16 +17,19 @@ TIMESTAMP_PATTERNS = [
 ]
 
 # 消息行格式: "时间 发送者: 内容"
-MESSAGE_LINE_RE = re.compile(
-    r"^(?P<time>.+?)\s+(?P<sender>.+?):\s+(?P<content>.+)$"
-)
+MESSAGE_LINE_RE = re.compile(r"^(?P<time>.+?)\s+(?P<sender>.+?):\s+(?P<content>.+)$")
 
 # WhatsApp 特殊消息
 SYSTEM_MESSAGES = {
-    "<attached:", "Messages and calls are end-to-end encrypted",
-    "You created group", "changed the subject",
-    "changed this group", "added you",
-    "left", "removed", "changed their phone number",
+    "<attached:",
+    "Messages and calls are end-to-end encrypted",
+    "You created group",
+    "changed the subject",
+    "changed this group",
+    "added you",
+    "left",
+    "removed",
+    "changed their phone number",
 }
 
 
@@ -60,12 +63,14 @@ def parse_whatsapp_txt(file_path: str | Path) -> list[UnifiedMessage]:
             if current_sender and current_content:
                 content = "\n".join(current_content)
                 if not _is_system_message(content):
-                    messages.append(UnifiedMessage(
-                        sender=current_sender,
-                        content=content,
-                        timestamp=current_time or datetime.now(),
-                        platform="whatsapp",
-                    ))
+                    messages.append(
+                        UnifiedMessage(
+                            sender=current_sender,
+                            content=content,
+                            timestamp=current_time or datetime.now(),
+                            platform="whatsapp",
+                        )
+                    )
 
             current_time = _parse_timestamp(match.group("time"))
             current_sender = match.group("sender")
@@ -78,12 +83,14 @@ def parse_whatsapp_txt(file_path: str | Path) -> list[UnifiedMessage]:
     if current_sender and current_content:
         content = "\n".join(current_content)
         if not _is_system_message(content):
-            messages.append(UnifiedMessage(
-                sender=current_sender,
-                content=content,
-                timestamp=current_time or datetime.now(),
-                platform="whatsapp",
-            ))
+            messages.append(
+                UnifiedMessage(
+                    sender=current_sender,
+                    content=content,
+                    timestamp=current_time or datetime.now(),
+                    platform="whatsapp",
+                )
+            )
 
     return messages
 

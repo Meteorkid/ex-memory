@@ -36,7 +36,9 @@ def init_db():
 
 def _get_current_version(conn) -> int:
     """读取当前 schema 版本号。"""
-    conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
+    )
     row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
     return row[0] if row[0] is not None else 0
 
@@ -253,7 +255,5 @@ def revoke_token(token: str):
 
 def clean_expired_tokens():
     with _get_conn() as conn:
-        conn.execute(
-            "DELETE FROM tokens WHERE expires_at < datetime('now')"
-        )
+        conn.execute("DELETE FROM tokens WHERE expires_at < datetime('now')")
         conn.commit()

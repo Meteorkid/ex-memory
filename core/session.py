@@ -45,6 +45,7 @@ class ChatSession:
         self.slug = pt_prompt("请输入镜像名称: ").strip()
         try:
             from core.validation import validate_slug
+
             self.slug = validate_slug(self.slug)
         except ValueError as e:
             print(f"错误: {e}")
@@ -126,7 +127,9 @@ class ChatSession:
             self.engine.relationship_stage = stage
 
         stage_label = RELATIONSHIP_STAGES[stage]
-        print(f"--- 关系阶段已切换: {RELATIONSHIP_STAGES[old_stage]} → {stage_label} ---")
+        print(
+            f"--- 关系阶段已切换: {RELATIONSHIP_STAGES[old_stage]} → {stage_label} ---"
+        )
 
     def _process_command(self, user_input: str):
         parts = user_input[1:].split(maxsplit=1)
@@ -205,7 +208,9 @@ class ChatSession:
 
         try:
             prompts_dir = Path(__file__).resolve().parent.parent / "prompts"
-            prompt_template = (prompts_dir / "session_summary.md").read_text(encoding="utf-8")
+            prompt_template = (prompts_dir / "session_summary.md").read_text(
+                encoding="utf-8"
+            )
 
             # 只取最近 20 轮做摘要（避免上下文超限）
             recent = self.history[-40:]
@@ -219,7 +224,10 @@ class ChatSession:
                 model=cfg["model"],
                 messages=[
                     {"role": "system", "content": prompt_template},
-                    {"role": "user", "content": f"请压缩以下对话为摘要：\n\n{history_text}"},
+                    {
+                        "role": "user",
+                        "content": f"请压缩以下对话为摘要：\n\n{history_text}",
+                    },
                 ],
                 temperature=0.3,
             )
@@ -235,14 +243,20 @@ class ChatSession:
                 # Token 预算控制：过大的摘要列表弹出旧项
                 from core.validation import estimate_tokens
                 from config import LLM_MAX_CONTEXT_CHARS
-                while (len(self.engine.session_summaries) > 5
-                       and estimate_tokens("\n".join(self.engine.session_summaries)) > LLM_MAX_CONTEXT_CHARS * 0.3):
+
+                while (
+                    len(self.engine.session_summaries) > 5
+                    and estimate_tokens("\n".join(self.engine.session_summaries))
+                    > LLM_MAX_CONTEXT_CHARS * 0.3
+                ):
                     self.engine.session_summaries.pop(0)
 
             # 可选：加入向量库
             if self.vector_store and self.embedder:
                 try:
-                    self.vector_store.add_session_summary(summary, self.slug, self.embedder)
+                    self.vector_store.add_session_summary(
+                        summary, self.slug, self.embedder
+                    )
                 except Exception:
                     logger.debug("摘要写入向量库失败（非关键）")
 
@@ -255,6 +269,7 @@ class ChatSession:
     def _update_skill_memory(self, new_summary: str):
         """将新摘要追加到 SKILL.md 的 PART A 末尾。"""
         from config import get_ex_dir
+
         skill_path = get_ex_dir(self.slug) / "SKILL.md"
         if not skill_path.exists():
             return
@@ -290,7 +305,7 @@ class ChatSession:
             self.turn_count += 1
 
             if len(self.history) > self.talk_length * 2:
-                self.history = self.history[-(self.talk_length * 2):]
+                self.history = self.history[-(self.talk_length * 2) :]
 
             if self.turn_count >= ARCHIVE_THRESHOLD:
                 self._maybe_archive()

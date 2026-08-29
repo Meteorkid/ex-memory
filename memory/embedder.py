@@ -11,6 +11,7 @@ MAX_BATCH_SIZE = 100  # 单次 API 调用最大文本数
 
 class EmbeddingError(Exception):
     """Embedding 服务不可用异常。"""
+
     pass
 
 

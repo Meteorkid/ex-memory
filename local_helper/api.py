@@ -16,14 +16,31 @@ from pydantic import BaseModel, Field
 
 from local_helper import __version__
 from local_helper.export.html_exporter import export_conversation
-from local_helper.security import LocalSession, LocalSessionStore, OneTimeTicketStore, is_loopback_host, validate_origin
+from local_helper.security import (
+    LocalSession,
+    LocalSessionStore,
+    OneTimeTicketStore,
+    is_loopback_host,
+    validate_origin,
+)
 from local_helper.task_store import PublicTaskStore
-from local_helper.wechat_macos.discovery import SUPPORTED_WECHAT_VERSIONS, detect_environment
-from local_helper.wechat_macos.catalog import discover_decrypted_catalog, load_session_catalog
+from local_helper.wechat_macos.discovery import (
+    SUPPORTED_WECHAT_VERSIONS,
+    detect_environment,
+)
+from local_helper.wechat_macos.catalog import (
+    discover_decrypted_catalog,
+    load_session_catalog,
+)
 from local_helper.wechat_macos.pipeline import run_expert_decryption
 from local_helper.wechat_macos.reader import iter_messages
 from local_helper.wechat_macos.sip import get_sip_status
-from local_helper.workflow import ExpertWorkflow, WorkflowError, WorkflowPhase, WorkflowState
+from local_helper.workflow import (
+    ExpertWorkflow,
+    WorkflowError,
+    WorkflowPhase,
+    WorkflowState,
+)
 
 
 LOCAL_SESSION_COOKIE = "ex_memory_local_session"
@@ -35,16 +52,30 @@ class HelperSettings:
     local_base_url: str = "http://127.0.0.1:17653"
     open_browser_on_launch: bool = True
     workflow_root: Path = field(
-        default_factory=lambda: Path.home() / "Library" / "Application Support" / "ex-memory-helper" / "tasks"
+        default_factory=lambda: (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "ex-memory-helper"
+            / "tasks"
+        )
     )
     capture_launcher: Path = field(
-        default_factory=lambda: Path(__file__).parent / "wechat_macos" / "lldb_capture_launcher.sh"
+        default_factory=lambda: (
+            Path(__file__).parent / "wechat_macos" / "lldb_capture_launcher.sh"
+        )
     )
     capture_module: Path = field(
-        default_factory=lambda: Path(__file__).parent / "wechat_macos" / "lldb_key_capture.py"
+        default_factory=lambda: (
+            Path(__file__).parent / "wechat_macos" / "lldb_key_capture.py"
+        )
     )
-    sqlcipher_binary: Path = field(default_factory=lambda: Path(__file__).parent / "bin" / "sqlcipher")
-    export_root: Path = field(default_factory=lambda: Path.home() / "Downloads" / "ex-memory-wechat-exports")
+    sqlcipher_binary: Path = field(
+        default_factory=lambda: Path(__file__).parent / "bin" / "sqlcipher"
+    )
+    export_root: Path = field(
+        default_factory=lambda: Path.home() / "Downloads" / "ex-memory-wechat-exports"
+    )
 
 
 class PrepareExpertRequest(BaseModel):
@@ -99,7 +130,9 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
         if request.url.path.startswith("/v1/control/"):
             origin = request.headers.get("origin")
             if not validate_origin(origin, settings.allowed_origins):
-                return JSONResponse(status_code=403, content={"error": "origin_not_allowed"})
+                return JSONResponse(
+                    status_code=403, content={"error": "origin_not_allowed"}
+                )
             if request.method == "OPTIONS":
                 response = JSONResponse(content={"ok": True})
             else:
@@ -115,7 +148,9 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
         if request.url.path.startswith("/local/api/"):
             origin = request.headers.get("origin")
             if origin and origin.rstrip("/") != settings.local_base_url.rstrip("/"):
-                return JSONResponse(status_code=403, content={"error": "local_origin_required"})
+                return JSONResponse(
+                    status_code=403, content={"error": "local_origin_required"}
+                )
 
         return await call_next(request)
 
@@ -143,7 +178,11 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="任务不存在") from exc
-        return {"task_id": task.task_id, "reopened": True, "local_url": issue_local_url(task.task_id)}
+        return {
+            "task_id": task.task_id,
+            "reopened": True,
+            "local_url": issue_local_url(task.task_id),
+        }
 
     @app.get("/v1/control/tasks/{task_id}")
     def task_status(task_id: str):
@@ -164,7 +203,9 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
             raise HTTPException(status_code=403, detail="启动票据无效或已使用")
         session = sessions.issue(task)
         app.state.public_task_aliases[task] = task
-        response = HTMLResponse(_local_export_page(session.csrf_token, settings.export_root))
+        response = HTMLResponse(
+            _local_export_page(session.csrf_token, settings.export_root)
+        )
         response.set_cookie(
             LOCAL_SESSION_COOKIE,
             session.token,
@@ -218,12 +259,15 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
             (
                 item
                 for item in environment.accounts
-                if item.account_id == state.account_id and str(item.root) == state.account_root
+                if item.account_id == state.account_id
+                and str(item.root) == state.account_root
             ),
             None,
         )
         if account is None:
-            raise HTTPException(status_code=409, detail="微信账号目录已经变化，请重新开始")
+            raise HTTPException(
+                status_code=409, detail="微信账号目录已经变化，请重新开始"
+            )
         return environment, account
 
     @app.get("/local/api/environment")
@@ -268,11 +312,24 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
                 status_code=409,
                 detail=f"当前微信 {current_version} 尚未支持；此助手仅验证 {supported_versions}",
             )
-        account = next((item for item in environment.accounts if item.account_id == payload.account_id), None)
+        account = next(
+            (
+                item
+                for item in environment.accounts
+                if item.account_id == payload.account_id
+            ),
+            None,
+        )
         if account is None:
-            raise HTTPException(status_code=409, detail="所选微信账号目录已变化，请刷新本地页面后重新选择")
+            raise HTTPException(
+                status_code=409,
+                detail="所选微信账号目录已变化，请刷新本地页面后重新选择",
+            )
         if not payload.key_rules_confirmed:
-            raise HTTPException(status_code=409, detail="请先确认：每个微信账号密钥不同，切换账号后必须重新提取")
+            raise HTTPException(
+                status_code=409,
+                detail="请先确认：每个微信账号密钥不同，切换账号后必须重新提取",
+            )
         try:
             state = get_workflow().prepare(
                 task_id=session.task_id,
@@ -295,10 +352,15 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
         environment, account = account_for_state(state)
         if environment.app_version not in SUPPORTED_WECHAT_VERSIONS:
             supported_versions = "、".join(SUPPORTED_WECHAT_VERSIONS)
-            raise HTTPException(status_code=409, detail=f"当前 LLDB 提取器仅验证支持微信 {supported_versions}")
+            raise HTTPException(
+                status_code=409,
+                detail=f"当前 LLDB 提取器仅验证支持微信 {supported_versions}",
+            )
         sip_status = app.state.sip_status_provider()
         if sip_status.value != "disabled":
-            raise HTTPException(status_code=409, detail="请先在恢复模式中手动关闭 SIP 并重启")
+            raise HTTPException(
+                status_code=409, detail="请先在恢复模式中手动关闭 SIP 并重启"
+            )
 
         def worker() -> None:
             try:
@@ -325,7 +387,9 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
                 except (ValueError, WorkflowError):
                     pass
 
-        threading.Thread(target=worker, name=f"wechat-decrypt-{session.task_id[:8]}", daemon=True).start()
+        threading.Thread(
+            target=worker, name=f"wechat-decrypt-{session.task_id[:8]}", daemon=True
+        ).start()
         return {"accepted": True, "task_id": session.workflow_task_id}
 
     @app.post("/local/api/expert/authorize-export")
@@ -356,9 +420,13 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
             workflow.delete_task(session.workflow_task_id)
         except WorkflowError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        public_task_id = app.state.public_task_aliases.get(session.workflow_task_id, session.task_id)
+        public_task_id = app.state.public_task_aliases.get(
+            session.workflow_task_id, session.task_id
+        )
         try:
-            tasks.update(public_task_id, status="cancelled", phase="deleted", progress=0)
+            tasks.update(
+                public_task_id, status="cancelled", phase="deleted", progress=0
+            )
         except KeyError:
             pass
         return {"deleted": True}
@@ -442,7 +510,9 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
         environment, account = account_for_state(state)
         catalog = discover_decrypted_catalog(workflow.decrypted_paths(state))
         _contacts, found_sessions = load_session_catalog(catalog)
-        selected = next((item for item in found_sessions if item.wxid == payload.session_wxid), None)
+        selected = next(
+            (item for item in found_sessions if item.wxid == payload.session_wxid), None
+        )
         if selected is None:
             raise HTTPException(status_code=404, detail="所选会话不存在")
         if not catalog.message_databases:
@@ -476,9 +546,17 @@ def create_helper_app(settings: HelperSettings) -> FastAPI:
                     partial=result.status == "partial",
                 )
             except Exception as exc:
-                workflow.fail(local_session.workflow_task_id, error_code="export_failed", error_detail=str(exc))
+                workflow.fail(
+                    local_session.workflow_task_id,
+                    error_code="export_failed",
+                    error_detail=str(exc),
+                )
 
-        threading.Thread(target=worker, name=f"wechat-export-{local_session.task_id[:8]}", daemon=True).start()
+        threading.Thread(
+            target=worker,
+            name=f"wechat-export-{local_session.task_id[:8]}",
+            daemon=True,
+        ).start()
         return {"accepted": True, "task_id": local_session.workflow_task_id}
 
     return app
@@ -546,7 +624,10 @@ initialize();
         .replace("__EXPORT_ROOT__", output_path)
         .replace("__DISABLE_TERMINAL__", _terminal_result_figure("disable"))
         .replace("__ENABLE_TERMINAL__", _terminal_result_figure("enable"))
-        .replace("然后启动并登录微信，再点击下方按钮。", "点击下方按钮前，请先从微信菜单完全退出微信。")
+        .replace(
+            "然后启动并登录微信，再点击下方按钮。",
+            "点击下方按钮前，请先从微信菜单完全退出微信。",
+        )
         .replace("我已关闭 SIP，开始提取和解密", "微信已完全退出，开始等待提取")
         .replace(
             "助手会再次检测 SIP。出现“请完全退出微信”后，请用微信菜单退出，不要强制结束本地助手。",
@@ -562,7 +643,10 @@ def _terminal_result_figure(action: str) -> str:
     if action == "disable":
         apple_rows = [
             ("cmd", command),
-            ("txt", "This will disable System Integrity Protection. Are you sure you want to continue? [y/N]: y"),
+            (
+                "txt",
+                "This will disable System Integrity Protection. Are you sure you want to continue? [y/N]: y",
+            ),
             ("txt", "Enter your username: your_username"),
             ("pwd", "Enter your password:"),
             ("ok", f"Successfully {action_word} System Integrity Protection."),
@@ -589,7 +673,9 @@ def _terminal_result_figure(action: str) -> str:
     ]
     intel_note = "如出现确认或认证提示，按屏幕提示完成；密码不会显示字符。"
 
-    return _terminal_svg("Terminal — Recovery · Apple 芯片", apple_rows, apple_note, apple_aria) + _terminal_svg(
+    return _terminal_svg(
+        "Terminal — Recovery · Apple 芯片", apple_rows, apple_note, apple_aria
+    ) + _terminal_svg(
         "Terminal — Recovery · Intel Mac",
         intel_rows,
         intel_note,
@@ -597,7 +683,9 @@ def _terminal_result_figure(action: str) -> str:
     )
 
 
-def _terminal_svg(title: str, rows: list[tuple[str, str]], note: str, aria_label: str) -> str:
+def _terminal_svg(
+    title: str, rows: list[tuple[str, str]], note: str, aria_label: str
+) -> str:
     top = 82
     line_h = 27
     height = top + len(rows) * line_h + 30
@@ -605,7 +693,9 @@ def _terminal_svg(title: str, rows: list[tuple[str, str]], note: str, aria_label
     y = top
     for kind, text in rows:
         if kind == "cmd":
-            parts.append(f'<text x="24" y="{y}" fill="#78dba9">bash-3.2#</text><text x="124" y="{y}" fill="#f3f0fa">{text}</text>')
+            parts.append(
+                f'<text x="24" y="{y}" fill="#78dba9">bash-3.2#</text><text x="124" y="{y}" fill="#f3f0fa">{text}</text>'
+            )
         elif kind == "ok":
             parts.append(f'<text x="24" y="{y}" fill="#78dba9">{text}</text>')
         elif kind == "pwd":
@@ -615,7 +705,9 @@ def _terminal_svg(title: str, rows: list[tuple[str, str]], note: str, aria_label
                 f'<text x="228" y="{y}" fill="#6f6a7c">（不显示字符）</text>'
             )
         elif kind == "ps1":
-            parts.append(f'<text x="24" y="{y}" fill="#78dba9">bash-3.2#</text><rect x="124" y="{y - 13}" width="9" height="17" rx="1" fill="#c4bcff" opacity=".9"/>')
+            parts.append(
+                f'<text x="24" y="{y}" fill="#78dba9">bash-3.2#</text><rect x="124" y="{y - 13}" width="9" height="17" rx="1" fill="#c4bcff" opacity=".9"/>'
+            )
         else:
             parts.append(f'<text x="24" y="{y}" fill="#c9c5d2">{text}</text>')
         y += line_h

@@ -26,6 +26,7 @@ def isolated_db(tmp_path, monkeypatch):
 
     # 绕过登录限流（测试共享同一 IP，会触发 15 次/分钟限制）
     import server.routes as routes_mod
+
     original_limiter = routes_mod._login_limiter
     noop_limiter = MagicMock()
     noop_limiter.check = MagicMock()
@@ -39,6 +40,7 @@ def isolated_db(tmp_path, monkeypatch):
 @pytest.fixture
 def client():
     from server.app import create_app
+
     app = create_app()
     return TestClient(app)
 
@@ -47,13 +49,14 @@ def client():
 def auth_headers(client, request):
     """注册并登录，返回认证 headers。每次测试用唯一用户名避免限流。"""
     import hashlib
+
     uname = "chat_" + hashlib.md5(request.node.name.encode()).hexdigest()[:12]
-    client.post("/api/auth/register", json={
-        "username": uname, "password": "test123456"
-    })
-    resp = client.post("/api/auth/login", json={
-        "username": uname, "password": "test123456"
-    })
+    client.post(
+        "/api/auth/register", json={"username": uname, "password": "test123456"}
+    )
+    resp = client.post(
+        "/api/auth/login", json={"username": uname, "password": "test123456"}
+    )
     token = resp.json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -88,7 +91,11 @@ def test_chat_invalid_slug(client, auth_headers):
 def test_chat_nonexistent_exe(client, auth_headers):
     """不存在的镜像返回 404。"""
     from fastapi import HTTPException
-    with patch("server.routes._check_exe_access", side_effect=HTTPException(status_code=404, detail="镜像不存在")):
+
+    with patch(
+        "server.routes._check_exe_access",
+        side_effect=HTTPException(status_code=404, detail="镜像不存在"),
+    ):
         resp = client.post(
             "/api/chat",
             json={"slug": "nonexistent123", "message": "hello"},
@@ -117,9 +124,11 @@ def test_chat_success(client, auth_headers):
         MagicMock(prompt_tokens=10, completion_tokens=5),
     )
 
-    with patch("server.routes._get_engine", return_value=mock_engine), \
-         patch("server.routes.validate_slug", return_value="test"), \
-         patch("server.routes.assert_exe_access"):
+    with (
+        patch("server.routes._get_engine", return_value=mock_engine),
+        patch("server.routes.validate_slug", return_value="test"),
+        patch("server.routes.assert_exe_access"),
+    ):
         resp = client.post(
             "/api/chat",
             json={"slug": "test", "message": "hello"},
@@ -140,9 +149,11 @@ def test_chat_with_stickers(client, auth_headers):
         MagicMock(prompt_tokens=10, completion_tokens=5),
     )
 
-    with patch("server.routes._get_engine", return_value=mock_engine), \
-         patch("server.routes.validate_slug", return_value="test"), \
-         patch("server.routes.assert_exe_access"):
+    with (
+        patch("server.routes._get_engine", return_value=mock_engine),
+        patch("server.routes.validate_slug", return_value="test"),
+        patch("server.routes.assert_exe_access"),
+    ):
         resp = client.post(
             "/api/chat",
             json={"slug": "test", "message": "今天开心吗"},
@@ -158,9 +169,11 @@ def test_chat_engine_error(client, auth_headers):
     mock_engine = MagicMock()
     mock_engine.chat.side_effect = RuntimeError("LLM 调用超时")
 
-    with patch("server.routes._get_engine", return_value=mock_engine), \
-         patch("server.routes.validate_slug", return_value="test"), \
-         patch("server.routes.assert_exe_access"):
+    with (
+        patch("server.routes._get_engine", return_value=mock_engine),
+        patch("server.routes.validate_slug", return_value="test"),
+        patch("server.routes.assert_exe_access"),
+    ):
         resp = client.post(
             "/api/chat",
             json={"slug": "test", "message": "hello"},

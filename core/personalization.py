@@ -41,11 +41,19 @@ def analyze_user_style(messages: list[dict]) -> dict:
         content = msg.get("content", "")
         total_length += len(content)
         # 简单分词（按空格和标点）
-        words = content.replace("，", " ").replace("。", " ").replace("！", " ").replace("？", " ").split()
+        words = (
+            content.replace("，", " ")
+            .replace("。", " ")
+            .replace("！", " ")
+            .replace("？", " ")
+            .split()
+        )
         all_words.extend(words)
 
     word_counter = Counter(all_words)
-    common_words = [word for word, count in word_counter.most_common(10) if len(word) > 1]
+    common_words = [
+        word for word, count in word_counter.most_common(10) if len(word) > 1
+    ]
 
     # 分析消息长度
     avg_length = total_length / len(user_messages) if user_messages else 0
@@ -61,8 +69,18 @@ def analyze_user_style(messages: list[dict]) -> dict:
     positive_words = ["开心", "高兴", "快乐", "幸福", "哈哈", "太好了", "爱", "喜欢"]
     negative_words = ["难过", "伤心", "生气", "讨厌", "烦", "哭", "失望"]
 
-    positive_count = sum(1 for msg in user_messages for word in positive_words if word in msg.get("content", ""))
-    negative_count = sum(1 for msg in user_messages for word in negative_words if word in msg.get("content", ""))
+    positive_count = sum(
+        1
+        for msg in user_messages
+        for word in positive_words
+        if word in msg.get("content", "")
+    )
+    negative_count = sum(
+        1
+        for msg in user_messages
+        for word in negative_words
+        if word in msg.get("content", "")
+    )
 
     if positive_count > negative_count * 1.5:
         emotional_tendency = "positive"
@@ -102,12 +120,16 @@ def calculate_relationship_temperature(slug: str, messages: list[dict]) -> dict:
 
     # 因素2: 情感强度
     love_words = ["爱", "喜欢", "想你", "想见你", "宝贝", "亲爱的"]
-    love_count = sum(1 for msg in messages for word in love_words if word in msg.get("content", ""))
+    love_count = sum(
+        1 for msg in messages for word in love_words if word in msg.get("content", "")
+    )
     emotion_score = min(love_count / 20, 1.0) * 25  # 最高25分
 
     # 因素3: 互动平衡（用户和助手消息比例）
     if user_messages and assistant_messages:
-        balance = min(len(user_messages), len(assistant_messages)) / max(len(user_messages), len(assistant_messages))
+        balance = min(len(user_messages), len(assistant_messages)) / max(
+            len(user_messages), len(assistant_messages)
+        )
         balance_score = balance * 20  # 最高20分
     else:
         balance_score = 0
@@ -129,7 +151,9 @@ def calculate_relationship_temperature(slug: str, messages: list[dict]) -> dict:
         time_score = 5
 
     # 计算总分
-    temperature = round(frequency_score + emotion_score + balance_score + depth_score + time_score)
+    temperature = round(
+        frequency_score + emotion_score + balance_score + depth_score + time_score
+    )
     temperature = max(0, min(100, temperature))
 
     # 确定等级
@@ -158,6 +182,7 @@ def calculate_relationship_temperature(slug: str, messages: list[dict]) -> dict:
 def save_user_profile(slug: str, profile: dict):
     """保存用户画像。"""
     from config import get_ex_dir
+
     ex_dir = get_ex_dir(slug)
     profile_file = ex_dir / "user_profile.json"
 
@@ -170,6 +195,7 @@ def save_user_profile(slug: str, profile: dict):
 def load_user_profile(slug: str) -> dict:
     """加载用户画像。"""
     from config import get_ex_dir
+
     ex_dir = get_ex_dir(slug)
     profile_file = ex_dir / "user_profile.json"
 

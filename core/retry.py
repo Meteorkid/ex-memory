@@ -23,10 +23,16 @@ def retry_api(max_attempts: int = 3, base_delay: float = 1.0, max_delay: float =
                         delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
                         logger.warning(
                             "%s 第 %d/%d 次失败: %s，%0.1fs 后重试",
-                            func.__name__, attempt, max_attempts, e, delay,
+                            func.__name__,
+                            attempt,
+                            max_attempts,
+                            e,
+                            delay,
                         )
                         time.sleep(delay)
-            logger.error("%s 全部 %d 次重试失败: %s", func.__name__, max_attempts, last_error)
+            logger.error(
+                "%s 全部 %d 次重试失败: %s", func.__name__, max_attempts, last_error
+            )
             raise last_error
 
         return wrapper

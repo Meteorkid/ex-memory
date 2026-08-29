@@ -44,7 +44,9 @@ def test_export_creates_complete_offline_structure(tmp_path: Path):
 
     assert result.status == "complete"
     assert result.message_count == 1
-    assert all((result.output_dir / directory).is_dir() for directory in RESOURCE_DIRECTORIES)
+    assert all(
+        (result.output_dir / directory).is_dir() for directory in RESOURCE_DIRECTORIES
+    )
     manifest = json.loads(result.manifest_file.read_text(encoding="utf-8"))
     assert manifest["message_count"] == 1
     assert manifest["status"] == "complete"
@@ -60,8 +62,18 @@ def test_export_copies_media_by_hash_and_marks_missing(tmp_path: Path):
     source.write_bytes(b"video-bytes")
     result = export_conversation(
         messages=(
-            message(local_id=1, content='<video path="msg/video/2026-01/clip.mp4"/>', kind=MessageKind.VIDEO, raw_type=43),
-            message(local_id=2, content='<video path="missing.mp4"/>', kind=MessageKind.VIDEO, raw_type=43),
+            message(
+                local_id=1,
+                content='<video path="msg/video/2026-01/clip.mp4"/>',
+                kind=MessageKind.VIDEO,
+                raw_type=43,
+            ),
+            message(
+                local_id=2,
+                content='<video path="missing.mp4"/>',
+                kind=MessageKind.VIDEO,
+                raw_type=43,
+            ),
         ),
         output_root=tmp_path / "exports",
         account_root=account_root,
@@ -86,7 +98,11 @@ def test_unknown_message_is_preserved_and_script_content_is_escaped(tmp_path: Pa
     account_root.mkdir()
     payload = "</script><script>alert(1)</script>"
     result = export_conversation(
-        messages=(message(local_id=9, content=payload, kind=MessageKind.UNKNOWN, raw_type=999),),
+        messages=(
+            message(
+                local_id=9, content=payload, kind=MessageKind.UNKNOWN, raw_type=999
+            ),
+        ),
         output_root=tmp_path / "exports",
         account_root=account_root,
         session_wxid="wxid_friend",
@@ -100,12 +116,16 @@ def test_unknown_message_is_preserved_and_script_content_is_escaped(tmp_path: Pa
     html = result.html_file.read_text(encoding="utf-8")
     assert payload not in html
     assert "\\u003c/script>" in html
-    assert (result.output_dir / "raw" / "message_0.sqlite-9.txt").read_text(encoding="utf-8") == payload
+    assert (result.output_dir / "raw" / "message_0.sqlite-9.txt").read_text(
+        encoding="utf-8"
+    ) == payload
     assert result.status == "partial"
 
 
 def test_extract_media_hints_deduplicates_paths():
-    content = '<appmsg path="msg/file/report.pdf"><filename>report.pdf</filename></appmsg>'
+    content = (
+        '<appmsg path="msg/file/report.pdf"><filename>report.pdf</filename></appmsg>'
+    )
     hints = extract_media_hints(content)
     assert "msg/file/report.pdf" in hints
     assert hints.count("report.pdf") == 1
@@ -117,7 +137,9 @@ def test_voice_is_exported_from_media_database(tmp_path: Path):
     media_db = tmp_path / "media_0.db"
     with sqlite3.connect(media_db) as connection:
         connection.execute("CREATE TABLE Name2Id(user_name TEXT)")
-        connection.execute("INSERT INTO Name2Id(rowid, user_name) VALUES (7, 'wxid_friend')")
+        connection.execute(
+            "INSERT INTO Name2Id(rowid, user_name) VALUES (7, 'wxid_friend')"
+        )
         connection.execute(
             "CREATE TABLE VoiceInfo(chat_name_id INTEGER, local_id INTEGER, svr_id INTEGER, "
             "data_index INTEGER, voice_data BLOB)"
@@ -126,7 +148,9 @@ def test_voice_is_exported_from_media_database(tmp_path: Path):
             "INSERT INTO VoiceInfo VALUES (7, 10, 99, 0, ?)",
             (b"\x02#!SILK_V3voice",),
         )
-    voice_message = message(local_id=10, content="", kind=MessageKind.VOICE, raw_type=34)
+    voice_message = message(
+        local_id=10, content="", kind=MessageKind.VOICE, raw_type=34
+    )
     voice_message = Message(**{**voice_message.__dict__, "server_id": 99})
 
     result = export_conversation(
@@ -155,7 +179,9 @@ def test_bare_media_md5_finds_file_with_extension(tmp_path: Path):
     source.write_bytes(b"original-image-container")
 
     result = export_conversation(
-        messages=(message(local_id=3, content=digest, kind=MessageKind.IMAGE, raw_type=3),),
+        messages=(
+            message(local_id=3, content=digest, kind=MessageKind.IMAGE, raw_type=3),
+        ),
         output_root=tmp_path / "exports",
         account_root=account_root,
         session_wxid="wxid_friend",

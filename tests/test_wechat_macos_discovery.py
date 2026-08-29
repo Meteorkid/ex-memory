@@ -45,7 +45,9 @@ def test_detect_environment_reads_app_version(tmp_path: Path):
     assert environment.accounts == ()
 
 
-def test_detect_environment_reports_full_disk_access_denied(tmp_path: Path, monkeypatch):
+def test_detect_environment_reports_full_disk_access_denied(
+    tmp_path: Path, monkeypatch
+):
     data_root = tmp_path / "xwechat_files"
     data_root.mkdir()
     original_iterdir = Path.iterdir
@@ -57,14 +59,18 @@ def test_detect_environment_reports_full_disk_access_denied(tmp_path: Path, monk
 
     monkeypatch.setattr(Path, "iterdir", denied_iterdir)
 
-    environment = detect_environment(app_path=tmp_path / "WeChat.app", data_root=data_root)
+    environment = detect_environment(
+        app_path=tmp_path / "WeChat.app", data_root=data_root
+    )
 
     assert environment.accounts == ()
     assert environment.data_accessible is False
     assert environment.error_code == "full_disk_access_required"
 
 
-def test_detect_environment_identifies_the_only_account_with_open_wechat_databases(tmp_path: Path):
+def test_detect_environment_identifies_the_only_account_with_open_wechat_databases(
+    tmp_path: Path,
+):
     data_root = tmp_path / "xwechat_files"
     first_db = data_root / "wxid_first_abcd" / "db_storage" / "message" / "message.db"
     second_db = data_root / "wxid_second_ef01" / "db_storage" / "message" / "message.db"
@@ -76,7 +82,9 @@ def test_detect_environment_identifies_the_only_account_with_open_wechat_databas
     def runner(command, **_kwargs):
         if command[:3] == ["/usr/bin/pgrep", "-x", "WeChat"]:
             return subprocess.CompletedProcess(command, 0, stdout="42\n", stderr="")
-        return subprocess.CompletedProcess(command, 0, stdout=f"p42\nn{second_db}\n", stderr="")
+        return subprocess.CompletedProcess(
+            command, 0, stdout=f"p42\nn{second_db}\n", stderr=""
+        )
 
     environment = detect_environment(
         app_path=tmp_path / "WeChat.app",

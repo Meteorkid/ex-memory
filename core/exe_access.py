@@ -40,6 +40,7 @@ def set_owner_user_id(slug: str, user_id: int) -> None:
 
 def _single_user_mode() -> bool:
     from config import SINGLE_USER_MODE
+
     return SINGLE_USER_MODE
 
 
@@ -77,6 +78,7 @@ def assert_exe_access(slug: str, user_id: int) -> None:
 def iter_accessible_exes(user_id: int):
     """迭代当前用户可访问的镜像目录。"""
     from config import EXES_DIR
+
     if not EXES_DIR.exists():
         return
     for d in EXES_DIR.iterdir():

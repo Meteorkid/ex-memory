@@ -1,4 +1,5 @@
 """/update — 向已有镜像追加新素材。"""
+
 from pathlib import Path
 from config import get_ex_dir, get_embedding_config, get_collection_name
 from core.validation import validate_slug
@@ -34,7 +35,11 @@ def cmd_update(slug: str):
     embedder = None
     vector_store = None
     if emb_cfg["api_key"]:
-        embedder = Embedder(api_key=emb_cfg["api_key"], base_url=emb_cfg["base_url"], model=emb_cfg["model"])
+        embedder = Embedder(
+            api_key=emb_cfg["api_key"],
+            base_url=emb_cfg["base_url"],
+            model=emb_cfg["model"],
+        )
         vector_store = VectorStore(
             persist_dir=str(ex_dir / "chroma_db"),
             collection_name=get_collection_name(slug),
@@ -50,11 +55,14 @@ def cmd_update(slug: str):
         from memory.ingest import ingest_wechat_file, build_materials_summary
 
         name = slug.replace("_", " ")
-        messages, chunk_count = ingest_wechat_file(file_path, slug, name, vector_store, embedder)
+        messages, chunk_count = ingest_wechat_file(
+            file_path, slug, name, vector_store, embedder
+        )
         if messages:
             print(f"  解析完成：{len(messages)} 条消息，入库 {chunk_count} 个切片")
             materials_summary = build_materials_summary(
-                vector_store, embedder,
+                vector_store,
+                embedder,
                 messages_count=len(messages),
                 prefix=f"新增聊天记录 {len(messages)} 条\n",
             )
@@ -77,6 +85,7 @@ def cmd_update(slug: str):
         materials_summary = text
 
         from memory.ingest import ingest_text
+
         if vector_store and embedder:
             n = ingest_text(text, slug, "oral_update", vector_store, embedder)
             print(f"  入库完成：{n} 个切片")
@@ -89,11 +98,14 @@ def cmd_update(slug: str):
         from memory.ingest import ingest_qq_file, build_materials_summary
 
         name = slug.replace("_", " ")
-        messages, chunk_count = ingest_qq_file(file_path, slug, name, vector_store, embedder)
+        messages, chunk_count = ingest_qq_file(
+            file_path, slug, name, vector_store, embedder
+        )
         if messages:
             print(f"  解析完成：{len(messages)} 条消息，入库 {chunk_count} 个切片")
             materials_summary = build_materials_summary(
-                vector_store, embedder,
+                vector_store,
+                embedder,
                 messages_count=len(messages),
                 prefix=f"新增 QQ 聊天记录 {len(messages)} 条\n",
             )
@@ -104,6 +116,7 @@ def cmd_update(slug: str):
     if materials_summary:
         print("正在增量合并...")
         from pipeline.merger import merge_new_material
+
         source_type = {"A": "wechat", "B": "oral", "C": "qq"}.get(choice, "oral")
         result = merge_new_material(slug, materials_summary, source_type=source_type)
 

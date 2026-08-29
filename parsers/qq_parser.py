@@ -19,23 +19,15 @@ logger = logging.getLogger("ex-memory")
 # ── QQ TXT 格式正则 ──
 
 # 格式 A：2024-01-01 10:00:00 发送者名(12345)
-_MSG_A = re.compile(
-    r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(.+?)\((\d+)\)\s*$"
-)
+_MSG_A = re.compile(r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(.+?)\((\d+)\)\s*$")
 
 # 格式 B：2024-01-01 10:00:00 发送者名
-_MSG_B = re.compile(
-    r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(.+?)\s*$"
-)
+_MSG_B = re.compile(r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(.+?)\s*$")
 
 # 格式 C：发送者名(12345) 2024-01-15 20:30:45
-_MSG_C = re.compile(
-    r"^(.+?)\((\d+)\)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*$"
-)
+_MSG_C = re.compile(r"^(.+?)\((\d+)\)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*$")
 # 检测用（不加 $ 锚定，适用于多行 head）
-_MSG_C_DETECT = re.compile(
-    r"^(.+?)\((\d+)\)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})"
-)
+_MSG_C_DETECT = re.compile(r"^(.+?)\((\d+)\)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})")
 
 
 def detect_qq_format(file_path: str) -> str:
@@ -68,7 +60,9 @@ def detect_qq_format(file_path: str) -> str:
     return "plaintext"
 
 
-def parse_qq_txt(file_path: str, target_name: str = "", fmt: str = "auto") -> list[dict]:
+def parse_qq_txt(
+    file_path: str, target_name: str = "", fmt: str = "auto"
+) -> list[dict]:
     """解析 QQ 导出的 TXT 文件。
 
     Args:
@@ -186,9 +180,13 @@ def _parse_mht(file_path: str, target_name: str) -> list[dict]:
     # MHT 是 MIME 格式，尝试解析
     try:
         # policy.default 下实际返回 EmailMessage，但 typeshed 仍标注为 Message
-        msg = cast(EmailMessage, email.message_from_string(
-            content, policy=policy.default,  # type: ignore[arg-type]  # typeshed 重载缺失
-        ))
+        msg = cast(
+            EmailMessage,
+            email.message_from_string(
+                content,
+                policy=policy.default,  # type: ignore[arg-type]  # typeshed 重载缺失
+            ),
+        )
     except (ValueError, TypeError) as e:
         logger.warning("MHT 解析失败 %s: %s", file_path, e)
         return []
@@ -236,7 +234,12 @@ def _parse_merged_text(text: str, target_name: str) -> list[dict]:
             if current_msg:
                 messages.append(current_msg)
             sender, qq, timestamp = m.groups()
-            current_msg = {"timestamp": timestamp, "sender": sender.strip(), "qq": qq.strip(), "content": ""}
+            current_msg = {
+                "timestamp": timestamp,
+                "sender": sender.strip(),
+                "qq": qq.strip(),
+                "content": "",
+            }
             continue
 
         # 尝试格式 A（时间戳+名字+QQ号）
@@ -245,7 +248,12 @@ def _parse_merged_text(text: str, target_name: str) -> list[dict]:
             if current_msg:
                 messages.append(current_msg)
             timestamp, sender, qq = m.groups()
-            current_msg = {"timestamp": timestamp, "sender": sender.strip(), "qq": qq.strip(), "content": ""}
+            current_msg = {
+                "timestamp": timestamp,
+                "sender": sender.strip(),
+                "qq": qq.strip(),
+                "content": "",
+            }
             continue
 
         # 尝试格式 B（时间戳+名字）
@@ -254,7 +262,11 @@ def _parse_merged_text(text: str, target_name: str) -> list[dict]:
             if current_msg:
                 messages.append(current_msg)
             timestamp, sender = m.groups()
-            current_msg = {"timestamp": timestamp, "sender": sender.strip(), "content": ""}
+            current_msg = {
+                "timestamp": timestamp,
+                "sender": sender.strip(),
+                "content": "",
+            }
             continue
 
         # 消息内容行
@@ -295,12 +307,14 @@ def _normalize(messages: list[dict], target_name: str) -> list[dict]:
             # 未指定目标时，非"我"的都是 target
             is_target = sender != "我"
 
-        result.append({
-            "timestamp": m.get("timestamp", ""),
-            "sender": sender,
-            "content": content,
-            "is_target": is_target,
-        })
+        result.append(
+            {
+                "timestamp": m.get("timestamp", ""),
+                "sender": sender,
+                "content": content,
+                "is_target": is_target,
+            }
+        )
 
     return result
 
@@ -319,11 +333,13 @@ def parse(file_path: str, target_name: str = "", fmt: str = "auto") -> list[dict
             content = f.read().strip()
         if not content:
             return []
-        return [{
-            "timestamp": "",
-            "sender": target_name or "unknown",
-            "content": content,
-            "is_target": True,
-        }]
+        return [
+            {
+                "timestamp": "",
+                "sender": target_name or "unknown",
+                "content": content,
+                "is_target": True,
+            }
+        ]
 
     return parse_qq_txt(file_path, target_name, fmt=fmt)

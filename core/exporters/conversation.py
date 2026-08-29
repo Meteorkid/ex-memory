@@ -31,7 +31,9 @@ def export_ex_memory_conversation(slug: str, fmt: str = "html") -> ExportedConve
     messages = load_conversation_messages(slug)
     content = _render(slug, messages, fmt)
     suffix = ".md" if fmt == "md" else f".{fmt}"
-    tmp = tempfile.NamedTemporaryFile(prefix=f"ex-memory-{slug}-chat-", suffix=suffix, delete=False)
+    tmp = tempfile.NamedTemporaryFile(
+        prefix=f"ex-memory-{slug}-chat-", suffix=suffix, delete=False
+    )
     tmp_path = Path(tmp.name)
     tmp.close()
     tmp_path.write_text(content, encoding="utf-8")
@@ -73,11 +75,15 @@ def _render(slug: str, messages: list[dict], fmt: str) -> str:
     if fmt == "md":
         return _render_markdown(slug, messages)
     if fmt == "json":
-        return json.dumps({
-            "slug": slug,
-            "exported_at": datetime.now().isoformat(),
-            "messages": messages,
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "slug": slug,
+                "exported_at": datetime.now().isoformat(),
+                "messages": messages,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
     return _render_text(slug, messages)
 
 
@@ -157,13 +163,15 @@ def _load_cli_session_messages(slug: str) -> list[dict]:
             continue
         session_time = _session_timestamp(path)
         for role, content in _parse_cli_session(path.read_text(encoding="utf-8")):
-            messages.append({
-                "id": f"{path.stem}-{len(messages)}",
-                "role": role,
-                "content": content,
-                "created_at": session_time,
-                "source": "cli",
-            })
+            messages.append(
+                {
+                    "id": f"{path.stem}-{len(messages)}",
+                    "role": role,
+                    "content": content,
+                    "created_at": session_time,
+                    "source": "cli",
+                }
+            )
     return messages
 
 

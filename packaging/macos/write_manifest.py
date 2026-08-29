@@ -37,7 +37,9 @@ def main() -> None:
         "built_at": datetime.now(timezone.utc).isoformat(),
     }
     temporary = args.output.with_suffix(args.output.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     os.replace(temporary, args.output)
 
 

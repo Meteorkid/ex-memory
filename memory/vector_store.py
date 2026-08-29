@@ -11,6 +11,7 @@ logger = logging.getLogger("ex-memory")
 
 class IngestError(Exception):
     """入库异常，携带已成功写入的批次数。"""
+
     def __init__(self, message: str, batches_completed: int = 0):
         super().__init__(message)
         self.batches_completed = batches_completed
@@ -111,11 +112,13 @@ class VectorStore:
             for i, doc in enumerate(results["documents"][0]):
                 meta = results["metadatas"][0][i] if results["metadatas"] else {}
                 score = 1 - results["distances"][0][i] if results["distances"] else 0
-                output.append({
-                    "display_text": meta.get("display_text", doc),
-                    "score": score,
-                    "metadata": meta,
-                })
+                output.append(
+                    {
+                        "display_text": meta.get("display_text", doc),
+                        "score": score,
+                        "metadata": meta,
+                    }
+                )
         return output
 
     def search_target_only(
@@ -137,11 +140,13 @@ class VectorStore:
             ids=[f"session_{slug}_{stable_id}"],
             embeddings=[embedding],
             documents=[text],
-            metadatas=[{
-                "source": "session_summary",
-                "dominant_speaker": "session",
-                "display_text": text[:200],
-            }],
+            metadatas=[
+                {
+                    "source": "session_summary",
+                    "dominant_speaker": "session",
+                    "display_text": text[:200],
+                }
+            ],
         )
 
     def count(self) -> int:

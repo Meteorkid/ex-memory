@@ -1,4 +1,5 @@
 """/{slug} — 进入指定镜像的对话模式。"""
+
 import logging
 from config import get_ex_dir, ARCHIVE_THRESHOLD
 from core.validation import validate_slug, validate_user_input
@@ -50,13 +51,16 @@ def cmd_chat(slug: str):
             if detect_correction(user_msg):
                 print("\n（检测到纠正意图，正在处理...）")
                 result = handle_correction(
-                    slug=slug, user_msg=user_msg, last_reply=reply, history=session.history
+                    slug=slug,
+                    user_msg=user_msg,
+                    last_reply=reply,
+                    history=session.history,
                 )
                 print(result)
                 session.engine._load()
 
             if len(session.history) > session.talk_length * 2:
-                session.history = session.history[-(session.talk_length * 2):]
+                session.history = session.history[-(session.talk_length * 2) :]
 
             if session.turn_count >= ARCHIVE_THRESHOLD:
                 session._maybe_archive()
@@ -71,6 +75,7 @@ def cmd_chat(slug: str):
     print(f"\n--- 进入 [{slug}] 的对话模式 (输入 /help 查看指令) ---\n")
 
     from prompt_toolkit import prompt as pt_prompt
+
     session.running = True
 
     while session.running:
@@ -96,11 +101,13 @@ def cmd_chat(slug: str):
 
 def _do_backup(slug: str):
     from commands.backup import cmd_backup
+
     cmd_backup(slug)
 
 
 def _do_reflect(slug: str):
     from commands.reflect import cmd_reflect
+
     cmd_reflect(slug)
 
 

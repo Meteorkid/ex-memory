@@ -1,4 +1,5 @@
 """/reflect — 关系反思分析。"""
+
 from config import get_ex_dir
 from commands import register
 
@@ -9,6 +10,7 @@ def cmd_reflect(slug: str):
         return
 
     from pipeline.reflector import run_reflection
+
     try:
         print("正在进行关系反思分析（可能需要 1-2 分钟）...")
         reflection = run_reflection(slug)

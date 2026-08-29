@@ -7,7 +7,16 @@ import time
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Query
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    UploadFile,
+    File,
+    Form,
+    Depends,
+    Request,
+    Query,
+)
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -40,11 +49,13 @@ from fastapi.security import HTTPAuthorizationCredentials
 # 简单内存缓存
 # ═══════════════════════════════════════
 
+
 class SimpleCache:
     """内存缓存：TTL + LRU 淘汰，防止内存泄漏。"""
 
     def __init__(self, default_ttl=60, maxsize=256):
         from collections import OrderedDict
+
         self._cache = OrderedDict()
         self._default_ttl = default_ttl
         self._maxsize = maxsize
@@ -71,12 +82,14 @@ class SimpleCache:
     def clear(self):
         self._cache.clear()
 
+
 # 全局缓存实例
 cache = SimpleCache(default_ttl=30)  # 30秒 TTL
 
 # ═══════════════════════════════════════
 # meta.json 读写工具
 # ═══════════════════════════════════════
+
 
 def _load_meta(slug: str) -> dict:
     """读取镜像 meta.json，不存在则抛 404。"""
@@ -89,7 +102,9 @@ def _load_meta(slug: str) -> dict:
 def _save_meta(slug: str, meta: dict) -> None:
     """写入镜像 meta.json。"""
     meta_file = get_ex_dir(slug) / "meta.json"
-    meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    meta_file.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 logger = logging.getLogger("ex-memory")
@@ -129,6 +144,7 @@ def _get_login_limiter():
     global _login_limiter
     if _login_limiter is None:
         from server.middleware import LoginRateLimiter
+
         _login_limiter = LoginRateLimiter()
     return _login_limiter
 
@@ -143,12 +159,17 @@ def _get_audit():
 def _audit(event: str, username: str = "", client_ip: str = "", detail: str = ""):
     """记录审计事件（不会因审计日志写入失败影响主流程）。"""
     try:
-        _get_audit().info(json.dumps({
-            "event": event,
-            "username": username,
-            "ip": client_ip,
-            "detail": detail,
-        }, ensure_ascii=False))
+        _get_audit().info(
+            json.dumps(
+                {
+                    "event": event,
+                    "username": username,
+                    "ip": client_ip,
+                    "detail": detail,
+                },
+                ensure_ascii=False,
+            )
+        )
     except (OSError, TypeError, ValueError) as e:
         # 审计写入失败不阻断主流程，但必须留痕，否则审计缺口无人察觉
         logger.warning("审计日志写入失败 event=%s: %s", event, e)
@@ -161,6 +182,7 @@ def _get_engine(slug: str):
         if engine is not None:
             return engine
     from core.factory import create_engine_and_store
+
     engine, _, _ = create_engine_and_store(slug)
     with _engine_cache_lock:
         if slug not in _engine_cache:
@@ -202,10 +224,12 @@ def _invalidate_engine(slug: str):
 
 # --- 用户认证 ---
 
+
 @router.post("/auth/register", response_model=StatusResponse)
 def register(req: AuthRequest, request: Request):
     """注册新用户。"""
     import config
+
     if config.METEOR_STORE_SSO_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
     if DISABLE_REGISTRATION:
@@ -213,9 +237,12 @@ def register(req: AuthRequest, request: Request):
     client_ip = _get_client_ip(request)
     _get_login_limiter().check(req.username, client_ip)
     from server.auth import register_user
+
     error = register_user(req.username, req.password)
     if error:
-        _audit("register_failed", username=req.username, client_ip=client_ip, detail=error)
+        _audit(
+            "register_failed", username=req.username, client_ip=client_ip, detail=error
+        )
         raise HTTPException(status_code=400, detail=error)
     _audit("register_success", username=req.username, client_ip=client_ip)
     return StatusResponse(message="注册成功，请登录")
@@ -225,12 +252,14 @@ def register(req: AuthRequest, request: Request):
 def login(req: AuthRequest, request: Request):
     """登录获取 token。"""
     import config
+
     if config.METEOR_STORE_SSO_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
     client_ip = _get_client_ip(request)
     _get_login_limiter().check(req.username, client_ip)
 
     from server.auth import login_user
+
     token = login_user(req.username, req.password)
     if token is None:
         _audit("login_failed", username=req.username, client_ip=client_ip)
@@ -246,15 +275,18 @@ def logout(
 ):
     """注销当前 Bearer token。"""
     import config
+
     if config.METEOR_STORE_SSO_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
     from server.auth import revoke_token
+
     if credentials:
         revoke_token(credentials.credentials)
     return StatusResponse(message="已注销")
 
 
 # --- 镜像管理 ---
+
 
 @router.get("/exes", response_model=list[ExeInfo])
 def list_exes(user_id: int = Depends(require_auth)):
@@ -264,13 +296,15 @@ def list_exes(user_id: int = Depends(require_auth)):
         meta_path = d / "meta.json"
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            exes.append(ExeInfo(
-                slug=d.name,
-                name=meta.get("name", d.name),
-                state=meta.get("pipeline_state", "unknown"),
-                created_at=meta.get("created_at", ""),
-                updated_at=meta.get("updated_at"),
-            ))
+            exes.append(
+                ExeInfo(
+                    slug=d.name,
+                    name=meta.get("name", d.name),
+                    state=meta.get("pipeline_state", "unknown"),
+                    created_at=meta.get("created_at", ""),
+                    updated_at=meta.get("updated_at"),
+                )
+            )
         except (OSError, json.JSONDecodeError) as e:
             logger.warning("跳过损坏的 meta.json slug=%s: %s", d.name, e)
     return sorted(exes, key=lambda e: e.created_at, reverse=True)
@@ -289,8 +323,12 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
         raise HTTPException(status_code=409, detail=f"镜像 [{slug}] 已存在")
 
     from pipeline.orchestrator import run_create_flow_api
+
     result = run_create_flow_api(
-        slug=slug, name=req.name, answers=req.answers, owner_user_id=user_id,
+        slug=slug,
+        name=req.name,
+        answers=req.answers,
+        owner_user_id=user_id,
     )
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
@@ -299,7 +337,9 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
     except (OSError, ValueError, FileNotFoundError) as e:
         # 绑定失败会让镜像在多用户模式下永久不可访问，必须显式暴露
         logger.error("镜像 [%s] 绑定 owner 失败: %s", slug, e)
-        raise HTTPException(status_code=500, detail="镜像创建成功但归属绑定失败，请联系管理员")
+        raise HTTPException(
+            status_code=500, detail="镜像创建成功但归属绑定失败，请联系管理员"
+        )
     return StatusResponse(message=f"镜像 [{slug}] 创建成功")
 
 
@@ -309,6 +349,7 @@ def resume_exe(slug: str, req: ResumeRequest, user_id: int = Depends(require_aut
     slug = _check_exe_access(slug, user_id)
 
     from pipeline.orchestrator import run_create_flow_api
+
     result = run_create_flow_api(slug=slug, name=req.name, answers=[], resume=True)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
@@ -323,6 +364,7 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
     slug = _check_exe_access(slug, user_id)
     ex_dir = get_ex_dir(slug)
     import shutil
+
     shutil.rmtree(ex_dir)
     _audit("exe_deleted", username=f"user_id={user_id}", detail=f"slug={slug}")
     return StatusResponse(message=f"镜像 [{slug}] 已删除")
@@ -334,7 +376,12 @@ MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
 
 
 @router.post("/exes/{slug}/import", response_model=StatusResponse)
-async def import_data(slug: str, file: UploadFile = File(...), target_name: str = Form(""), user_id: int = Depends(require_auth)):
+async def import_data(
+    slug: str,
+    file: UploadFile = File(...),
+    target_name: str = Form(""),
+    user_id: int = Depends(require_auth),
+):
     """导入聊天记录数据源（自动检测微信/QQ 格式）。"""
     slug = _check_exe_access(slug, user_id)
     ex_dir = get_ex_dir(slug)
@@ -362,6 +409,7 @@ async def import_data(slug: str, file: UploadFile = File(...), target_name: str 
         _invalidate_engine(slug)
 
         from config import get_embedding_config, get_collection_name
+
         emb_cfg = get_embedding_config()
         if not emb_cfg["api_key"]:
             raise HTTPException(status_code=500, detail="未配置 Embedding API Key")
@@ -369,7 +417,11 @@ async def import_data(slug: str, file: UploadFile = File(...), target_name: str 
         from memory.embedder import Embedder
         from memory.vector_store import VectorStore
 
-        embedder = Embedder(api_key=emb_cfg["api_key"], base_url=emb_cfg["base_url"], model=emb_cfg["model"])
+        embedder = Embedder(
+            api_key=emb_cfg["api_key"],
+            base_url=emb_cfg["base_url"],
+            model=emb_cfg["model"],
+        )
         vector_store = VectorStore(
             persist_dir=str(ex_dir / "chroma_db"),
             collection_name=get_collection_name(slug),
@@ -379,22 +431,35 @@ async def import_data(slug: str, file: UploadFile = File(...), target_name: str 
         ext = Path(safe_name).suffix.lower()
         if ext == ".mht" or ext == ".mhtml":
             from memory.ingest import ingest_qq_file
-            messages, chunk_count = ingest_qq_file(str(tmp_path), slug, target_name, vector_store, embedder)
+
+            messages, chunk_count = ingest_qq_file(
+                str(tmp_path), slug, target_name, vector_store, embedder
+            )
         elif ext == ".txt":
             # TXT 需要检测是微信还是 QQ 格式
             from parsers.wechat_parser import detect_format
+
             fmt = detect_format(str(tmp_path))
             if fmt == "plaintext":
                 # 微信无法识别，尝试 QQ
                 from memory.ingest import ingest_qq_file
-                messages, chunk_count = ingest_qq_file(str(tmp_path), slug, target_name, vector_store, embedder)
+
+                messages, chunk_count = ingest_qq_file(
+                    str(tmp_path), slug, target_name, vector_store, embedder
+                )
             else:
                 from memory.ingest import ingest_wechat_file
-                messages, chunk_count = ingest_wechat_file(str(tmp_path), slug, target_name, vector_store, embedder)
+
+                messages, chunk_count = ingest_wechat_file(
+                    str(tmp_path), slug, target_name, vector_store, embedder
+                )
         else:
             # JSON/JSONL 默认微信
             from memory.ingest import ingest_wechat_file
-            messages, chunk_count = ingest_wechat_file(str(tmp_path), slug, target_name, vector_store, embedder)
+
+            messages, chunk_count = ingest_wechat_file(
+                str(tmp_path), slug, target_name, vector_store, embedder
+            )
 
         if not messages:
             return StatusResponse(message="未提取到有效消息")
@@ -408,6 +473,7 @@ async def import_data(slug: str, file: UploadFile = File(...), target_name: str 
 
 # --- 贴纸 ---
 
+
 @router.get("/stickers")
 def list_all_stickers(
     category: str = Query("all", description="过滤分类"),
@@ -416,6 +482,7 @@ def list_all_stickers(
     """返回所有可用贴纸（emoji + 图片 + GIF）。"""
     from core.sticker_selector import get_all_stickers
     from core.sticker_manager import list_stickers as list_image_stickers
+
     emoji_stickers = get_all_stickers()
     image_stickers = list_image_stickers(category=category, user_id=user_id)
     # emoji 贴纸始终返回（不过滤分类），图片贴纸按 category 过滤
@@ -424,7 +491,9 @@ def list_all_stickers(
     elif category == "custom":
         combined = image_stickers
     else:
-        combined = [s for s in emoji_stickers if s.get("emotion") == category] + image_stickers
+        combined = [
+            s for s in emoji_stickers if s.get("emotion") == category
+        ] + image_stickers
     return {"stickers": combined}
 
 
@@ -433,9 +502,16 @@ def get_sticker_route(sticker_id: str, user_id: int = Depends(require_auth)):
     """获取单个贴纸信息。"""
     from core.sticker_selector import STICKERS
     from core.sticker_manager import get_sticker as get_image_sticker
+
     if sticker_id in STICKERS:
         s = STICKERS[sticker_id]
-        return {"id": sticker_id, "type": "emoji", "emoji": s["emoji"], "label": s["label"], "category": s["emotion"]}
+        return {
+            "id": sticker_id,
+            "type": "emoji",
+            "emoji": s["emoji"],
+            "label": s["label"],
+            "category": s["emotion"],
+        }
     sticker = get_image_sticker(sticker_id, user_id=user_id)
     if sticker:
         return sticker
@@ -451,6 +527,7 @@ async def upload_sticker(
 ):
     """上传自定义贴纸。"""
     from core.sticker_manager import upload_sticker as _upload, ALLOWED_EXTENSIONS
+
     ext = Path(file.filename).suffix.lower() if file.filename else ""
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"不支持的文件类型: {ext}")
@@ -466,6 +543,7 @@ async def upload_sticker(
 def delete_custom_sticker(sticker_id: str, user_id: int = Depends(require_auth)):
     """删除自定义贴纸。"""
     from core.sticker_manager import delete_sticker
+
     if not delete_sticker(sticker_id, user_id):
         raise HTTPException(status_code=404, detail="贴纸不存在或为内置贴纸，不可删除")
     return StatusResponse(message="贴纸已删除")
@@ -473,11 +551,13 @@ def delete_custom_sticker(sticker_id: str, user_id: int = Depends(require_auth))
 
 # --- 钱包 ---
 
+
 @router.get("/exes/{slug}/wallet")
 def get_wallet(slug: str, user_id: int = Depends(require_auth)):
     """获取钱包信息。"""
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import load_wallet, load_redpackets, load_transfers
+
     wallet = load_wallet(slug)
     packets = load_redpackets(slug)
     transfers = load_transfers(slug)
@@ -491,11 +571,13 @@ def get_wallet(slug: str, user_id: int = Depends(require_auth)):
 
 # --- 红包 ---
 
+
 @router.post("/exes/{slug}/redpacket/send", response_model=StatusResponse)
 def send_redpacket(slug: str, user_id: int = Depends(require_auth)):
     """生成一个红包（模拟 ta 发红包）。"""
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import create_redpacket
+
     rp = create_redpacket(slug)
     if rp is None:
         raise HTTPException(status_code=429, detail="红包太频繁，请稍后再试")
@@ -507,6 +589,7 @@ def open_redpacket(slug: str, rp_id: str, user_id: int = Depends(require_auth)):
     """打开红包。"""
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import open_redpacket
+
     rp = open_redpacket(slug, rp_id)
     if rp is None:
         raise HTTPException(status_code=400, detail="红包不存在或已被打开")
@@ -515,20 +598,30 @@ def open_redpacket(slug: str, rp_id: str, user_id: int = Depends(require_auth)):
 
 # --- 转账 ---
 
+
 @router.post("/exes/{slug}/transfer/send", response_model=StatusResponse)
-def send_transfer(slug: str, req: TransferRequest, user_id: int = Depends(require_auth)):
+def send_transfer(
+    slug: str, req: TransferRequest, user_id: int = Depends(require_auth)
+):
     """发起转账。"""
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import create_transfer
+
     create_transfer(slug, req.amount, req.note, req.direction)
     return StatusResponse(message=f"转账已发起: {req.note} (¥{req.amount})")
 
 
 @router.post("/exes/{slug}/transfer/{tx_id}/confirm")
-def confirm_transfer(slug: str, tx_id: str, req: TransferConfirmRequest, user_id: int = Depends(require_auth)):
+def confirm_transfer(
+    slug: str,
+    tx_id: str,
+    req: TransferConfirmRequest,
+    user_id: int = Depends(require_auth),
+):
     """确认转账 (receive/return)。"""
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import confirm_transfer
+
     tx = confirm_transfer(slug, tx_id, req.action)
     if tx is None:
         raise HTTPException(status_code=400, detail="转账不存在或已处理")
@@ -536,6 +629,7 @@ def confirm_transfer(slug: str, tx_id: str, req: TransferConfirmRequest, user_id
 
 
 # --- Token 用量 ---
+
 
 @router.get("/exes/{slug}/usage")
 def get_usage(slug: str, user_id: int = Depends(require_auth)):
@@ -563,6 +657,7 @@ def reset_usage(slug: str, user_id: int = Depends(require_auth)):
 
 # --- 对话 ---
 
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
     """单轮对话。"""
@@ -577,6 +672,7 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
     if req.sticker_id and not message:
         from core.sticker_manager import get_sticker
         from core.sticker_selector import STICKERS
+
         if req.sticker_id in STICKERS:
             message = STICKERS[req.sticker_id]["emoji"]
         else:
@@ -616,6 +712,7 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
         # 持久化对话（供搜索/统计使用）
         try:
             from core.conversation_store import append_turn
+
             append_turn(slug, user_id, message, reply, stickers=stickers, source="web")
         except (OSError, ValueError) as e:
             # 持久化失败不影响本次回复，但会造成搜索/统计缺数据
@@ -641,6 +738,7 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
     if req.sticker_id and not message:
         from core.sticker_manager import get_sticker
         from core.sticker_selector import STICKERS
+
         if req.sticker_id in STICKERS:
             message = STICKERS[req.sticker_id]["emoji"]
         else:
@@ -664,14 +762,16 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
                 yield f"data: {json.dumps(item)}\n\n"
 
             # 流式无法获取精确 usage，用 token 估算
-            est_prompt = estimate_tokens(message + "\n".join(
-                m.get("content", "")[:200] for m in history[-20:]
-            ))
+            est_prompt = estimate_tokens(
+                message + "\n".join(m.get("content", "")[:200] for m in history[-20:])
+            )
             est_completion = estimate_tokens(full_reply)
+
             # 构造一个近似 usage 对象用于累计
             class _ApproxUsage:
                 prompt_tokens = est_prompt
                 completion_tokens = est_completion
+
             approx_usage = _ApproxUsage()
 
             with _counter_lock:
@@ -692,12 +792,14 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
 
 # --- 更新 ---
 
+
 @router.post("/exes/{slug}/update", response_model=StatusResponse)
 def update_exe(slug: str, req: UpdateRequest, user_id: int = Depends(require_auth)):
     """向镜像追加新素材。"""
     slug = _check_exe_access(slug, user_id)
 
     from pipeline.merger import merge_new_material
+
     result = merge_new_material(slug, req.content, req.source_type)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=_INTERNAL_ERROR)
@@ -707,12 +809,14 @@ def update_exe(slug: str, req: UpdateRequest, user_id: int = Depends(require_aut
 
 # --- 反思 ---
 
+
 @router.post("/exes/{slug}/reflect", response_model=StatusResponse)
 def reflect_exe(slug: str, user_id: int = Depends(require_auth)):
     """关系反思分析。"""
     slug = _check_exe_access(slug, user_id)
 
     from pipeline.reflector import run_reflection
+
     try:
         run_reflection(slug)
     except FileNotFoundError:
@@ -723,6 +827,7 @@ def reflect_exe(slug: str, user_id: int = Depends(require_auth)):
 
 
 # --- 朋友圈 ---
+
 
 @router.get("/exes/{slug}/moments")
 def list_moments(slug: str, user_id: int = Depends(require_auth)):
@@ -742,6 +847,7 @@ def generate_moment(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
 
     from pipeline.moment_generator import generate_moment as _gen
+
     try:
         _gen(slug)
         return StatusResponse(message="朋友圈已生成")
@@ -753,11 +859,15 @@ def generate_moment(slug: str, user_id: int = Depends(require_auth)):
 
 # --- 版本管理 ---
 
+
 @router.post("/exes/{slug}/backup", response_model=StatusResponse)
-def backup_exe(slug: str, req: Optional[BackupRequest] = None, user_id: int = Depends(require_auth)):
+def backup_exe(
+    slug: str, req: Optional[BackupRequest] = None, user_id: int = Depends(require_auth)
+):
     """备份版本。"""
     slug = _check_exe_access(slug, user_id)
     from core.version_manager import backup
+
     version = backup(slug, req.version_name if req else "")
     return StatusResponse(message=f"备份成功: {version}")
 
@@ -767,6 +877,7 @@ def rollback_exe(slug: str, req: RollbackRequest, user_id: int = Depends(require
     """回滚版本。"""
     slug = _check_exe_access(slug, user_id)
     from core.version_manager import rollback, list_versions
+
     try:
         rollback(slug, req.version)
         _invalidate_engine(slug)
@@ -784,13 +895,19 @@ def list_versions_route(slug: str, user_id: int = Depends(require_auth)):
     """列出版本。"""
     slug = _check_exe_access(slug, user_id)
     from core.version_manager import list_versions
+
     return {"slug": slug, "versions": list_versions(slug)}
 
 
 # --- 对话搜索 ---
 
+
 @router.get("/exes/{slug}/messages/search")
-def search_messages(slug: str, q: str = Query(..., min_length=1, max_length=200), user_id: int = Depends(require_auth)):
+def search_messages(
+    slug: str,
+    q: str = Query(..., min_length=1, max_length=200),
+    user_id: int = Depends(require_auth),
+):
     """全文搜索对话内容（基于 JSONL 归档）。"""
     slug = _check_exe_access(slug, user_id)
     from core.conversation_store import load_jsonl_messages
@@ -810,17 +927,20 @@ def search_messages(slug: str, q: str = Query(..., min_length=1, max_length=200)
                 snippet = "…" + snippet
             if end < len(content):
                 snippet = snippet + "…"
-            results.append({
-                "id": msg.get("id", ""),
-                "role": msg.get("role", ""),
-                "content": content,
-                "snippet": snippet,
-                "created_at": msg.get("created_at", ""),
-            })
+            results.append(
+                {
+                    "id": msg.get("id", ""),
+                    "role": msg.get("role", ""),
+                    "content": content,
+                    "snippet": snippet,
+                    "created_at": msg.get("created_at", ""),
+                }
+            )
     return {"results": results[-100:], "total": len(results)}
 
 
 # --- 对话统计 ---
+
 
 @router.get("/exes/{slug}/stats")
 def get_stats(slug: str, user_id: int = Depends(require_auth)):
@@ -882,6 +1002,7 @@ def get_stats(slug: str, user_id: int = Depends(require_auth)):
 
 # --- 情感分析 ---
 
+
 @router.get("/exes/{slug}/emotion")
 def get_emotion(slug: str, user_id: int = Depends(require_auth)):
     """对话情感分析：整体情感倾向 + 情感曲线。"""
@@ -896,10 +1017,12 @@ def get_emotion(slug: str, user_id: int = Depends(require_auth)):
 
 # --- 健康提醒 ---
 
+
 @router.get("/user/health/check")
 def health_check(user_id: int = Depends(require_auth)):
     """检查是否需要显示使用时长提醒。"""
     from core.health_tracker import health_tracker
+
     health_tracker.start_session(user_id)
     should_remind = health_tracker.should_remind(user_id)
     tip = health_tracker.get_health_tip()
@@ -910,6 +1033,7 @@ def health_check(user_id: int = Depends(require_auth)):
 def health_stats(user_id: int = Depends(require_auth)):
     """获取用户使用统计。"""
     from core.health_tracker import health_tracker
+
     return health_tracker.get_usage_stats(user_id)
 
 
@@ -917,10 +1041,12 @@ def health_stats(user_id: int = Depends(require_auth)):
 def mindful_message(user_id: int = Depends(require_auth)):
     """获取正念引导消息。"""
     from core.health_tracker import health_tracker
+
     return {"message": health_tracker.get_mindful_message()}
 
 
 # --- 多人镜像管理 ---
+
 
 @router.put("/exes/{slug}/group")
 def set_group(slug: str, group: str = Query(...), user_id: int = Depends(require_auth)):
@@ -944,10 +1070,12 @@ def list_groups(user_id: int = Depends(require_auth)):
             group = meta.get("group", "默认")
             if group not in groups:
                 groups[group] = []
-            groups[group].append({
-                "slug": exe_dir.name,
-                "name": meta.get("name", exe_dir.name),
-            })
+            groups[group].append(
+                {
+                    "slug": exe_dir.name,
+                    "name": meta.get("name", exe_dir.name),
+                }
+            )
         except (OSError, json.JSONDecodeError) as e:
             logger.warning("跳过损坏的 meta.json slug=%s: %s", exe_dir.name, e)
 
@@ -955,6 +1083,7 @@ def list_groups(user_id: int = Depends(require_auth)):
 
 
 # --- 关系阶段管理 ---
+
 
 @router.get("/exes/{slug}/stage")
 def get_stage(slug: str, user_id: int = Depends(require_auth)):
@@ -1028,6 +1157,7 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
 
 # --- 使用统计 ---
 
+
 @router.get("/stats/usage")
 def get_usage_stats(user_id: int = Depends(require_auth)):
     """获取用户使用统计。"""
@@ -1079,11 +1209,13 @@ def submit_feedback(req: FeedbackRequest, user_id: int = Depends(require_auth)):
 
 # --- 情感记忆 ---
 
+
 @router.get("/exes/{slug}/emotional-memories")
 def get_emotional_memories(slug: str, user_id: int = Depends(require_auth)):
     """获取情感记忆。"""
     slug = _check_exe_access(slug, user_id)
     from core.emotional_memory import load_emotional_memories
+
     memories = load_emotional_memories(slug)
     return {"memories": memories}
 
@@ -1092,7 +1224,10 @@ def get_emotional_memories(slug: str, user_id: int = Depends(require_auth)):
 def extract_memories(slug: str, user_id: int = Depends(require_auth)):
     """从对话历史中提取情感记忆。"""
     slug = _check_exe_access(slug, user_id)
-    from core.emotional_memory import extract_emotional_memories, save_emotional_memories
+    from core.emotional_memory import (
+        extract_emotional_memories,
+        save_emotional_memories,
+    )
 
     history = _load_history(slug, with_time=True)
 
@@ -1104,11 +1239,13 @@ def extract_memories(slug: str, user_id: int = Depends(require_auth)):
 
 # --- 个性化 ---
 
+
 @router.get("/exes/{slug}/user-profile")
 def get_user_profile(slug: str, user_id: int = Depends(require_auth)):
     """获取用户画像。"""
     slug = _check_exe_access(slug, user_id)
     from core.personalization import load_user_profile
+
     profile = load_user_profile(slug)
     return {"profile": profile}
 
@@ -1117,7 +1254,11 @@ def get_user_profile(slug: str, user_id: int = Depends(require_auth)):
 def analyze_user_profile(slug: str, user_id: int = Depends(require_auth)):
     """分析用户对话风格。"""
     slug = _check_exe_access(slug, user_id)
-    from core.personalization import analyze_user_style, calculate_relationship_temperature, save_user_profile
+    from core.personalization import (
+        analyze_user_style,
+        calculate_relationship_temperature,
+        save_user_profile,
+    )
 
     history = _load_history(slug, with_time=True)
 

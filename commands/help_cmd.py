@@ -1,4 +1,5 @@
 """/help — 显示帮助。"""
+
 from commands import register
 
 

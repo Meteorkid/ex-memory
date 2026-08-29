@@ -46,19 +46,27 @@ def import_chat_file(file_path: Path, slug: str, target_name: str) -> ImportResu
     return ImportResult(messages_count=len(messages), chunk_count=chunk_count)
 
 
-def _ingest_by_extension(file_path: Path, slug: str, target_name: str, vector_store, embedder):
+def _ingest_by_extension(
+    file_path: Path, slug: str, target_name: str, vector_store, embedder
+):
     """根据文件扩展名选择微信/QQ 摄入器。"""
     ext = file_path.suffix.lower()
     if ext in (".mht", ".mhtml"):
         from memory.ingest import ingest_qq_file
+
         return ingest_qq_file(str(file_path), slug, target_name, vector_store, embedder)
 
     if ext == ".txt":
         from parsers.wechat_parser import detect_format
+
         fmt = detect_format(str(file_path))
         if fmt == "plaintext":
             from memory.ingest import ingest_qq_file
-            return ingest_qq_file(str(file_path), slug, target_name, vector_store, embedder)
+
+            return ingest_qq_file(
+                str(file_path), slug, target_name, vector_store, embedder
+            )
 
     from memory.ingest import ingest_wechat_file
+
     return ingest_wechat_file(str(file_path), slug, target_name, vector_store, embedder)

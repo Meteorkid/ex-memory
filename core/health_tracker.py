@@ -56,7 +56,10 @@ class HealthTracker:
         last_reminder = self._last_reminder.get(user_id, 0)
 
         # 超过 30 分钟 且 距离上次提醒超过 30 分钟
-        if session_duration > self._reminder_interval and (now - last_reminder) > self._reminder_interval:
+        if (
+            session_duration > self._reminder_interval
+            and (now - last_reminder) > self._reminder_interval
+        ):
             self._last_reminder[user_id] = now
             return True
         return False

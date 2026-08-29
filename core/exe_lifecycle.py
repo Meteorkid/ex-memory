@@ -19,7 +19,9 @@ def create_exe_export(slug: str) -> Path:
     if not ex_dir.exists():
         raise FileNotFoundError(f"镜像 [{slug}] 不存在")
 
-    tmp = tempfile.NamedTemporaryFile(prefix=f"ex-memory-{slug}-", suffix=".zip", delete=False)
+    tmp = tempfile.NamedTemporaryFile(
+        prefix=f"ex-memory-{slug}-", suffix=".zip", delete=False
+    )
     tmp_path = Path(tmp.name)
     tmp.close()
 
@@ -57,8 +59,12 @@ def _should_export(path: Path) -> bool:
 
 
 def _export_manifest(slug: str) -> str:
-    return json.dumps({
-        "slug": slug,
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-        "format": "ex-memory-exe-export-v1",
-    }, ensure_ascii=False, indent=2)
+    return json.dumps(
+        {
+            "slug": slug,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "format": "ex-memory-exe-export-v1",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )

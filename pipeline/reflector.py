@@ -42,7 +42,10 @@ def run_reflection(slug: str) -> str:
         model=cfg["model"],
         messages=[
             {"role": "system", "content": reflect_prompt},
-            {"role": "user", "content": f"请根据以下关系记忆进行反思分析：\n\n{memory_content}"},
+            {
+                "role": "user",
+                "content": f"请根据以下关系记忆进行反思分析：\n\n{memory_content}",
+            },
         ],
         temperature=0.7,
     )

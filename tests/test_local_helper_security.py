@@ -39,14 +39,20 @@ def test_origin_requires_exact_match():
 
 def test_control_api_rejects_wrong_host_and_origin():
     helper = client()
-    assert helper.get(
-        "/v1/control/health",
-        headers={"host": "evil.example", "origin": SITE_ORIGIN},
-    ).status_code == 421
-    assert helper.get(
-        "/v1/control/health",
-        headers={"origin": "https://evil.example"},
-    ).status_code == 403
+    assert (
+        helper.get(
+            "/v1/control/health",
+            headers={"host": "evil.example", "origin": SITE_ORIGIN},
+        ).status_code
+        == 421
+    )
+    assert (
+        helper.get(
+            "/v1/control/health",
+            headers={"origin": "https://evil.example"},
+        ).status_code
+        == 403
+    )
 
 
 def test_control_api_cors_and_public_status_are_privacy_safe():
@@ -54,7 +60,13 @@ def test_control_api_cors_and_public_status_are_privacy_safe():
     headers = {"origin": SITE_ORIGIN}
     health = helper.get("/v1/control/health", headers=headers)
     assert health.status_code == 200
-    assert set(health.json()) == {"status", "helper_version", "platform", "architecture", "api_version"}
+    assert set(health.json()) == {
+        "status",
+        "helper_version",
+        "platform",
+        "architecture",
+        "api_version",
+    }
     assert health.headers["access-control-allow-origin"] == SITE_ORIGIN
 
     launched = helper.post("/v1/control/launch", headers=headers)
@@ -62,9 +74,17 @@ def test_control_api_cors_and_public_status_are_privacy_safe():
     assert set(launched.json()) == {"task_id", "launched", "local_url"}
     assert launched.json()["local_url"].startswith("http://127.0.0.1:")
 
-    status = helper.get(f"/v1/control/tasks/{launched.json()['task_id']}", headers=headers)
+    status = helper.get(
+        f"/v1/control/tasks/{launched.json()['task_id']}", headers=headers
+    )
     assert status.status_code == 200
-    assert set(status.json()) == {"task_id", "status", "phase", "progress", "error_code"}
+    assert set(status.json()) == {
+        "task_id",
+        "status",
+        "phase",
+        "progress",
+        "error_code",
+    }
 
 
 def test_control_api_accepts_private_network_preflight_for_allowed_origin():
@@ -86,7 +106,9 @@ def test_control_api_accepts_private_network_preflight_for_allowed_origin():
 
 def test_local_ticket_is_one_time():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -100,7 +122,9 @@ def test_local_ticket_is_one_time():
 
 def test_local_page_can_be_reopened_with_a_fresh_one_time_ticket_for_the_same_task():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     headers = {"origin": SITE_ORIGIN}
@@ -151,7 +175,9 @@ def test_reopening_the_local_page_invokes_the_browser_with_a_fresh_url(monkeypat
 
 def test_local_export_page_includes_request_failure_permission_steps():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -170,7 +196,9 @@ def test_local_export_page_includes_request_failure_permission_steps():
 
 def test_local_export_page_routes_api_failures_to_permission_guidance():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -184,7 +212,9 @@ def test_local_export_page_routes_api_failures_to_permission_guidance():
 
 def test_local_export_page_disables_start_when_no_account_is_found():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -198,7 +228,9 @@ def test_local_export_page_disables_start_when_no_account_is_found():
 
 def test_local_export_page_auto_selects_the_detected_current_wechat_account():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -213,7 +245,9 @@ def test_local_export_page_auto_selects_the_detected_current_wechat_account():
 
 def test_local_export_page_keeps_account_selection_recoverable_after_validation_errors():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -224,12 +258,17 @@ def test_local_export_page_keeps_account_selection_recoverable_after_validation_
     assert "if(!elements.account.value)" in page.text
     assert "请先选择当前登录的微信账号" in page.text
     assert "if(fatal)" in page.text
-    assert "renderRequestFailure(new Error('本地助手没有“完全磁盘访问”权限。'),true)" in page.text
+    assert (
+        "renderRequestFailure(new Error('本地助手没有“完全磁盘访问”权限。'),true)"
+        in page.text
+    )
 
 
 def test_local_export_page_stops_before_sip_steps_for_an_unsupported_wechat_version():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -237,14 +276,19 @@ def test_local_export_page_stops_before_sip_steps_for_an_unsupported_wechat_vers
 
     page = helper.get(f"/local/export?ticket={ticket.token}&task={task.task_id}")
 
-    assert "environment.supported_wechat_versions.includes(environment.wechat_version)" in page.text
+    assert (
+        "environment.supported_wechat_versions.includes(environment.wechat_version)"
+        in page.text
+    )
     assert "尚未支持，为保护本机数据已停止" in page.text
     assert "不要关闭 SIP" in page.text
 
 
 def test_local_export_page_uses_project_dark_theme():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -260,7 +304,9 @@ def test_local_export_page_uses_project_dark_theme():
 
 def test_local_export_page_includes_photographable_sip_recovery_steps():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -279,7 +325,9 @@ def test_local_export_page_includes_photographable_sip_recovery_steps():
 
 def test_local_export_page_shows_terminal_results_for_both_sip_commands():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -299,7 +347,9 @@ def test_local_export_page_shows_terminal_results_for_both_sip_commands():
 
 def test_local_export_page_shows_sip_verification_and_troubleshooting():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -314,7 +364,9 @@ def test_local_export_page_shows_sip_verification_and_troubleshooting():
 
 def test_local_export_page_shows_extracting_progress_indicator():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -329,7 +381,9 @@ def test_local_export_page_shows_extracting_progress_indicator():
 
 def test_local_export_page_explains_per_account_key_rules():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -345,7 +399,9 @@ def test_local_export_page_explains_per_account_key_rules():
 
 def test_local_export_page_shows_failed_hint_and_troubleshooting_steps():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -361,7 +417,9 @@ def test_local_export_page_shows_failed_hint_and_troubleshooting_steps():
 
 def test_local_environment_requires_private_session():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     assert helper.get("/local/api/environment").status_code == 401
@@ -386,7 +444,9 @@ def test_local_environment_requires_private_session():
 
 def test_local_environment_explains_full_disk_access_requirement():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     app.state.environment_provider = lambda: WeChatEnvironment(
         app_version="4.1.12",
@@ -408,7 +468,9 @@ def test_local_environment_explains_full_disk_access_requirement():
 
 def test_local_mutation_requires_csrf_token():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()
@@ -417,7 +479,12 @@ def test_local_mutation_requires_csrf_token():
     csrf = page.headers["x-ex-memory-csrf"]
 
     assert helper.post("/local/api/confirm", json={}).status_code == 403
-    assert helper.post("/local/api/confirm", headers={"x-ex-memory-csrf": csrf}, json={}).status_code == 200
+    assert (
+        helper.post(
+            "/local/api/confirm", headers={"x-ex-memory-csrf": csrf}, json={}
+        ).status_code
+        == 200
+    )
 
 
 def test_prepare_requires_explicit_per_account_key_confirmation(tmp_path: Path):
@@ -426,7 +493,9 @@ def test_prepare_requires_explicit_per_account_key_confirmation(tmp_path: Path):
     storage.mkdir(parents=True)
     database = storage / "message.db"
     database.write_bytes(bytes(4096))
-    account = WeChatAccount("wxid_account", account_root, storage, (database,), "fingerprint")
+    account = WeChatAccount(
+        "wxid_account", account_root, storage, (database,), "fingerprint"
+    )
     app = create_helper_app(
         HelperSettings(
             allowed_origins=frozenset({SITE_ORIGIN}),
@@ -434,7 +503,9 @@ def test_prepare_requires_explicit_per_account_key_confirmation(tmp_path: Path):
             workflow_root=tmp_path / "tasks",
         )
     )
-    app.state.environment_provider = lambda: WeChatEnvironment("4.1.12", (account,), True)
+    app.state.environment_provider = lambda: WeChatEnvironment(
+        "4.1.12", (account,), True
+    )
     helper = TestClient(app)
     task = app.state.tasks.create()
     ticket = app.state.tickets.issue()
@@ -451,7 +522,9 @@ def test_prepare_requires_explicit_per_account_key_confirmation(tmp_path: Path):
     assert "每个微信账号密钥不同" in rejected.json()["detail"]
 
 
-def test_prepare_rejects_an_empty_account_selection_with_actionable_guidance(tmp_path: Path):
+def test_prepare_rejects_an_empty_account_selection_with_actionable_guidance(
+    tmp_path: Path,
+):
     app = create_helper_app(
         HelperSettings(
             allowed_origins=frozenset({SITE_ORIGIN}),
@@ -474,13 +547,17 @@ def test_prepare_rejects_an_empty_account_selection_with_actionable_guidance(tmp
     assert response.json()["detail"] == "请先选择当前登录的微信账号"
 
 
-def test_prepare_stops_an_unsupported_wechat_version_before_creating_a_workflow(tmp_path: Path):
+def test_prepare_stops_an_unsupported_wechat_version_before_creating_a_workflow(
+    tmp_path: Path,
+):
     account_root = tmp_path / "account"
     storage = account_root / "db_storage"
     storage.mkdir(parents=True)
     database = storage / "message.db"
     database.write_bytes(bytes(4096))
-    account = WeChatAccount("wxid_account", account_root, storage, (database,), "fingerprint")
+    account = WeChatAccount(
+        "wxid_account", account_root, storage, (database,), "fingerprint"
+    )
     app = create_helper_app(
         HelperSettings(
             allowed_origins=frozenset({SITE_ORIGIN}),
@@ -488,7 +565,9 @@ def test_prepare_stops_an_unsupported_wechat_version_before_creating_a_workflow(
             workflow_root=tmp_path / "tasks",
         )
     )
-    app.state.environment_provider = lambda: WeChatEnvironment("4.1.13", (account,), True)
+    app.state.environment_provider = lambda: WeChatEnvironment(
+        "4.1.13", (account,), True
+    )
     helper = TestClient(app)
     task = app.state.tasks.create()
     ticket = app.state.tickets.issue()
@@ -505,7 +584,9 @@ def test_prepare_stops_an_unsupported_wechat_version_before_creating_a_workflow(
     assert not (tmp_path / "tasks").exists()
 
 
-def test_prepare_explains_when_a_previously_listed_account_directory_changed(tmp_path: Path):
+def test_prepare_explains_when_a_previously_listed_account_directory_changed(
+    tmp_path: Path,
+):
     app = create_helper_app(
         HelperSettings(
             allowed_origins=frozenset({SITE_ORIGIN}),
@@ -526,7 +607,9 @@ def test_prepare_explains_when_a_previously_listed_account_directory_changed(tmp
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "所选微信账号目录已变化，请刷新本地页面后重新选择"
+    assert (
+        response.json()["detail"] == "所选微信账号目录已变化，请刷新本地页面后重新选择"
+    )
 
 
 def test_local_user_can_delete_safe_task_data(tmp_path: Path):
@@ -535,7 +618,9 @@ def test_local_user_can_delete_safe_task_data(tmp_path: Path):
     storage.mkdir(parents=True)
     database = storage / "message.db"
     database.write_bytes(bytes(4096))
-    account = WeChatAccount("wxid_account", account_root, storage, (database,), "fingerprint")
+    account = WeChatAccount(
+        "wxid_account", account_root, storage, (database,), "fingerprint"
+    )
     app = create_helper_app(
         HelperSettings(
             allowed_origins=frozenset({SITE_ORIGIN}),
@@ -543,7 +628,9 @@ def test_local_user_can_delete_safe_task_data(tmp_path: Path):
             workflow_root=tmp_path / "tasks",
         )
     )
-    app.state.environment_provider = lambda: WeChatEnvironment("4.1.12", (account,), True)
+    app.state.environment_provider = lambda: WeChatEnvironment(
+        "4.1.12", (account,), True
+    )
     helper = TestClient(app)
     task = app.state.tasks.create()
     ticket = app.state.tickets.issue()
@@ -561,7 +648,9 @@ def test_local_user_can_delete_safe_task_data(tmp_path: Path):
     assert deleted.status_code == 200
     assert deleted.json() == {"deleted": True}
     assert not (tmp_path / "tasks" / task.task_id).exists()
-    public = helper.get(f"/v1/control/tasks/{task.task_id}", headers={"origin": SITE_ORIGIN})
+    public = helper.get(
+        f"/v1/control/tasks/{task.task_id}", headers={"origin": SITE_ORIGIN}
+    )
     assert public.json() == {
         "task_id": task.task_id,
         "status": "cancelled",
@@ -573,7 +662,9 @@ def test_local_user_can_delete_safe_task_data(tmp_path: Path):
 
 def test_local_export_page_offers_irreversible_task_cleanup():
     app = create_helper_app(
-        HelperSettings(allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False)
+        HelperSettings(
+            allowed_origins=frozenset({SITE_ORIGIN}), open_browser_on_launch=False
+        )
     )
     helper = TestClient(app)
     task = app.state.tasks.create()

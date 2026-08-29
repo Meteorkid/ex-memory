@@ -5,35 +5,118 @@
 
 POSITIVE_WORDS = [
     # 开心/喜爱
-    "开心", "高兴", "快乐", "幸福", "好开心", "太棒了", "哈哈哈", "嘻嘻",
-    "爱", "喜欢", "想你", "想见你", "有你真好", "你真好", "好爱",
-    "甜蜜", "温暖", "感动", "期待", "兴奋", "完美", "太好了", "好耶",
-    "宝贝", "亲爱的", "么么", "抱抱", "亲亲", "mua",
+    "开心",
+    "高兴",
+    "快乐",
+    "幸福",
+    "好开心",
+    "太棒了",
+    "哈哈哈",
+    "嘻嘻",
+    "爱",
+    "喜欢",
+    "想你",
+    "想见你",
+    "有你真好",
+    "你真好",
+    "好爱",
+    "甜蜜",
+    "温暖",
+    "感动",
+    "期待",
+    "兴奋",
+    "完美",
+    "太好了",
+    "好耶",
+    "宝贝",
+    "亲爱的",
+    "么么",
+    "抱抱",
+    "亲亲",
+    "mua",
     # 认可/感谢
-    "谢谢", "感谢", "辛苦了", "厉害", "牛", "nb", "yyds", "绝了",
-    "可以的", "不错", "棒", "优秀", "赞",
+    "谢谢",
+    "感谢",
+    "辛苦了",
+    "厉害",
+    "牛",
+    "nb",
+    "yyds",
+    "绝了",
+    "可以的",
+    "不错",
+    "棒",
+    "优秀",
+    "赞",
     # 撒娇（正面）
-    "嘿嘿", "嘻嘻", "嘻嘻嘻", "呀", "哇", "耶",
+    "嘿嘿",
+    "嘻嘻",
+    "嘻嘻嘻",
+    "呀",
+    "哇",
+    "耶",
 ]
 
 NEGATIVE_WORDS = [
     # 生气/不满
-    "生气", "讨厌", "烦", "烦死了", "滚", "走开", "别烦我",
-    "你什么意思", "说了多少次", "说了多少遍", "听不懂吗",
-    "随便", "无所谓", "你说了算", "行吧", "哦",
+    "生气",
+    "讨厌",
+    "烦",
+    "烦死了",
+    "滚",
+    "走开",
+    "别烦我",
+    "你什么意思",
+    "说了多少次",
+    "说了多少遍",
+    "听不懂吗",
+    "随便",
+    "无所谓",
+    "你说了算",
+    "行吧",
+    "哦",
     # 难过/失望
-    "难过", "伤心", "心碎", "失望", "心痛", "哭", "呜呜", "委屈",
-    "你不理我", "你都不理我", "你不在乎", "你不在乎我",
-    "分手", "再见", "别联系了",
+    "难过",
+    "伤心",
+    "心碎",
+    "失望",
+    "心痛",
+    "哭",
+    "呜呜",
+    "委屈",
+    "你不理我",
+    "你都不理我",
+    "你不在乎",
+    "你不在乎我",
+    "分手",
+    "再见",
+    "别联系了",
     # 冷淡
-    "嗯", "哦哦", "好的", "知道了", "随便你",
+    "嗯",
+    "哦哦",
+    "好的",
+    "知道了",
+    "随便你",
     # 吃醋
-    "你跟谁", "又是谁", "你是不是", "那个女的", "那个男的",
+    "你跟谁",
+    "又是谁",
+    "你是不是",
+    "那个女的",
+    "那个男的",
 ]
 
 NEUTRAL_WORDS = [
-    "哦", "嗯嗯", "好的好的", "收到", "了解", "ok", "OK",
-    "是的", "对", "对吧", "对哦",
+    "哦",
+    "嗯嗯",
+    "好的好的",
+    "收到",
+    "了解",
+    "ok",
+    "OK",
+    "是的",
+    "对",
+    "对吧",
+    "对哦",
 ]
 
 
@@ -125,7 +208,10 @@ def analyze_history(history: list[dict]) -> dict:
     return {
         "overall": {"label": _label_from_score(overall_avg), "score": overall_avg},
         "user_sentiment": {"label": _label_from_score(user_avg), "score": user_avg},
-        "assistant_sentiment": {"label": _label_from_score(assistant_avg), "score": assistant_avg},
+        "assistant_sentiment": {
+            "label": _label_from_score(assistant_avg),
+            "score": assistant_avg,
+        },
         "message_count": len(all_scores),
         "positive_count": labels["positive"],
         "negative_count": labels["negative"],
@@ -149,7 +235,7 @@ def generate_emotion_curve(history: list[dict], bucket_size: int = 10) -> list[d
 
     buckets: list[dict] = []
     for i in range(0, len(messages), bucket_size):
-        chunk = messages[i:i + bucket_size]
+        chunk = messages[i : i + bucket_size]
         scores = []
         for msg in chunk:
             result = analyze_sentiment(msg["content"])
@@ -163,14 +249,16 @@ def generate_emotion_curve(history: list[dict], bucket_size: int = 10) -> list[d
         else:
             label = "neutral"
 
-        buckets.append({
-            "bucket": len(buckets),
-            "start": i,
-            "end": min(i + bucket_size - 1, len(messages) - 1),
-            "score": avg_score,
-            "label": label,
-            "count": len(chunk),
-        })
+        buckets.append(
+            {
+                "bucket": len(buckets),
+                "start": i,
+                "end": min(i + bucket_size - 1, len(messages) - 1),
+                "score": avg_score,
+                "label": label,
+                "count": len(chunk),
+            }
+        )
 
     return buckets
 

@@ -89,14 +89,16 @@ def _scan_builtin() -> list[dict]:
             if f.suffix.lower() not in ALLOWED_EXTENSIONS:
                 continue
             sticker_type = "gif" if f.suffix.lower() == ".gif" else "image"
-            result.append({
-                "id": f"builtin_{category_dir.name}_{f.stem}",
-                "type": sticker_type,
-                "url": f"/static/stickers/builtin/{category_dir.name}/{f.name}",
-                "label": f.stem,
-                "category": category,
-                "source": "builtin",
-            })
+            result.append(
+                {
+                    "id": f"builtin_{category_dir.name}_{f.stem}",
+                    "type": sticker_type,
+                    "url": f"/static/stickers/builtin/{category_dir.name}/{f.name}",
+                    "label": f.stem,
+                    "category": category,
+                    "source": "builtin",
+                }
+            )
     return result
 
 
@@ -112,15 +114,17 @@ def _scan_custom(user_id: Optional[int] = None) -> list[dict]:
         if not filepath.exists():
             continue
         sticker_type = "gif" if filepath.suffix.lower() == ".gif" else "image"
-        result.append({
-            "id": item["id"],
-            "type": sticker_type,
-            "url": f"/static/stickers/custom/{custom_dir.name}/{item['filename']}",
-            "label": item.get("label", ""),
-            "category": item.get("category", "custom"),
-            "source": "custom",
-            "owner_user_id": item.get("owner_user_id"),
-        })
+        result.append(
+            {
+                "id": item["id"],
+                "type": sticker_type,
+                "url": f"/static/stickers/custom/{custom_dir.name}/{item['filename']}",
+                "label": item.get("label", ""),
+                "category": item.get("category", "custom"),
+                "source": "custom",
+                "owner_user_id": item.get("owner_user_id"),
+            }
+        )
     return result
 
 
@@ -162,7 +166,9 @@ def upload_sticker(
 ) -> dict:
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise ValueError(f"不支持的文件类型: {ext}，允许: {', '.join(ALLOWED_EXTENSIONS)}")
+        raise ValueError(
+            f"不支持的文件类型: {ext}，允许: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
     if len(file_content) > MAX_FILE_SIZE:
         raise ValueError(f"文件过大，最大 {MAX_FILE_SIZE // 1024 // 1024}MB")
 

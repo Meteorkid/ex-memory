@@ -40,13 +40,21 @@ def mask_sensitive(text: str) -> str:
     result = text
     for name, pattern in PATTERNS.items():
         if name == "phone":
-            result = pattern.sub(lambda m: m.group()[:3] + "****" + m.group()[-4:], result)
+            result = pattern.sub(
+                lambda m: m.group()[:3] + "****" + m.group()[-4:], result
+            )
         elif name == "id_card":
-            result = pattern.sub(lambda m: m.group()[:6] + "********" + m.group()[-4:], result)
+            result = pattern.sub(
+                lambda m: m.group()[:6] + "********" + m.group()[-4:], result
+            )
         elif name == "bank_card":
-            result = pattern.sub(lambda m: m.group()[:4] + " **** **** " + m.group()[-4:], result)
+            result = pattern.sub(
+                lambda m: m.group()[:4] + " **** **** " + m.group()[-4:], result
+            )
         elif name == "email":
-            result = pattern.sub(lambda m: m.group()[0] + "***@" + m.group().split("@")[1], result)
+            result = pattern.sub(
+                lambda m: m.group()[0] + "***@" + m.group().split("@")[1], result
+            )
     return result
 
 
@@ -88,13 +96,16 @@ def scan_conversation(slug: str) -> dict:
         for line in f:
             try:
                 import json
+
                 msg = json.loads(line)
                 content = msg.get("content", "")
                 result = scan_sensitive(content)
                 if result["found"]:
                     for t in result["types"]:
                         if t not in total_found:
-                            total_found.append(t) if isinstance(total_found, list) else None
+                            total_found.append(t) if isinstance(
+                                total_found, list
+                            ) else None
                     for t, c in result["count"].items():
                         total_count[t] = total_count.get(t, 0) + c
             except (json.JSONDecodeError, KeyError):

@@ -34,7 +34,13 @@ def backup(slug: str, version_name: str = "", include_chroma: bool = True) -> st
     version_path.mkdir(parents=True, exist_ok=True)
 
     # 备份关键文件
-    for filename in ["SKILL.md", "memory.md", "persona.md", "corrections.md", "meta.json"]:
+    for filename in [
+        "SKILL.md",
+        "memory.md",
+        "persona.md",
+        "corrections.md",
+        "meta.json",
+    ]:
         src = ex_dir / filename
         if src.exists():
             shutil.copy2(src, version_path / filename)
@@ -82,7 +88,13 @@ def rollback(slug: str, version_name: str):
         pass  # 备份失败不阻塞回滚
 
     # 恢复关键文件
-    for filename in ["SKILL.md", "memory.md", "persona.md", "corrections.md", "meta.json"]:
+    for filename in [
+        "SKILL.md",
+        "memory.md",
+        "persona.md",
+        "corrections.md",
+        "meta.json",
+    ]:
         src = version_path / filename
         if src.exists():
             shutil.copy2(src, ex_dir / filename)

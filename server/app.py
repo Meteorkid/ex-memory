@@ -13,10 +13,12 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "web" / "static"
 
 def create_app() -> FastAPI:
     import config
+
     if config.METEOR_STORE_SSO_ENABLED and not config.METEOR_STORE_PROXY_TOKEN:
         raise RuntimeError("METEOR_STORE_PROXY_TOKEN is required in proxy SSO mode")
 
     from server.auth import init_db
+
     init_db()
 
     app = FastAPI(
@@ -47,6 +49,7 @@ def create_app() -> FastAPI:
         html = STATIC_DIR / "index.html"
         if html.exists():
             import config
+
             document = html.read_text(encoding="utf-8")
             auth_mode = "proxy" if config.METEOR_STORE_SSO_ENABLED else "native"
             document = document.replace(
@@ -60,10 +63,10 @@ def create_app() -> FastAPI:
                     '<div id="offline-banner" class="offline-banner" role="alert">'
                     '\n    <span class="offline-status-dot" aria-hidden="true"></span>'
                     '\n    <span class="offline-status-copy"><strong>连接已中断</strong>'
-                    '<small>请检查网络后重试</small></span>'
+                    "<small>请检查网络后重试</small></span>"
                     '\n    <button id="offline-retry" class="offline-retry" type="button">重试</button>'
-                    '\n</div>',
-                    '',
+                    "\n</div>",
+                    "",
                     1,
                 )
             return HTMLResponse(document, headers={"Cache-Control": "no-store"})
@@ -77,11 +80,13 @@ def create_app() -> FastAPI:
     def health_ready():
         """就绪检查：验证依赖是否可用。"""
         import shutil
+
         checks = {}
 
         # ChromaDB 可写检查
         try:
             from config import PROJECT_DIR
+
             test_dir = PROJECT_DIR / "data" / "health_check_chroma"
             test_dir.mkdir(parents=True, exist_ok=True)
             (test_dir / ".write_test").write_text("ok")
@@ -112,6 +117,7 @@ app = create_app()
 
 def run_server(host: str = "0.0.0.0", port: int = 8000):
     import uvicorn
+
     uvicorn.run("server.app:app", host=host, port=port, reload=True)
 
 

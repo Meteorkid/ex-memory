@@ -39,13 +39,19 @@ def find_wechat_pid(
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise WeChatPipelineError("无法检查微信进程") from exc
-    pids = [int(line) for line in result.stdout.splitlines() if line.strip().isdigit() and int(line) > 1]
+    pids = [
+        int(line)
+        for line in result.stdout.splitlines()
+        if line.strip().isdigit() and int(line) > 1
+    ]
     if result.returncode != 0 or not pids:
         raise WeChatPipelineError("请先启动微信并登录需要导出的账号")
     return min(pids)
 
 
-def wait_for_process_exit(pid: int, *, timeout_seconds: int = 300, interval_seconds: float = 1.0) -> bool:
+def wait_for_process_exit(
+    pid: int, *, timeout_seconds: int = 300, interval_seconds: float = 1.0
+) -> bool:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
         try:
@@ -81,7 +87,9 @@ def run_expert_decryption(
         )
         return captured.keys
 
-    def snapshot_and_decrypt(keys: tuple[WeChatKeyPair, ...], task_dir: Path) -> tuple[Path, ...]:
+    def snapshot_and_decrypt(
+        keys: tuple[WeChatKeyPair, ...], task_dir: Path
+    ) -> tuple[Path, ...]:
         return decrypt_account_databases(
             account=account,
             task_dir=task_dir,
@@ -92,7 +100,9 @@ def run_expert_decryption(
     return workflow.decrypt_while_sip_disabled(
         task_id=task_id,
         extract_keys=extract,
-        wait_for_wechat_exit=lambda: captured is not None and process_waiter(captured.wechat_pid),
+        wait_for_wechat_exit=lambda: (
+            captured is not None and process_waiter(captured.wechat_pid)
+        ),
         snapshot_and_decrypt=snapshot_and_decrypt,
     )
 
@@ -127,7 +137,9 @@ def decrypt_account_databases(
         else:
             candidates = keys_by_salt.get(header.hex(), ())
             if not candidates:
-                raise KeyExtractionError(f"数据库 {relative.as_posix()} 缺少可验证的密钥")
+                raise KeyExtractionError(
+                    f"数据库 {relative.as_posix()} 缺少可验证的密钥"
+                )
             last_error: Exception | None = None
             for pair in candidates:
                 try:
@@ -141,6 +153,8 @@ def decrypt_account_databases(
                 except Exception as exc:
                     last_error = exc
             else:
-                raise KeyExtractionError(f"数据库 {relative.as_posix()} 的密钥候选均未通过验证") from last_error
+                raise KeyExtractionError(
+                    f"数据库 {relative.as_posix()} 的密钥候选均未通过验证"
+                ) from last_error
         outputs.append(output)
     return tuple(outputs)

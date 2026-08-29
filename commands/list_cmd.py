@@ -1,4 +1,5 @@
 """/list — 列出所有镜像。"""
+
 import json
 from config import EXES_DIR
 from commands import register

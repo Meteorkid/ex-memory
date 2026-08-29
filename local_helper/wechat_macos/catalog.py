@@ -7,7 +7,12 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from local_helper.wechat_macos.reader import Contact, Session, read_contacts, read_sessions
+from local_helper.wechat_macos.reader import (
+    Contact,
+    Session,
+    read_contacts,
+    read_sessions,
+)
 
 
 @dataclass(frozen=True)
@@ -29,14 +34,20 @@ def discover_decrypted_catalog(databases: tuple[Path, ...]) -> DecryptedCatalog:
             contacts.append(database)
         if tables.intersection({"SessionTable", "SessionAbstract", "Session"}):
             sessions.append(database)
-        if any(re.fullmatch(r"(?:Msg|Chat)_[0-9A-Fa-f]{32}", table) for table in tables):
+        if any(
+            re.fullmatch(r"(?:Msg|Chat)_[0-9A-Fa-f]{32}", table) for table in tables
+        ):
             messages.append(database)
         if "VoiceInfo" in tables and "Name2Id" in tables:
             media.append(database)
-    return DecryptedCatalog(tuple(contacts), tuple(sessions), tuple(messages), tuple(media))
+    return DecryptedCatalog(
+        tuple(contacts), tuple(sessions), tuple(messages), tuple(media)
+    )
 
 
-def load_session_catalog(catalog: DecryptedCatalog) -> tuple[dict[str, Contact], tuple[Session, ...]]:
+def load_session_catalog(
+    catalog: DecryptedCatalog,
+) -> tuple[dict[str, Contact], tuple[Session, ...]]:
     contacts: dict[str, Contact] = {}
     for database in catalog.contact_databases:
         contacts.update(read_contacts(database))
@@ -46,7 +57,9 @@ def load_session_catalog(catalog: DecryptedCatalog) -> tuple[dict[str, Contact],
             previous = sessions.get(session.wxid)
             if previous is None or session.last_timestamp > previous.last_timestamp:
                 sessions[session.wxid] = session
-    return contacts, tuple(sorted(sessions.values(), key=lambda item: item.last_timestamp, reverse=True))
+    return contacts, tuple(
+        sorted(sessions.values(), key=lambda item: item.last_timestamp, reverse=True)
+    )
 
 
 def _read_table_names(database: Path) -> set[str]:
@@ -54,4 +67,9 @@ def _read_table_names(database: Path) -> set[str]:
         raise ValueError("数据库不能是符号链接")
     resolved = database.resolve(strict=True)
     with sqlite3.connect(f"file:{resolved}?mode=ro", uri=True) as connection:
-        return {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        return {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }

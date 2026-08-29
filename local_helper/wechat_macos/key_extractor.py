@@ -9,7 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
 
-from local_helper.wechat_macos.page_verifier import derive_sqlcipher4_key, verify_sqlcipher4_page
+from local_helper.wechat_macos.page_verifier import (
+    derive_sqlcipher4_key,
+    verify_sqlcipher4_page,
+)
 from local_helper.wechat_macos.sip import SIPStatus
 
 
@@ -55,7 +58,9 @@ def collect_database_salts(databases: Iterable[Path]) -> tuple[str, ...]:
     return tuple(sorted(salts))
 
 
-def derive_verified_key_pairs(password: bytes, databases: Iterable[Path]) -> tuple[WeChatKeyPair, ...]:
+def derive_verified_key_pairs(
+    password: bytes, databases: Iterable[Path]
+) -> tuple[WeChatKeyPair, ...]:
     """用一次捕获的账号密码验证该账号下全部可读加密数据库。"""
     if len(password) != 32:
         return ()
@@ -121,7 +126,9 @@ end run
     if result.returncode != 0 or password_match is None or pid_match is None:
         if "(-128)" in result.stderr or "User canceled" in result.stderr:
             raise KeyExtractionError("用户取消了管理员授权")
-        raise KeyExtractionError("未捕获当前账号密钥；请完全退出微信后重试，并在提示后重新登录当前账号")
+        raise KeyExtractionError(
+            "未捕获当前账号密钥；请完全退出微信后重试，并在提示后重新登录当前账号"
+        )
 
     password = bytearray.fromhex(password_match.group(1))
     try:
@@ -130,7 +137,9 @@ end run
         for index in range(len(password)):
             password[index] = 0
     if set(requested_salts) != {pair.salt_hex for pair in pairs}:
-        raise KeyExtractionError("当前登录账号与所选账号不匹配；每个微信账号密钥不同，请登录目标账号后重新提取")
+        raise KeyExtractionError(
+            "当前登录账号与所选账号不匹配；每个微信账号密钥不同，请登录目标账号后重新提取"
+        )
     pid = int(pid_match.group(1))
     if pid <= 1:
         raise KeyExtractionError("微信进程 PID 无效")

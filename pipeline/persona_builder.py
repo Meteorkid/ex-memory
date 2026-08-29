@@ -56,7 +56,10 @@ def build_persona(
         model=cfg["model"],
         messages=[
             {"role": "system", "content": analyzer_prompt},
-            {"role": "user", "content": f"请分析以下原材料，提取性格特征和行为模式：\n\n{materials_summary}"},
+            {
+                "role": "user",
+                "content": f"请分析以下原材料，提取性格特征和行为模式：\n\n{materials_summary}",
+            },
         ],
         temperature=0.7,
     )
@@ -109,7 +112,9 @@ def build_persona(
     # Step 3: 生成完整 persona.md
     recall_section = ""
     if recall_samples:
-        recall_section = f"\n\n## 主动回忆原话（用于对话中自然提起 ta 曾说过的话）\n{recall_samples}"
+        recall_section = (
+            f"\n\n## 主动回忆原话（用于对话中自然提起 ta 曾说过的话）\n{recall_samples}"
+        )
 
     user_content = f"""请根据以下分析结果生成 persona.md：
 

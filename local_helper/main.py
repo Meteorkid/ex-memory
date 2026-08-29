@@ -26,7 +26,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def configured_origins(cli_origins: list[str] | None) -> frozenset[str]:
     values = list(cli_origins or ())
-    values.extend(item for item in os.getenv("EX_MEMORY_ALLOWED_ORIGINS", "").split(",") if item.strip())
+    values.extend(
+        item
+        for item in os.getenv("EX_MEMORY_ALLOWED_ORIGINS", "").split(",")
+        if item.strip()
+    )
     release_file = runtime_resource("release-origin.txt")
     if release_file.is_file() and not release_file.is_symlink():
         values.extend(release_file.read_text(encoding="utf-8").splitlines())
@@ -49,7 +53,9 @@ def runtime_resource(relative: str) -> Path:
                 return primary
             return resolved
         return primary
-    bundle_frameworks = Path(sys.executable).resolve().parent.parent / "Frameworks" / relative
+    bundle_frameworks = (
+        Path(sys.executable).resolve().parent.parent / "Frameworks" / relative
+    )
     if bundle_frameworks.exists():
         return bundle_frameworks
     return primary
@@ -64,7 +70,8 @@ def main() -> None:
         or runtime_resource("local_helper/wechat_macos/lldb_capture_launcher.sh"),
         "capture_module": args.capture_module
         or runtime_resource("local_helper/wechat_macos/lldb_key_capture.py"),
-        "sqlcipher_binary": args.sqlcipher_binary or runtime_resource("local_helper/bin/sqlcipher"),
+        "sqlcipher_binary": args.sqlcipher_binary
+        or runtime_resource("local_helper/bin/sqlcipher"),
     }
     if args.workflow_root:
         settings_kwargs["workflow_root"] = args.workflow_root

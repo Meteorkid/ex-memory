@@ -17,8 +17,11 @@ LOCK_TIMEOUT = 5  # 文件锁超时秒数
 def atomic_write(path: Path, content: str, encoding: str = "utf-8"):
     """原子写入：先写临时文件，再 os.replace。"""
     tmp = tempfile.NamedTemporaryFile(
-        mode="w", encoding=encoding, suffix=".tmp",
-        dir=path.parent, delete=False,
+        mode="w",
+        encoding=encoding,
+        suffix=".tmp",
+        dir=path.parent,
+        delete=False,
     )
     try:
         tmp.write(content)
@@ -67,7 +70,9 @@ def locked_write_json(path: Path, data: Any):
     locked_write(path, content)
 
 
-def locked_update_json(path: Path, default: Union[Any, Callable[[], Any]], updater: Callable[[Any], Any]) -> Any:
+def locked_update_json(
+    path: Path, default: Union[Any, Callable[[], Any]], updater: Callable[[Any], Any]
+) -> Any:
     """在同一把文件锁内完成 JSON 读-改-写，返回 updater 的结果。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = path.with_name(path.name + ".lock")

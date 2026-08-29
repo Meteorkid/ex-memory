@@ -67,10 +67,16 @@ def resolve_wechat_exporter_binary(binary_path: Optional[Path] = None) -> Path:
     """解析并校验 WechatExporter 二进制路径。"""
     raw = binary_path or os.getenv("WECHAT_EXPORTER_BIN")
     if not raw:
-        raise WechatExporterNotConfigured(f"未配置 WechatExporter 二进制。{CONFIG_HINT}")
+        raise WechatExporterNotConfigured(
+            f"未配置 WechatExporter 二进制。{CONFIG_HINT}"
+        )
     path = Path(raw).expanduser()
     if not path.exists() or not path.is_file():
-        raise WechatExporterNotConfigured(f"WechatExporter 二进制不存在: {path}。{CONFIG_HINT}")
+        raise WechatExporterNotConfigured(
+            f"WechatExporter 二进制不存在: {path}。{CONFIG_HINT}"
+        )
     if not os.access(path, os.X_OK):
-        raise WechatExporterNotConfigured(f"WechatExporter 不可执行: {path}。请执行 chmod +x 或重新编译。")
+        raise WechatExporterNotConfigured(
+            f"WechatExporter 不可执行: {path}。请执行 chmod +x 或重新编译。"
+        )
     return path

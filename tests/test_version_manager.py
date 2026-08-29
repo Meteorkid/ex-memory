@@ -67,7 +67,9 @@ class TestVersionManager:
             assert versions == []
 
     def test_backup_nonexistent_ex(self, temp_ex_dir):
-        with patch("core.version_manager.get_ex_dir", return_value=Path("/nonexistent")):
+        with patch(
+            "core.version_manager.get_ex_dir", return_value=Path("/nonexistent")
+        ):
             with pytest.raises(FileNotFoundError, match="镜像不存在"):
                 backup("ghost")
 

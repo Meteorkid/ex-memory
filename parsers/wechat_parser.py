@@ -84,7 +84,11 @@ def parse_wechatmsg_txt(file_path: str, target_name: str = "") -> list[dict]:
                 if current_msg:
                     messages.append(current_msg)
                 timestamp, sender = match.groups()
-                current_msg = {"timestamp": timestamp, "sender": sender.strip(), "content": ""}
+                current_msg = {
+                    "timestamp": timestamp,
+                    "sender": sender.strip(),
+                    "content": "",
+                }
             elif current_msg and line.strip():
                 if current_msg["content"]:
                     current_msg["content"] += "\n"
@@ -100,12 +104,14 @@ def parse_plaintext(file_path: str, target_name: str = "") -> list[dict]:
     """解析纯文本。"""
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
-    return [{
-        "timestamp": "",
-        "sender": target_name or "unknown",
-        "content": content,
-        "is_target": True,
-    }]
+    return [
+        {
+            "timestamp": "",
+            "sender": target_name or "unknown",
+            "content": content,
+            "is_target": True,
+        }
+    ]
 
 
 def _normalize_messages(messages_raw: list, target_name: str) -> list[dict]:
@@ -142,12 +148,14 @@ def _normalize_messages(messages_raw: list, target_name: str) -> list[dict]:
         if content in non_text_map:
             content = f"[{non_text_map[content]}]"
 
-        normalized.append({
-            "timestamp": msg.get("formattedTime", msg.get("timestamp", "")),
-            "sender": "我" if is_me else (target_name or sender),
-            "content": content,
-            "is_target": not is_me,
-        })
+        normalized.append(
+            {
+                "timestamp": msg.get("formattedTime", msg.get("timestamp", "")),
+                "sender": "我" if is_me else (target_name or sender),
+                "content": content,
+                "is_target": not is_me,
+            }
+        )
 
     return _filter_text_messages(normalized)
 

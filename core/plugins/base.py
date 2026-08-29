@@ -7,6 +7,7 @@ from typing import Optional
 @dataclass
 class PluginMeta:
     """插件元数据。"""
+
     name: str
     version: str = "1.0.0"
     author: str = ""

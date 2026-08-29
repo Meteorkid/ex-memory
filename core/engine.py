@@ -6,8 +6,13 @@ from datetime import datetime
 from typing import Optional
 
 from config import (
-    get_llm_config, get_llm_client, get_ex_dir, RECENT_SESSIONS, DEFAULT_TOP_K,
-    RAG_THRESHOLD, LLM_MAX_CONTEXT_CHARS,
+    get_llm_config,
+    get_llm_client,
+    get_ex_dir,
+    RECENT_SESSIONS,
+    DEFAULT_TOP_K,
+    RAG_THRESHOLD,
+    LLM_MAX_CONTEXT_CHARS,
 )
 from core.retry import retry_api
 from core.validation import estimate_tokens, sanitize_chat_history
@@ -94,13 +99,21 @@ class ChatEngine:
         sessions_dir = self.ex_dir / "sessions"
         if sessions_dir.exists():
             # 优先使用 LLM 语义摘要（短小精准），没有则回退到原始归档
-            summary_files = sorted(sessions_dir.glob("*_summary.md"), reverse=True)[:RECENT_SESSIONS]
+            summary_files = sorted(sessions_dir.glob("*_summary.md"), reverse=True)[
+                :RECENT_SESSIONS
+            ]
             if summary_files:
-                self.session_summaries = [f.read_text(encoding="utf-8") for f in summary_files]
+                self.session_summaries = [
+                    f.read_text(encoding="utf-8") for f in summary_files
+                ]
             else:
                 # 兼容旧归档（无摘要文件时直接读原始对话）
-                raw_files = sorted(sessions_dir.glob("session_*.md"), reverse=True)[:RECENT_SESSIONS]
-                self.session_summaries = [f.read_text(encoding="utf-8") for f in raw_files]
+                raw_files = sorted(sessions_dir.glob("session_*.md"), reverse=True)[
+                    :RECENT_SESSIONS
+                ]
+                self.session_summaries = [
+                    f.read_text(encoding="utf-8") for f in raw_files
+                ]
 
         corrections_path = self.ex_dir / "corrections.md"
         if corrections_path.exists():
@@ -109,14 +122,16 @@ class ChatEngine:
         logger.info("已连接 %s 的数字镜像 (model=%s)", self.slug, self.model)
 
     def _build_system_prompt(self, rag_results: Optional[list[dict]] = None) -> str:
-        sticker_list = ", ".join(f"{sid}({s['label']})" for sid, s in IMAGE_STICKERS.items())
+        sticker_list = ", ".join(
+            f"{sid}({s['label']})" for sid, s in IMAGE_STICKERS.items()
+        )
 
         # 时间感知：让 AI 感知对话发生的时间背景
         now = datetime.now()
         time_context = (
             f"\n---\n## 时间感知\n"
             f"当前时间：{now.strftime('%Y年%m月%d日 %H:%M')}，"
-            f"星期{['一','二','三','四','五','六','日'][now.weekday()]}。\n"
+            f"星期{['一', '二', '三', '四', '五', '六', '日'][now.weekday()]}。\n"
             f"请根据时间背景自然调整回复：\n"
             f"- 早上说早安、问吃早餐了吗\n"
             f"- 午饭时间问吃了什么\n"
@@ -143,7 +158,9 @@ class ChatEngine:
                 filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
                 if filtered:
                     p.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
-                    p.append("以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n")
+                    p.append(
+                        "以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n"
+                    )
                     for r in filtered:
                         p.append(f"- {r.get('display_text', '')}")
                     p.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
@@ -219,12 +236,14 @@ class ChatEngine:
     @staticmethod
     def _extract_sticker_tags(text: str) -> tuple[str, list[str]]:
         """从回复文本中提取 [sticker:xxx] 标记，返回 (清理后文本, 贴纸ID列表)。"""
-        pattern = r'\[sticker:([a-zA-Z0-9_-]+)\]'
+        pattern = r"\[sticker:([a-zA-Z0-9_-]+)\]"
         sticker_ids = re.findall(pattern, text)
-        clean_text = re.sub(pattern, '', text).strip()
+        clean_text = re.sub(pattern, "", text).strip()
         return clean_text, sticker_ids
 
-    def chat(self, user_input: str, history: list[dict]) -> tuple[str, list[str], object]:
+    def chat(
+        self, user_input: str, history: list[dict]
+    ) -> tuple[str, list[str], object]:
         messages = self._prepare_messages(user_input, history)
 
         response = self._call_api(messages)
@@ -275,8 +294,14 @@ class ChatEngine:
 
         # 检测是否触发红包
         from core.wallet_manager import detect_redpacket_trigger, create_redpacket
+
         trigger = detect_redpacket_trigger(user_input, full_reply)
         if trigger:
             rp = create_redpacket(self.slug, trigger)
             if rp:
-                yield {"type": "red_packet", "id": rp["id"], "amount": rp["amount"], "note": rp["note"]}
+                yield {
+                    "type": "red_packet",
+                    "id": rp["id"],
+                    "amount": rp["amount"],
+                    "note": rp["note"],
+                }

@@ -19,13 +19,19 @@ def cmd_export_wechat(arg: str):
     sessions = tuple(parts[3:])
 
     try:
-        from core.exporters.wechat_adapter import WechatExportOptions, run_wechat_exporter
-        result = run_wechat_exporter(WechatExportOptions(
-            backup_dir=backup_dir,
-            output_dir=output_dir,
-            account=account,
-            sessions=sessions,
-        ))
+        from core.exporters.wechat_adapter import (
+            WechatExportOptions,
+            run_wechat_exporter,
+        )
+
+        result = run_wechat_exporter(
+            WechatExportOptions(
+                backup_dir=backup_dir,
+                output_dir=output_dir,
+                account=account,
+                sessions=sessions,
+            )
+        )
     except Exception as e:
         print(f"WechatExporter 导出失败: {e}")
         return

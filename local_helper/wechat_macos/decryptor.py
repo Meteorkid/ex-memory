@@ -43,7 +43,7 @@ def decrypt_database(
 
     sql = "\n".join(
         (
-            f'PRAGMA key = "x\'{raw_key}\'";',
+            f"PRAGMA key = \"x'{raw_key}'\";",
             f"ATTACH DATABASE '{quoted_output}' AS plaintext KEY '';",
             "SELECT sqlcipher_export('plaintext');",
             "DETACH DATABASE plaintext;",
@@ -63,7 +63,9 @@ def decrypt_database(
         raise DatabaseDecryptionError("SQLCipher 执行失败") from exc
     if result.returncode != 0 or _contains_sqlcipher_error(result.stderr):
         output_resolved.unlink(missing_ok=True)
-        raise DatabaseDecryptionError("SQLCipher 无法解密数据库，密钥或 schema 参数可能不匹配")
+        raise DatabaseDecryptionError(
+            "SQLCipher 无法解密数据库，密钥或 schema 参数可能不匹配"
+        )
     if not output_resolved.is_file() or output_resolved.stat().st_size == 0:
         output_resolved.unlink(missing_ok=True)
         raise DatabaseDecryptionError("SQLCipher 未生成有效的解密数据库")
@@ -73,7 +75,13 @@ def decrypt_database(
 
 
 def _contains_sqlcipher_error(stderr: str) -> bool:
-    return bool(re.search(r"file is not a database|encrypted|out of memory|error", stderr, re.IGNORECASE))
+    return bool(
+        re.search(
+            r"file is not a database|encrypted|out of memory|error",
+            stderr,
+            re.IGNORECASE,
+        )
+    )
 
 
 def verify_plain_sqlite(path: Path) -> None:
@@ -83,7 +91,8 @@ def verify_plain_sqlite(path: Path) -> None:
                 "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL"
             ).fetchall()
             has_virtual_tables = any(
-                str(row[0]).lstrip().upper().startswith("CREATE VIRTUAL TABLE") for row in schema_rows
+                str(row[0]).lstrip().upper().startswith("CREATE VIRTUAL TABLE")
+                for row in schema_rows
             )
             try:
                 result = connection.execute("PRAGMA integrity_check").fetchone()
@@ -106,4 +115,6 @@ def verify_sqlite_master(path: Path) -> None:
             connection.execute("SELECT name FROM sqlite_master LIMIT 1").fetchone()
     except sqlite3.DatabaseError as exc:
         path.unlink(missing_ok=True)
-        raise DatabaseDecryptionError("解密数据库无法读取 SQLite sqlite_master") from exc
+        raise DatabaseDecryptionError(
+            "解密数据库无法读取 SQLite sqlite_master"
+        ) from exc

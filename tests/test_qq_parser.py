@@ -56,12 +56,7 @@ class TestParseTxtA:
         assert messages[1]["is_target"] is False
 
     def test_multiline_message(self, tmp_path):
-        content = (
-            "2024-01-15 20:30:45 张三(12345)\n"
-            "第一行\n"
-            "第二行\n"
-            "第三行\n\n"
-        )
+        content = "2024-01-15 20:30:45 张三(12345)\n第一行\n第二行\n第三行\n\n"
         f = tmp_path / "chat.txt"
         f.write_text(content, encoding="utf-8")
 
@@ -80,12 +75,7 @@ class TestParseTxtB:
     """测试格式 B（时间戳 + 昵称，无 QQ 号）。"""
 
     def test_basic_parse(self, tmp_path):
-        content = (
-            "2024-01-15 20:30:45 张三\n"
-            "你好\n\n"
-            "2024-01-15 20:31:00 李四\n"
-            "嗯嗯\n\n"
-        )
+        content = "2024-01-15 20:30:45 张三\n你好\n\n2024-01-15 20:31:00 李四\n嗯嗯\n\n"
         f = tmp_path / "chat.txt"
         f.write_text(content, encoding="utf-8")
 

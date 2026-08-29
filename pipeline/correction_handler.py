@@ -56,7 +56,9 @@ def handle_correction(
     ex_dir = get_ex_dir(slug)
 
     # 读取 correction_handler prompt
-    prompt_template = (PROMPTS_DIR / "correction_handler.md").read_text(encoding="utf-8")
+    prompt_template = (PROMPTS_DIR / "correction_handler.md").read_text(
+        encoding="utf-8"
+    )
 
     # 构建上下文
     context = f"""## 纠正上下文
@@ -109,6 +111,7 @@ def handle_correction(
 
     # 重新生成 SKILL.md
     from pipeline.skill_combiner import write_skill
+
     write_skill(slug)
 
     return f"已记录纠正 #{count + 1}，下条回复会体现。"

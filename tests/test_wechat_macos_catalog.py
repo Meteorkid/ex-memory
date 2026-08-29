@@ -1,7 +1,10 @@
 import sqlite3
 from pathlib import Path
 
-from local_helper.wechat_macos.catalog import discover_decrypted_catalog, load_session_catalog
+from local_helper.wechat_macos.catalog import (
+    discover_decrypted_catalog,
+    load_session_catalog,
+)
 
 
 def _database(path: Path, statements: tuple[str, ...]) -> Path:

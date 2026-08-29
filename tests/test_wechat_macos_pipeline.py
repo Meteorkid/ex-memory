@@ -6,7 +6,10 @@ import pytest
 
 from local_helper.wechat_macos.discovery import WeChatAccount
 from local_helper.wechat_macos.key_extractor import KeyExtractionError, WeChatKeyPair
-from local_helper.wechat_macos.pipeline import decrypt_account_databases, find_wechat_pid
+from local_helper.wechat_macos.pipeline import (
+    decrypt_account_databases,
+    find_wechat_pid,
+)
 
 
 def test_find_wechat_pid_uses_exact_process_name():

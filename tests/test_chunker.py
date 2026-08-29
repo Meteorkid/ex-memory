@@ -21,21 +21,30 @@ class TestChunkMessages:
     def test_multiple_chunks(self, sample_wechat_messages):
         chunker = Chunker()
         chunks = chunker.chunk_messages(
-            sample_wechat_messages, source="wechat", chat_id="test", chunk_turns=3, overlap_turns=0
+            sample_wechat_messages,
+            source="wechat",
+            chat_id="test",
+            chunk_turns=3,
+            overlap_turns=0,
         )
         assert len(chunks) >= 2
 
     def test_dominant_speaker_is_target(self, sample_target_heavy_messages):
         chunker = Chunker()
         chunks = chunker.chunk_messages(
-            sample_target_heavy_messages, source="wechat", chat_id="test", chunk_turns=20
+            sample_target_heavy_messages,
+            source="wechat",
+            chat_id="test",
+            chunk_turns=20,
         )
         assert len(chunks) == 1
         assert chunks[0]["metadata"]["dominant_speaker"] == "target"
 
     def test_chunk_has_required_fields(self, sample_wechat_messages):
         chunker = Chunker()
-        chunks = chunker.chunk_messages(sample_wechat_messages, source="qq", chat_id="test")
+        chunks = chunker.chunk_messages(
+            sample_wechat_messages, source="qq", chat_id="test"
+        )
         assert len(chunks) > 0
         for c in chunks:
             assert "id" in c
@@ -48,14 +57,20 @@ class TestChunkMessages:
     def test_overlap_between_chunks(self, sample_wechat_messages):
         chunker = Chunker()
         chunks = chunker.chunk_messages(
-            sample_wechat_messages, source="wechat", chat_id="test",
-            chunk_turns=3, overlap_turns=1,
+            sample_wechat_messages,
+            source="wechat",
+            chat_id="test",
+            chunk_turns=3,
+            overlap_turns=1,
         )
         if len(chunks) >= 2:
             # 有重叠时 chunk 数应比无重叠多
             non_overlap = chunker.chunk_messages(
-                sample_wechat_messages, source="wechat", chat_id="test2",
-                chunk_turns=3, overlap_turns=0,
+                sample_wechat_messages,
+                source="wechat",
+                chat_id="test2",
+                chunk_turns=3,
+                overlap_turns=0,
             )
             assert len(chunks) >= len(non_overlap)
 
@@ -75,12 +90,16 @@ class TestChunkText:
     def test_multiple_chunks(self):
         chunker = Chunker()
         long_text = "你好世界" * 300
-        result = chunker.chunk_text(long_text, source="oral", chunk_chars=200, overlap_chars=0)
+        result = chunker.chunk_text(
+            long_text, source="oral", chunk_chars=200, overlap_chars=0
+        )
         assert len(result) > 1
 
     def test_chunks_not_exceed_chunk_chars(self):
         chunker = Chunker()
         text = "ABCDEFGHIJ" * 100
-        result = chunker.chunk_text(text, source="oral", chunk_chars=800, overlap_chars=0)
+        result = chunker.chunk_text(
+            text, source="oral", chunk_chars=800, overlap_chars=0
+        )
         for c in result:
             assert len(c["text_for_embedding"]) <= 800

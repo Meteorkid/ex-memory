@@ -55,7 +55,9 @@ def validate_slug(slug: str) -> str:
 MAX_HISTORY_CONTENT = 4000
 
 
-def sanitize_chat_history(history: list[dict], max_turns: int = MAX_HISTORY_TURNS) -> list[dict]:
+def sanitize_chat_history(
+    history: list[dict], max_turns: int = MAX_HISTORY_TURNS
+) -> list[dict]:
     """仅保留 user/assistant 消息，并限制内容与条数。"""
     cleaned: list[dict] = []
     for item in history or []:

@@ -9,7 +9,9 @@ from logging.handlers import RotatingFileHandler
 _logger = None
 
 
-def setup_logging(log_dir: Optional[Path] = None, level: str = "INFO") -> logging.Logger:
+def setup_logging(
+    log_dir: Optional[Path] = None, level: str = "INFO"
+) -> logging.Logger:
     global _logger
     if _logger is not None:
         return _logger

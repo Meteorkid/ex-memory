@@ -33,6 +33,7 @@ def create_engine_and_store(slug: str):
                 )
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger("ex-memory")
                 logger.warning("向量库加载失败: %s，降级为纯文本模式", e)
 

@@ -20,7 +20,9 @@ class SnapshotFile:
     size: int
 
 
-def create_database_snapshot(source_db: Path, destination_dir: Path) -> tuple[SnapshotFile, ...]:
+def create_database_snapshot(
+    source_db: Path, destination_dir: Path
+) -> tuple[SnapshotFile, ...]:
     if source_db.is_symlink():
         raise ValueError("数据库必须是普通文件")
     source_db = source_db.resolve(strict=True)
@@ -51,7 +53,14 @@ def create_database_snapshot(source_db: Path, destination_dir: Path) -> tuple[Sn
         if before != after or before != copied:
             target.unlink(missing_ok=True)
             raise SnapshotChangedError(f"快照期间数据库发生变化: {source.name}")
-        results.append(SnapshotFile(source=source, snapshot=target, sha256=copied, size=target.stat().st_size))
+        results.append(
+            SnapshotFile(
+                source=source,
+                snapshot=target,
+                sha256=copied,
+                size=target.stat().st_size,
+            )
+        )
     return tuple(results)
 
 
