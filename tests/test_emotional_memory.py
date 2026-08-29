@@ -11,8 +11,16 @@ class TestExtractEmotionalMemories:
 
     def test_basic_extraction(self):
         messages = [
-            {"role": "user", "content": "宝贝我想你了", "created_at": "2024-01-01T10:00:00"},
-            {"role": "assistant", "content": "亲爱的我也想你", "created_at": "2024-01-01T10:01:00"},
+            {
+                "role": "user",
+                "content": "宝贝我想你了",
+                "created_at": "2024-01-01T10:00:00",
+            },
+            {
+                "role": "assistant",
+                "content": "亲爱的我也想你",
+                "created_at": "2024-01-01T10:01:00",
+            },
         ]
         result = extract_emotional_memories(messages)
         assert "important_dates" in result
@@ -31,8 +39,16 @@ class TestExtractEmotionalMemories:
 
     def test_important_dates_extraction(self):
         messages = [
-            {"role": "user", "content": "生日快乐！", "created_at": "2024-01-15T10:00:00"},
-            {"role": "user", "content": "今天是我们的纪念日", "created_at": "2024-02-14T10:00:00"},
+            {
+                "role": "user",
+                "content": "生日快乐！",
+                "created_at": "2024-01-15T10:00:00",
+            },
+            {
+                "role": "user",
+                "content": "今天是我们的纪念日",
+                "created_at": "2024-02-14T10:00:00",
+            },
         ]
         result = extract_emotional_memories(messages)
         assert len(result["important_dates"]) >= 2
@@ -61,7 +77,9 @@ class TestExtractEmotionalMemories:
 
     def test_limits(self):
         # 超过限制数量
-        messages = [{"role": "user", "content": "生日快乐", "created_at": ""} for _ in range(50)]
+        messages = [
+            {"role": "user", "content": "生日快乐", "created_at": ""} for _ in range(50)
+        ]
         result = extract_emotional_memories(messages)
         assert len(result["important_dates"]) <= 20
         assert len(result["shared_experiences"]) <= 30
@@ -75,13 +93,24 @@ class TestGetMemoryContext:
     def test_with_memories(self, tmp_path, monkeypatch):
         # Mock get_ex_dir
         import config
+
         monkeypatch.setattr(config, "get_ex_dir", lambda slug: tmp_path)
 
         # 创建记忆文件
         import json
+
         memories = {
-            "important_dates": [{"content": "生日快乐", "timestamp": "", "type": "birthday", "keyword": "生日"}],
-            "shared_experiences": [{"content": "那次在公园", "timestamp": "", "type": "memory"}],
+            "important_dates": [
+                {
+                    "content": "生日快乐",
+                    "timestamp": "",
+                    "type": "birthday",
+                    "keyword": "生日",
+                }
+            ],
+            "shared_experiences": [
+                {"content": "那次在公园", "timestamp": "", "type": "memory"}
+            ],
             "emotional_milestones": [],
             "pet_names": ["宝贝", "亲爱的"],
         }
@@ -96,6 +125,7 @@ class TestGetMemoryContext:
 
     def test_without_memories(self, tmp_path, monkeypatch):
         import config
+
         monkeypatch.setattr(config, "get_ex_dir", lambda slug: tmp_path)
 
         context = get_memory_context("test")

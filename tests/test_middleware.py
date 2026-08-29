@@ -43,6 +43,7 @@ class TestGetClientIP:
         monkeypatch.setattr("config.TRUSTED_PROXY", True)
         monkeypatch.setattr("config.TRUSTED_PROXY_IPS", set())
         import server.middleware as mw
+
         monkeypatch.setattr(mw, "_warned_empty_proxy_whitelist", False)
 
         # 无论伪造成什么，限流 key 都应回落到真实直连 IP

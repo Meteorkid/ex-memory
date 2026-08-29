@@ -68,7 +68,11 @@ class TestCalculateRelationshipTemperature:
     def test_basic_temperature(self):
         messages = [
             {"role": "user", "content": "你好", "created_at": "2024-01-01T10:00:00"},
-            {"role": "assistant", "content": "你好呀", "created_at": "2024-01-01T10:01:00"},
+            {
+                "role": "assistant",
+                "content": "你好呀",
+                "created_at": "2024-01-01T10:01:00",
+            },
         ]
         result = calculate_relationship_temperature("test", messages)
         assert "temperature" in result
@@ -85,8 +89,20 @@ class TestCalculateRelationshipTemperature:
         # 大量含爱意的消息
         messages = []
         for i in range(50):
-            messages.append({"role": "user", "content": f"爱你宝贝想你 {i}", "created_at": f"2024-01-{i+1:02d}T10:00:00"})
-            messages.append({"role": "assistant", "content": f"亲爱的也好爱你 {i}", "created_at": f"2024-01-{i+1:02d}T10:01:00"})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"爱你宝贝想你 {i}",
+                    "created_at": f"2024-01-{i + 1:02d}T10:00:00",
+                }
+            )
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"亲爱的也好爱你 {i}",
+                    "created_at": f"2024-01-{i + 1:02d}T10:01:00",
+                }
+            )
         result = calculate_relationship_temperature("test", messages)
         assert result["temperature"] >= 60
 

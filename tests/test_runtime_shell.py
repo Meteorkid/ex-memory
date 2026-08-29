@@ -18,7 +18,7 @@ def test_proxy_runtime_shell_injects_base_path_and_auth_mode(monkeypatch):
 
 
 def test_browser_client_derives_api_and_static_urls_from_runtime_base_path():
-    source = ("web/static/app.js")
+    source = "web/static/app.js"
     text = __import__("pathlib").Path(source).read_text(encoding="utf-8")
 
     assert "document.documentElement.dataset.basePath" in text
