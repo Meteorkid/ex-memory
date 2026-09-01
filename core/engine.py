@@ -3,6 +3,7 @@
 import re
 import logging
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Optional
 
 from config import (
@@ -269,19 +270,40 @@ class ChatEngine:
             frequency_penalty=self.frequency_penalty,
             max_tokens=self.max_tokens,
             stream=True,
+            # 让最后一个 chunk 携带真实 usage，供计量使用；
+            # 不支持的端点不会报错，只是流里没有 usage，走估算兜底
+            stream_options={"include_usage": True},
         )
 
     def chat_stream(self, user_input: str, history: list[dict]):
-        """流式对话，yield dict: {type: text|sticker, content/id: ...}"""
+        """流式对话，yield dict: {type: text|sticker|usage|red_packet, content/id: ...}"""
         messages = self._prepare_messages(user_input, history)
 
         full_reply = ""
+        stream_usage = None
         stream = self._call_stream(messages)
         for chunk in stream:
-            delta = chunk.choices[0].delta
+            # include_usage 开启时，最后一个 chunk 只携带 usage、choices 为空
+            usage = getattr(chunk, "usage", None)
+            if usage is not None:
+                stream_usage = usage
+            choices = getattr(chunk, "choices", None)
+            if not choices:
+                continue
+            delta = choices[0].delta
             if delta.content:
                 full_reply += delta.content
                 yield {"type": "text", "content": delta.content}
+
+        if stream_usage is None:
+            # 兼容不支持 stream_options 的端点：回退估算必须覆盖完整请求体。
+            # system prompt（SKILL.md 等）占单轮输入的大头，漏算会严重少计
+            stream_usage = SimpleNamespace(
+                prompt_tokens=estimate_tokens(
+                    "\n".join(m["content"] for m in messages)
+                ),
+                completion_tokens=estimate_tokens(full_reply),
+            )
 
         clean_reply, inline_stickers = self._extract_sticker_tags(full_reply)
         stickers = select_stickers(clean_reply)
@@ -305,3 +327,10 @@ class ChatEngine:
                     "amount": rp["amount"],
                     "note": rp["note"],
                 }
+
+        # 计量口径与 /chat 一致：优先真实 usage，估算兜底同样计入 system prompt
+        yield {
+            "type": "usage",
+            "prompt_tokens": getattr(stream_usage, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(stream_usage, "completion_tokens", 0) or 0,
+        }

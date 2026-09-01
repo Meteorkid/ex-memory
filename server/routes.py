@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Optional
 from pathlib import Path
 from fastapi import (
@@ -793,11 +794,10 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
 
     history = sanitize_chat_history(req.history)
 
-    from core.validation import estimate_tokens
-
     async def generate():
         full_reply = ""
         collected_stickers: list[str] = []
+        stream_usage: Optional[dict] = None
         try:
             engine = _get_engine(slug, user_id)
             for item in engine.chat_stream(message, history):
@@ -805,28 +805,24 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
                     full_reply += item.get("content", "")
                 elif item.get("type") == "sticker" and item.get("id"):
                     collected_stickers.append(item["id"])
+                elif item.get("type") == "usage":
+                    stream_usage = item
                 yield f"data: {json.dumps(item)}\n\n"
 
-            # 流式无法获取精确 usage，用 token 估算
-            est_prompt = estimate_tokens(
-                message + "\n".join(m.get("content", "")[:200] for m in history[-20:])
-            )
-            est_completion = estimate_tokens(full_reply)
-
-            # 构造一个近似 usage 对象用于累计
-            class _ApproxUsage:
-                prompt_tokens = est_prompt
-                completion_tokens = est_completion
-
-            approx_usage = _ApproxUsage()
-
-            with _counter_lock:
-                key = (user_id, slug)
-                counter = _session_counters.get(key)
-                if counter is None:
-                    counter = TokenCounter()
-                    _session_counters[key] = counter
-                counter.update(approx_usage)
+            # 计量优先用真实 usage（engine 已开 stream_options，端点不支持时
+            # 退回含 system prompt 的估算），口径与 /chat 一致
+            if stream_usage is not None:
+                usage_obj = SimpleNamespace(
+                    prompt_tokens=int(stream_usage.get("prompt_tokens") or 0),
+                    completion_tokens=int(stream_usage.get("completion_tokens") or 0),
+                )
+                with _counter_lock:
+                    key = (user_id, slug)
+                    counter = _session_counters.get(key)
+                    if counter is None:
+                        counter = TokenCounter()
+                        _session_counters[key] = counter
+                    counter.update(usage_obj)
 
             yield "data: [DONE]\n\n"
         except Exception as e:

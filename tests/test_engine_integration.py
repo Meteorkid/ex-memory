@@ -56,8 +56,10 @@ def test_chat_stream_yields_text():
 
         chunk1 = MagicMock()
         chunk1.choices = [MagicMock(delta=MagicMock(content="你"))]
+        chunk1.usage = None
         chunk2 = MagicMock()
         chunk2.choices = [MagicMock(delta=MagicMock(content="好！"))]
+        chunk2.usage = None
         mock_client.chat.completions.create.return_value = [chunk1, chunk2]
 
         results = list(engine.chat_stream("hello", []))
