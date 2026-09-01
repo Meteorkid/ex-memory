@@ -7,15 +7,17 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from typing import Optional
+
 import config
 
 _SKIP_NAMES = {".DS_Store"}
 _SKIP_SUFFIXES = {".lock", ".tmp"}
 
 
-def create_exe_export(slug: str) -> Path:
+def create_exe_export(slug: str, owner: Optional[int] = None) -> Path:
     """将镜像目录打包为临时 zip 文件，返回 zip 路径。"""
-    ex_dir = config.get_ex_dir(slug)
+    ex_dir = config.resolve_ex_dir(slug, owner)
     if not ex_dir.exists():
         raise FileNotFoundError(f"镜像 [{slug}] 不存在")
 
@@ -42,9 +44,9 @@ def create_exe_export(slug: str) -> Path:
         raise
 
 
-def delete_exe_data(slug: str) -> None:
+def delete_exe_data(slug: str, owner: Optional[int] = None) -> None:
     """彻底删除镜像目录，包括 sessions、versions、wallet 与向量库。"""
-    ex_dir = config.get_ex_dir(slug)
+    ex_dir = config.resolve_ex_dir(slug, owner)
     if not ex_dir.exists():
         raise FileNotFoundError(f"镜像 [{slug}] 不存在")
     shutil.rmtree(ex_dir)

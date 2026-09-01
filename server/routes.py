@@ -50,6 +50,8 @@ from server.models import (
     TransferConfirmRequest,
     TransferRequest,
     UpdateRequest,
+    ConsentRequest,
+    SubjectRequestPayload,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -466,6 +468,24 @@ def import_data(
     必须声明为 def 让 FastAPI 放进线程池，否则会冻结整个事件循环。
     """
     slug = _check_exe_access(slug, user_id)
+
+    # 🔴 上传的是用户与他人的聊天记录，处理的是第三方的个人信息。
+    # 必须有针对这一项的独立同意，不能与总协议捆绑，也不能静默通过。
+    from config import THIRD_PARTY_DATA_POLICY_VERSION
+    from server.consent_store import POLICY_THIRD_PARTY_DATA, has_consented
+
+    if not has_consented(
+        user_id, POLICY_THIRD_PARTY_DATA, THIRD_PARTY_DATA_POLICY_VERSION
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "导入前需确认你对这份聊天记录拥有合法处理基础。"
+                f"请先提交 {POLICY_THIRD_PARTY_DATA} 协议"
+                f"（版本 {THIRD_PARTY_DATA_POLICY_VERSION}）的同意。"
+            ),
+        )
+
     ex_dir = resolve_ex_dir(slug, user_id)
 
     if file.size is not None and file.size > MAX_UPLOAD_SIZE:
@@ -1458,3 +1478,119 @@ def get_relationship_temperature(slug: str, user_id: int = Depends(require_auth)
 
     temperature = calculate_relationship_temperature(slug, history)
     return {"temperature": temperature}
+
+
+# --- 同意留痕与数据主体权利（M0：FR-015 ~ FR-019）---
+
+
+@router.get("/consents")
+def get_consents(user_id: int = Depends(require_auth)):
+    """本人的完整同意历史，供数据主体查询与举证。"""
+    from server.consent_store import list_consents
+
+    return {"consents": list_consents(user_id)}
+
+
+@router.post("/consents", response_model=StatusResponse)
+def post_consent(
+    req: ConsentRequest, request: Request, user_id: int = Depends(require_auth)
+):
+    """记录一次同意。协议改版需重新征得同意，所以版本必须带上。"""
+    from server.consent_store import record_consent
+
+    try:
+        record_consent(
+            user_id,
+            req.policy_type,
+            req.policy_version,
+            ip=_get_client_ip(request),
+            user_agent=request.headers.get("User-Agent", "")[:200],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return StatusResponse(message="已记录")
+
+
+@router.get("/safety/crisis-resources")
+def crisis_resources():
+    """求助资源。刻意免登录：需要它的人未必登录得进来。"""
+    from core.safety.resources import get_crisis_response
+
+    resp = get_crisis_response()
+    return {
+        "message": resp.message,
+        "hotlines": resp.hotlines,
+        "reviewed": resp.reviewed,
+    }
+
+
+@router.post("/safety/report", response_model=StatusResponse)
+def submit_subject_request(req: SubjectRequestPayload, request: Request):
+    """被模拟者投诉与逝者近亲属主张。
+
+    🔴 刻意免登录——被模拟者从来不是本站用户，逝者近亲属也多半不是。
+    代价是必须有独立限流，否则就是个开放的滥用入口。
+    """
+    from server.consent_store import create_subject_request
+
+    _get_login_limiter().check(
+        f"subject_request:{req.contact[:64]}", _get_client_ip(request)
+    )
+
+    try:
+        request_id = create_subject_request(
+            req.claim_type,
+            req.contact,
+            target_slug=req.target_slug,
+            target_hint=req.target_hint,
+            detail=req.detail,
+            identity_evidence=req.identity_evidence,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    _audit(
+        "subject_request_received",
+        client_ip=_get_client_ip(request),
+        detail=f"id={request_id} type={req.claim_type}",
+    )
+    return StatusResponse(message=f"已受理，受理编号 {request_id}")
+
+
+@router.post("/account/export")
+def export_account_data(user_id: int = Depends(require_auth)):
+    """导出本账号的全部个人信息。"""
+    from fastapi.responses import FileResponse
+
+    from server.account_lifecycle import export_account
+
+    try:
+        zip_path = export_account(user_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return FileResponse(
+        str(zip_path),
+        media_type="application/zip",
+        filename=f"ex-memory-account-{user_id}.zip",
+    )
+
+
+@router.delete("/account", response_model=StatusResponse)
+def delete_account_data(req: DeleteRequest, user_id: int = Depends(require_auth)):
+    """注销账号并级联删除全部个人信息。"""
+    if not req.confirm:
+        raise HTTPException(status_code=400, detail="需要确认注销")
+
+    from server.account_lifecycle import delete_account, verify_deletion
+
+    receipt = delete_account(user_id)
+    residues = verify_deletion(user_id)
+    if residues:
+        # 删不干净必须显式暴露，不能给用户一张假的删除回执
+        logger.error("账号删除残留 user_id=%s: %s", user_id, residues)
+        raise HTTPException(status_code=500, detail="删除未完成，请联系管理员")
+
+    _audit(
+        "account_deleted", username=f"user_id={user_id}", detail=str(receipt["exes"])
+    )
+    return StatusResponse(message="账号及全部数据已删除")

@@ -104,3 +104,27 @@ class AuthRequest(BaseModel):
 
 class LogoutRequest(BaseModel):
     token: str = Field(..., description="要注销的 token")
+
+
+class ConsentRequest(BaseModel):
+    """同意留痕。版本必须带上——协议改版要重新征得同意。"""
+
+    policy_type: str = Field(
+        description="terms / privacy / third_party_data / emotion_analysis"
+    )
+    policy_version: str = Field(min_length=1, max_length=32)
+
+
+class SubjectRequestPayload(BaseModel):
+    """数据主体请求：被模拟者投诉、逝者近亲属主张。免登录提交。"""
+
+    claim_type: str = Field(description="subject_complaint / deceased_kin / other")
+    contact: str = Field(min_length=1, max_length=200)
+    target_slug: Optional[str] = Field(default=None, max_length=64)
+    target_hint: Optional[str] = Field(
+        default=None, max_length=500, description="定位线索：昵称、时间段等"
+    )
+    detail: Optional[str] = Field(default=None, max_length=2000)
+    identity_evidence: Optional[str] = Field(
+        default=None, max_length=500, description="身份材料的引用，不在此提交材料本身"
+    )

@@ -58,6 +58,10 @@ RECENT_SESSIONS = 3
 # 对话留存天数：超过留存期的记录由 /cleanup 命令（配 cron）清理
 CONVERSATION_RETENTION_DAYS = int(os.getenv("CONVERSATION_RETENTION_DAYS", "90"))
 
+# 协议版本。改版后旧同意自动失效，用户须重新勾选——
+# 只记「同意过」而不记版本等于没有留痕。
+THIRD_PARTY_DATA_POLICY_VERSION = os.getenv("THIRD_PARTY_DATA_POLICY_VERSION", "v1")
+
 # RAG 配置
 DEFAULT_TOP_K = 10
 RAG_THRESHOLD = 0.3

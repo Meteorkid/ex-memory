@@ -67,6 +67,38 @@ def test_import_route_is_sync():
     )
 
 
+def _grant_third_party_consent(client, headers):
+    """FR-016：导入前必须有第三方数据处理的独立同意。"""
+    from config import THIRD_PARTY_DATA_POLICY_VERSION
+
+    resp = client.post(
+        "/api/consents",
+        json={
+            "policy_type": "third_party_data",
+            "policy_version": THIRD_PARTY_DATA_POLICY_VERSION,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200
+
+
+def test_import_without_third_party_consent_is_rejected(env):
+    """FR-016：没有独立同意时导入必须被拒，而不是静默通过。"""
+    from server.app import create_app
+
+    _make_exe(env, "imp")
+    client = TestClient(create_app())
+    headers = _login(client)
+
+    resp = client.post(
+        "/api/exes/imp/import",
+        files={"file": ("chat.json", b"{}", "application/json")},
+        headers=headers,
+    )
+    assert resp.status_code == 403
+    assert "合法处理基础" in resp.json()["detail"]
+
+
 def test_import_requires_auth(env):
     from server.app import create_app
 
@@ -85,6 +117,7 @@ def test_import_success(env):
     _make_exe(env, "imp")
     client = TestClient(create_app())
     headers = _login(client)
+    _grant_third_party_consent(client, headers)
 
     with (
         patch("config.get_embedding_config", return_value=_EMB_CFG),
@@ -131,6 +164,7 @@ def test_import_does_not_block_event_loop(env):
     ):
         with TestClient(app) as client:
             headers = _login(client)
+            _grant_third_party_consent(client, headers)
             result = {}
 
             def do_import():
