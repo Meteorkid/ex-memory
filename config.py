@@ -60,7 +60,8 @@ CONVERSATION_RETENTION_DAYS = int(os.getenv("CONVERSATION_RETENTION_DAYS", "90")
 # RAG 配置
 DEFAULT_TOP_K = 10
 RAG_THRESHOLD = 0.3
-CHUNK_TURNS = 5
+# 3 轮/重叠 1 的 Recall@5=91.5%，优于 5 轮/重叠 1 的 71.1%（见 docs/eval_report.md 第 1 节）
+CHUNK_TURNS = 3
 CHUNK_OVERLAP = 1
 
 # 日志

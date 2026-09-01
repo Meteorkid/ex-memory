@@ -27,4 +27,5 @@ from commands import (  # noqa: E402,F401
     export,
     export_wechat,
     cleanup,
+    vector_rebuild,
 )
