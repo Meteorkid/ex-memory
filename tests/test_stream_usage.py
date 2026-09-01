@@ -139,13 +139,11 @@ class TestRouteCountsStreamUsage:
         monkeypatch.setattr(routes, "_login_limiter", None)
         with routes._counter_lock:
             routes._session_counters.clear()
-        with routes._engine_cache_lock:
-            routes._engine_cache.clear()
+        routes._engine_cache.clear()
         yield exes
         with routes._counter_lock:
             routes._session_counters.clear()
-        with routes._engine_cache_lock:
-            routes._engine_cache.clear()
+        routes._engine_cache.clear()
 
     def test_usage_event_updates_session_counter(self, env):
         _make_route_exe(env, "u1")

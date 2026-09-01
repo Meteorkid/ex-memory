@@ -15,6 +15,7 @@ from config import (
     DEFAULT_TOP_K,
     RAG_THRESHOLD,
     LLM_MAX_CONTEXT_CHARS,
+    LLM_TOTAL_TOKEN_BUDGET,
 )
 from core.retry import retry_api
 from core.validation import estimate_tokens, sanitize_chat_history
@@ -252,10 +253,48 @@ class ChatEngine:
         """构建完整的消息列表（system + history + user）。"""
         rag_results = self._rag_search(user_input)
         system_prompt = self._build_system_prompt(rag_results)
+        history = self._fit_history_to_budget(system_prompt, user_input, history)
         messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(sanitize_chat_history(history))
+        messages.extend(history)
         messages.append({"role": "user", "content": user_input})
         return messages
+
+    @staticmethod
+    def _fit_history_to_budget(
+        system_prompt: str, user_input: str, history: list[dict]
+    ) -> list[dict]:
+        """按总预算从最旧一端裁剪历史。
+
+        system prompt 与本轮输入是不可裁的：前者是人格本身，后者是用户
+        刚说的话。所以只能裁历史，且从旧到新——近处的上下文对连贯性更重要。
+        超预算时报错并重试三次是最差的结果：必然失败，还消耗三倍配额。
+        """
+        cleaned = sanitize_chat_history(history)
+        fixed_cost = estimate_tokens(system_prompt) + estimate_tokens(user_input)
+        available = LLM_TOTAL_TOKEN_BUDGET - fixed_cost
+        if available <= 0:
+            # 人格本身就撑满了预算，只能放弃全部历史，让本轮至少能发出去
+            logger.warning(
+                "system prompt 已占满 token 预算（%d/%d），本轮不带历史",
+                fixed_cost,
+                LLM_TOTAL_TOKEN_BUDGET,
+            )
+            return []
+
+        kept: list[dict] = []
+        used = 0
+        for message in reversed(cleaned):
+            cost = estimate_tokens(message.get("content", ""))
+            if used + cost > available:
+                break
+            kept.append(message)
+            used += cost
+        if len(kept) < len(cleaned):
+            logger.info(
+                "历史超出 token 预算，保留最近 %d/%d 条", len(kept), len(cleaned)
+            )
+        kept.reverse()
+        return kept
 
     @staticmethod
     def _extract_sticker_tags(text: str) -> tuple[str, list[str]]:

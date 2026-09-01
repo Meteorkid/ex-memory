@@ -69,6 +69,19 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 单次请求的总 token 预算（FR-039 / D-08）。
+# 原先 LLM_MAX_CONTEXT_CHARS 只约束 system prompt，history 上限是
+# 100 轮 x 4000 字符 ≈ 26 万 tokens，远超模型上下文；超限必然报错，
+# 而重试还会把这个必然失败放大三倍。
+LLM_TOTAL_TOKEN_BUDGET = int(os.getenv("LLM_TOTAL_TOKEN_BUDGET", "48000"))
+
+# 进程内缓存上限（FR-041 / D-06 / D-07）。原为无上限裸 dict，
+# 每个引擎持有数万字符人格文本与向量库客户端，长期运行必然 OOM。
+ENGINE_CACHE_SIZE = int(os.getenv("ENGINE_CACHE_SIZE", "64"))
+ENGINE_CACHE_TTL_SECONDS = int(os.getenv("ENGINE_CACHE_TTL_SECONDS", "1800"))
+SESSION_COUNTER_CACHE_SIZE = int(os.getenv("SESSION_COUNTER_CACHE_SIZE", "2048"))
+SESSION_COUNTER_TTL_SECONDS = int(os.getenv("SESSION_COUNTER_TTL_SECONDS", "86400"))
+
 # 账号注销时 safety_events 的处置方式："anonymize" 或 "delete"。
 #
 # 两条路都已实现，这是一个法务裁量点而非工程取舍，所以做成配置项：

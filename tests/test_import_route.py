@@ -31,11 +31,9 @@ def env(tmp_path, monkeypatch):
     import server.routes as routes
 
     monkeypatch.setattr(routes, "_login_limiter", None)
-    with routes._engine_cache_lock:
-        routes._engine_cache.clear()
+    routes._engine_cache.clear()
     yield exes
-    with routes._engine_cache_lock:
-        routes._engine_cache.clear()
+    routes._engine_cache.clear()
 
 
 def _make_exe(exes_dir, slug: str, owner: int = 1):

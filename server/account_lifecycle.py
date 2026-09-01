@@ -235,12 +235,8 @@ def _purge_memory_caches(user_id: int) -> None:
     """清掉进程内缓存，否则删号后引擎实例还握着人格文本。"""
     import server.routes as routes
 
-    with routes._engine_cache_lock:
-        for key in [k for k in routes._engine_cache if k[0] == user_id]:
-            del routes._engine_cache[key]
-    with routes._counter_lock:
-        for key in [k for k in routes._session_counters if k[0] == user_id]:
-            del routes._session_counters[key]
+    routes._engine_cache.evict_where(lambda key: key[0] == user_id)
+    routes._session_counters.evict_where(lambda key: key[0] == user_id)
 
 
 # ── 完整性回查 ──

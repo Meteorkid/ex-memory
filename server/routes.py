@@ -26,6 +26,8 @@ from config import PROJECT_DIR, resolve_ex_dir, DISABLE_REGISTRATION
 from core.validation import validate_slug, validate_user_input, sanitize_chat_history
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
+import config
+from core.bounded_cache import BoundedCache
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
 from server.usage_guard import check_limit
@@ -125,14 +127,23 @@ router = APIRouter(prefix="/api")
 _INTERNAL_ERROR = "服务器内部错误，请稍后重试"
 
 # 服务端 session 级 token 累计计数器（内存存储，重启后清零）
-_session_counters: dict[tuple[int, str], TokenCounter] = {}
+# 会话级 token 计数。有上限：原为裸 dict，每个 (user, slug) 组合都会
+# 永久驻留，长期运行必然涨爆内存
+# BoundedCache 本身线程安全，但 TokenCounter 的累加不是，仍需一把锁
 _counter_lock = threading.Lock()
+_session_counters = BoundedCache(
+    maxsize=config.SESSION_COUNTER_CACHE_SIZE,
+    ttl_seconds=config.SESSION_COUNTER_TTL_SECONDS,
+)
 
 # Engine 缓存（避免每次请求重建 SKILL.md / ChromaDB 连接）
 # 键必须含用户维度：slug 是全局命名空间，仅按 slug 缓存会在
-# 同名镜像删除重建后把上一任 owner 的人格内容泄漏给新用户
-_engine_cache: dict[tuple[int, str], object] = {}
-_engine_cache_lock = threading.Lock()
+# 同名镜像删除重建后把上一任 owner 的人格内容泄漏给新用户。
+# 同样有上限：每个引擎持有数万字符人格文本与向量库客户端
+_engine_cache = BoundedCache(
+    maxsize=config.ENGINE_CACHE_SIZE,
+    ttl_seconds=config.ENGINE_CACHE_TTL_SECONDS,
+)
 
 # 登录限流 + 审计日志
 _login_limiter = None
@@ -193,19 +204,12 @@ def _audit(event: str, username: str = "", client_ip: str = "", detail: str = ""
 
 
 def _get_engine(slug: str, user_id: int):
-    """获取或创建 ChatEngine（按 (user_id, slug) 缓存，锁内 double-check）。"""
-    key = (user_id, slug)
-    with _engine_cache_lock:
-        engine = _engine_cache.get(key)
-        if engine is not None:
-            return engine
+    """获取或创建 ChatEngine（按 (user_id, slug) 缓存，LRU + TTL 有界）。"""
     from core.factory import create_engine_and_store
 
-    engine, _, _ = create_engine_and_store(slug, owner=user_id)
-    with _engine_cache_lock:
-        if key not in _engine_cache:
-            _engine_cache[key] = engine
-        return _engine_cache[key]
+    return _engine_cache.get_or_create(
+        (user_id, slug), lambda: create_engine_and_store(slug, owner=user_id)[0]
+    )
 
 
 def _check_exe_access(slug: str, user_id: int) -> str:
@@ -239,9 +243,7 @@ def _invalidate_engine(slug: str):
 
     清掉该 slug 下所有用户的缓存条目。
     """
-    with _engine_cache_lock:
-        for key in [k for k in _engine_cache if k[1] == slug]:
-            del _engine_cache[key]
+    _engine_cache.evict_where(lambda key: key[1] == slug)
 
 
 # 流式输出审核策略：下发前对「累计全文」过一遍本地词表。
@@ -794,8 +796,7 @@ def confirm_transfer(
 def get_usage(slug: str, user_id: int = Depends(require_auth)):
     """获取当前 session 的累计 Token 用量。"""
     slug = _check_exe_access(slug, user_id)
-    with _counter_lock:
-        counter = _session_counters.get((user_id, slug))
+    counter = _session_counters.get((user_id, slug))
     if counter is None:
         return {"prompt_tokens": 0, "completion_tokens": 0, "turns": 0}
     return {
@@ -809,8 +810,7 @@ def get_usage(slug: str, user_id: int = Depends(require_auth)):
 def reset_usage(slug: str, user_id: int = Depends(require_auth)):
     """重置 session Token 计数。"""
     slug = _check_exe_access(slug, user_id)
-    with _counter_lock:
-        _session_counters.pop((user_id, slug), None)
+    _session_counters.pop((user_id, slug))
     return {"message": "已重置"}
 
 
@@ -885,12 +885,8 @@ async def chat(
                 "completion_tokens": completion_tk,
             }
             # 累积 session 计数
+            counter = _session_counters.get_or_create((user_id, slug), TokenCounter)
             with _counter_lock:
-                key = (user_id, slug)
-                counter = _session_counters.get(key)
-                if counter is None:
-                    counter = TokenCounter()
-                    _session_counters[key] = counter
                 counter.update(usage)
                 token_info["session"] = {
                     "prompt_tokens": counter.total_prompt_tokens,
@@ -1022,12 +1018,8 @@ async def chat_stream(
                     prompt_tokens=int(stream_usage.get("prompt_tokens") or 0),
                     completion_tokens=int(stream_usage.get("completion_tokens") or 0),
                 )
+                counter = _session_counters.get_or_create((user_id, slug), TokenCounter)
                 with _counter_lock:
-                    key = (user_id, slug)
-                    counter = _session_counters.get(key)
-                    if counter is None:
-                        counter = TokenCounter()
-                        _session_counters[key] = counter
                     counter.update(usage_obj)
 
             yield "data: [DONE]\n\n"

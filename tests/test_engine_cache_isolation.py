@@ -34,12 +34,10 @@ def env(tmp_path, monkeypatch):
 
     import server.routes as routes
 
-    with routes._engine_cache_lock:
-        routes._engine_cache.clear()
+    routes._engine_cache.clear()
     monkeypatch.setattr(routes, "_login_limiter", None)
     yield exes
-    with routes._engine_cache_lock:
-        routes._engine_cache.clear()
+    routes._engine_cache.clear()
 
 
 @pytest.fixture
