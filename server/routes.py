@@ -415,13 +415,17 @@ MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
 
 
 @router.post("/exes/{slug}/import", response_model=StatusResponse)
-async def import_data(
+def import_data(
     slug: str,
     file: UploadFile = File(...),
     target_name: str = Form(""),
     user_id: int = Depends(require_auth),
 ):
-    """导入聊天记录数据源（自动检测微信/QQ 格式）。"""
+    """导入聊天记录数据源（自动检测微信/QQ 格式）。
+
+    函数体全是同步阻塞调用（文件拷贝、Embedding 网络请求、CPU 切片），
+    必须声明为 def 让 FastAPI 放进线程池，否则会冻结整个事件循环。
+    """
     slug = _check_exe_access(slug, user_id)
     ex_dir = get_ex_dir(slug)
 
