@@ -1150,6 +1150,8 @@ def set_stage(slug: str, stage: str = Query(...), user_id: int = Depends(require
     meta = _load_meta(slug)
     meta["stage"] = stage
     _save_meta(slug, meta)
+    # 缓存中的引擎还带着旧阶段，必须失效重建
+    _invalidate_engine(slug)
     return {"ok": True, "slug": slug, "stage": stage}
 
 

@@ -1,6 +1,7 @@
 """ChatEngine：SKILL.md + RAG 动态注入 + 重试 + Token 预算。"""
 
 import re
+import json
 import logging
 from datetime import datetime
 from types import SimpleNamespace
@@ -120,6 +121,22 @@ class ChatEngine:
         if corrections_path.exists():
             self.corrections = corrections_path.read_text(encoding="utf-8")
 
+        # 关系阶段：Web 写 "stage"，CLI 写 "relationship_stage"，两个键都认。
+        # 未知值回退默认阶段，注入 prompt 时才不会 KeyError
+        meta_path = self.ex_dir / "meta.json"
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                stage = meta.get("stage") or meta.get("relationship_stage")
+                if stage in STAGE_INSTRUCTIONS:
+                    self.relationship_stage = stage
+                elif stage:
+                    logger.warning(
+                        "未知关系阶段 %s，回退 %s", stage, self.relationship_stage
+                    )
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("加载 meta.json 失败: %s", e)
+
         logger.info("已连接 %s 的数字镜像 (model=%s)", self.slug, self.model)
 
     def _build_system_prompt(self, rag_results: Optional[list[dict]] = None) -> str:
@@ -149,6 +166,11 @@ class ChatEngine:
         def _assemble(sums: list[str]) -> str:
             p = [self.skill_content]
             p.append(time_context)
+            # 关系阶段决定整体语气基调（热恋/磨合/分手/治愈）
+            stage_instruction = STAGE_INSTRUCTIONS.get(
+                self.relationship_stage, STAGE_INSTRUCTIONS["dating"]
+            )
+            p.append(f"\n---\n## 当前关系阶段（语气基调）\n{stage_instruction}\n")
             if sums:
                 p.append("\n---\n## 最近对话记忆\n")
                 for i, summary in enumerate(sums, 1):
