@@ -4,6 +4,7 @@ import asyncio
 import json
 import pytest
 from unittest.mock import patch, MagicMock
+from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
 
@@ -146,7 +147,7 @@ class TestStreamInterrupted:
         async def scenario():
             req = ChatRequest(slug="s3", message="hi")
             with patch("server.routes._get_engine", return_value=engine):
-                resp = await chat_stream_route(req, user_id=1)
+                resp = await chat_stream_route(req, BackgroundTasks(), user_id=1)
                 agen = resp.body_iterator
                 await agen.__anext__()  # 消费第一个 SSE 事件后模拟断连
                 await agen.aclose()
@@ -175,7 +176,7 @@ class TestStreamInterrupted:
         async def scenario():
             req = ChatRequest(slug="s4", message="hi")
             with patch("server.routes._get_engine", return_value=engine):
-                resp = await chat_stream_route(req, user_id=1)
+                resp = await chat_stream_route(req, BackgroundTasks(), user_id=1)
                 chunks = []
                 async for chunk in resp.body_iterator:
                     chunks.append(chunk)
@@ -199,7 +200,7 @@ class TestStreamInterrupted:
         async def scenario():
             req = ChatRequest(slug="s5", message="hi")
             with patch("server.routes._get_engine", return_value=engine):
-                resp = await chat_stream_route(req, user_id=1)
+                resp = await chat_stream_route(req, BackgroundTasks(), user_id=1)
                 await resp.body_iterator.aclose()
 
         asyncio.run(scenario())

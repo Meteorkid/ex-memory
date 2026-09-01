@@ -10,6 +10,7 @@ from typing import Optional
 from pathlib import Path
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     HTTPException,
     UploadFile,
     File,
@@ -253,6 +254,19 @@ def _persist_stream_turn(
     except (OSError, ValueError) as e:
         # 持久化失败不影响本次回复，但会造成搜索/统计缺数据
         logger.warning("流式对话持久化失败 slug=%s: %s", slug, e)
+
+
+def _run_session_archive(slug: str, vector_store, embedder) -> None:
+    """后台任务：累计轮数达到阈值时归档会话并生成 LLM 摘要。"""
+    from core.session_archive import maybe_archive
+
+    try:
+        if maybe_archive(slug, vector_store=vector_store, embedder=embedder):
+            # 摘要写入了 sessions/ 与 SKILL.md，缓存引擎需要重建才会带上记忆层
+            _invalidate_engine(slug)
+    except Exception as e:
+        # 后台任务异常不能冒泡到响应收尾，留告警即可
+        logger.warning("会话归档后台任务失败 slug=%s: %s", slug, e)
 
 
 # --- 用户认证 ---
@@ -703,7 +717,11 @@ def reset_usage(slug: str, user_id: int = Depends(require_auth)):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
+async def chat(
+    req: ChatRequest,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(require_auth),
+):
     """单轮对话。"""
     try:
         slug = validate_slug(req.slug)
@@ -761,6 +779,10 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
         except (OSError, ValueError) as e:
             # 持久化失败不影响本次回复，但会造成搜索/统计缺数据
             logger.warning("对话持久化失败 slug=%s: %s", slug, e)
+        # 满阈值时会话归档（含 LLM 摘要），放后台执行不阻塞响应
+        background_tasks.add_task(
+            _run_session_archive, slug, engine.vector_store, engine.embedder
+        )
 
         return ChatResponse(reply=reply, stickers=stickers, tokens=token_info)
     except Exception as e:
@@ -769,7 +791,11 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
 
 
 @router.post("/chat/stream")
-async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
+async def chat_stream(
+    req: ChatRequest,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(require_auth),
+):
     """流式对话 (SSE)。"""
     try:
         slug = validate_slug(req.slug)
@@ -798,6 +824,7 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
         full_reply = ""
         collected_stickers: list[str] = []
         stream_usage: Optional[dict] = None
+        engine = None
         try:
             engine = _get_engine(slug, user_id)
             for item in engine.chat_stream(message, history):
@@ -833,6 +860,11 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
             # 均非 Exception 子类，不会被上面捕获）都走这里：已生成的部分必须落库。
             # 注意 finally 里禁止 yield（GeneratorExit 期间 yield 会直接报错）
             _persist_stream_turn(slug, user_id, message, full_reply, collected_stickers)
+            if engine is not None and full_reply.strip():
+                # 满阈值时会话归档（含 LLM 摘要），放后台执行不阻塞流式响应
+                background_tasks.add_task(
+                    _run_session_archive, slug, engine.vector_store, engine.embedder
+                )
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 

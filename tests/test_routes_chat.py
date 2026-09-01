@@ -31,7 +31,13 @@ def isolated_db(tmp_path, monkeypatch):
     noop_limiter = MagicMock()
     noop_limiter.check = MagicMock()
     routes_mod._login_limiter = noop_limiter
+
+    # 这些用例未隔离 EXES_DIR，会读写仓库真实的 exes/test；
+    # 归档后台任务必须打桩，否则会基于真实对话记录发起 LLM 调用
+    archive_patcher = patch("server.routes._run_session_archive")
+    archive_patcher.start()
     yield
+    archive_patcher.stop()
     routes_mod._login_limiter = original_limiter
     if test_db.exists():
         test_db.unlink()

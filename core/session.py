@@ -5,7 +5,6 @@ import json
 import logging
 import sys
 from datetime import datetime
-from pathlib import Path
 from prompt_toolkit import prompt as pt_prompt
 
 from config import get_ex_dir, ARCHIVE_THRESHOLD
@@ -179,113 +178,18 @@ class ChatSession:
             pass
 
     def _archive_session(self):
-        sessions_dir = get_ex_dir(self.slug) / "sessions"
-        sessions_dir.mkdir(parents=True, exist_ok=True)
+        """归档逻辑已提取到 core/session_archive，Web 与 CLI 共用。"""
+        from core.session_archive import archive_session
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_file = sessions_dir / f"session_{timestamp}.md"
-
-        lines = [f"# 对话记录 — {timestamp}\n"]
-        for msg in self.history:
-            role = "用户" if msg["role"] == "user" else self.slug
-            lines.append(f"**{role}**: {msg['content']}\n")
-
-        session_file.write_text("\n".join(lines), encoding="utf-8")
-        logger.info("对话已归档: %s", session_file.name)
-        print(f"--- 对话已归档: {session_file.name} ---")
-
-        # 生成 LLM 语义摘要
-        self._generate_summary(sessions_dir, timestamp)
-
-    def _generate_summary(self, sessions_dir: "Path", timestamp: str):
-        """调用 LLM 生成会话语义摘要，用于下次启动时快速恢复上下文。"""
-        from pathlib import Path
-        from config import get_llm_config, get_llm_client
-
-        cfg = get_llm_config()
-        if not cfg["api_key"]:
-            return
-
-        try:
-            prompts_dir = Path(__file__).resolve().parent.parent / "prompts"
-            prompt_template = (prompts_dir / "session_summary.md").read_text(
-                encoding="utf-8"
-            )
-
-            # 只取最近 20 轮做摘要（避免上下文超限）
-            recent = self.history[-40:]
-            history_text = "\n".join(
-                f"{'用户' if m['role'] == 'user' else self.slug}: {m['content'][:300]}"
-                for m in recent
-            )
-
-            client = get_llm_client()
-            response = client.chat.completions.create(
-                model=cfg["model"],
-                messages=[
-                    {"role": "system", "content": prompt_template},
-                    {
-                        "role": "user",
-                        "content": f"请压缩以下对话为摘要：\n\n{history_text}",
-                    },
-                ],
-                temperature=0.3,
-            )
-            summary = response.choices[0].message.content
-
-            summary_file = sessions_dir / f"session_{timestamp}_summary.md"
-            summary_file.write_text(summary, encoding="utf-8")
-            logger.info("会话摘要已生成: %s", summary_file.name)
-
-            # 追加到引擎的 session_summaries（当前 session 可能还没结束，但预先加载）
-            if self.engine:
-                self.engine.session_summaries.append(summary)
-                # Token 预算控制：过大的摘要列表弹出旧项
-                from core.validation import estimate_tokens
-                from config import LLM_MAX_CONTEXT_CHARS
-
-                while (
-                    len(self.engine.session_summaries) > 5
-                    and estimate_tokens("\n".join(self.engine.session_summaries))
-                    > LLM_MAX_CONTEXT_CHARS * 0.3
-                ):
-                    self.engine.session_summaries.pop(0)
-
-            # 可选：加入向量库
-            if self.vector_store and self.embedder:
-                try:
-                    self.vector_store.add_session_summary(
-                        summary, self.slug, self.embedder
-                    )
-                except Exception:
-                    logger.debug("摘要写入向量库失败（非关键）")
-
-            # 同步更新 SKILL.md 的记忆段
-            self._update_skill_memory(summary)
-
-        except Exception as e:
-            logger.warning("生成会话摘要失败（已降级，原始归档完好）: %s", e)
-
-    def _update_skill_memory(self, new_summary: str):
-        """将新摘要追加到 SKILL.md 的 PART A 末尾。"""
-        from config import get_ex_dir
-
-        skill_path = get_ex_dir(self.slug) / "SKILL.md"
-        if not skill_path.exists():
-            return
-
-        try:
-            content = skill_path.read_text(encoding="utf-8")
-            # 在 PART A 的末尾追加摘要
-            marker = "---\n\n## PART B"
-            if marker in content:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-                addition = f"\n\n### 对话摘要 ({timestamp})\n{new_summary}\n"
-                content = content.replace(marker, addition + marker)
-                skill_path.write_text(content, encoding="utf-8")
-                logger.info("SKILL.md 已同步最新摘要")
-        except Exception as e:
-            logger.debug("更新 SKILL.md 摘要失败（非关键）: %s", e)
+        result = archive_session(
+            self.slug,
+            self.history,
+            vector_store=self.vector_store,
+            embedder=self.embedder,
+            engine=self.engine,
+        )
+        if result:
+            print(f"--- 对话已归档: {result['session_file']} ---")
 
     def _chat(self, user_msg: str):
         try:
