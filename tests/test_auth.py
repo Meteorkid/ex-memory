@@ -103,7 +103,7 @@ class TestValidateToken:
 
         register_user("testuser", "password123")
         # 将过期时间设为过去
-        monkeypatch.setattr("server.auth.TOKEN_EXPIRY_SECONDS", -1)
+        monkeypatch.setattr("server.auth.ACCESS_TOKEN_EXPIRY_SECONDS", -1)
         token = login_user("testuser", "password123")
         user_id = validate_token(token)
         assert user_id is None

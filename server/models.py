@@ -155,3 +155,7 @@ class TaskAccepted(BaseModel):
     task_id: str
     message: str
     status: str = "queued"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(..., min_length=8, max_length=256)

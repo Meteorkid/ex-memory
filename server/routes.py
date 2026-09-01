@@ -61,6 +61,7 @@ from server.models import (
     PhoneCodeRequest,
     ReviewResolution,
     TaskAccepted,
+    RefreshRequest,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -403,14 +404,21 @@ def login(req: AuthRequest, request: Request):
     client_ip = _get_client_ip(request)
     _get_login_limiter().check(req.username, client_ip)
 
-    from server.auth import login_user
+    from server.auth import login_user_with_refresh
 
-    token = login_user(req.username, req.password)
-    if token is None:
+    session = login_user_with_refresh(
+        req.username,
+        req.password,
+        user_agent=request.headers.get("User-Agent", ""),
+        ip=client_ip,
+    )
+
+    if session is None:
         _audit("login_failed", username=req.username, client_ip=client_ip)
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     _audit("login_success", username=req.username, client_ip=client_ip)
-    return {"token": token, "token_type": "bearer"}
+    # token 字段保留，老客户端不受影响；refresh_token 与 session_id 为新增
+    return {**session, "token_type": "bearer"}
 
 
 @router.post("/auth/logout", response_model=StatusResponse)
@@ -1788,3 +1796,39 @@ def _task_view(task: dict) -> dict:
         "created_at": task.get("created_at"),
         "finished_at": task.get("finished_at"),
     }
+
+
+# --- 会话（FR-040）---
+
+
+@router.post("/auth/refresh")
+def refresh_token_route(req: RefreshRequest, request: Request):
+    """用 refresh 换一对新令牌。旧的立即作废。"""
+    from server.auth import refresh_session
+
+    session = refresh_session(
+        req.refresh_token,
+        user_agent=request.headers.get("User-Agent", ""),
+        ip=_get_client_ip(request),
+    )
+    if session is None:
+        raise HTTPException(status_code=401, detail="刷新令牌无效或已过期，请重新登录")
+    return session
+
+
+@router.post("/auth/revoke-all", response_model=StatusResponse)
+def revoke_all(user_id: int = Depends(require_auth)):
+    """登出全部设备。"""
+    from server.auth import revoke_all_sessions
+
+    count = revoke_all_sessions(user_id)
+    _audit("sessions_revoked", username=f"user_id={user_id}", detail=f"count={count}")
+    return StatusResponse(message=f"已登出 {count} 个会话")
+
+
+@router.get("/auth/sessions")
+def list_active_sessions(user_id: int = Depends(require_auth)):
+    """查看当前有哪些设备登录着。"""
+    from server.auth import list_sessions
+
+    return {"sessions": list_sessions(user_id)}

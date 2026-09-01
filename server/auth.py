@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import os
 import secrets
 import sqlite3
 import time
@@ -14,7 +15,16 @@ logger = logging.getLogger("ex-memory")
 
 DB_DIR = Path(__file__).resolve().parent.parent / "data"
 DB_PATH = DB_DIR / "users.db"
-TOKEN_EXPIRY_SECONDS = 7 * 24 * 3600  # 7 天
+# access token 短期、refresh token 长期：
+# 只有一种长期 token 时，被盗后的可利用窗口就是它的全部生命周期。
+ACCESS_TOKEN_EXPIRY_SECONDS = int(
+    os.getenv("ACCESS_TOKEN_EXPIRY_SECONDS", str(2 * 3600))
+)
+REFRESH_TOKEN_EXPIRY_SECONDS = int(
+    os.getenv("REFRESH_TOKEN_EXPIRY_SECONDS", str(30 * 24 * 3600))
+)
+# 兼容旧引用
+TOKEN_EXPIRY_SECONDS = ACCESS_TOKEN_EXPIRY_SECONDS
 
 
 @contextmanager
@@ -214,13 +224,7 @@ def login_user(username: str, password: str) -> Optional[str]:
         if not hmac.compare_digest(pw_hash, row["password_hash"]):
             return None
 
-        # 生成 token
-        token = secrets.token_urlsafe(32)
-        expires = _utc_after_str(TOKEN_EXPIRY_SECONDS)
-        conn.execute(
-            "INSERT INTO tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
-            (_token_hash(token), row["id"], expires),
-        )
+        token, _refresh, _session = _issue_session(conn, int(row["id"]))
         conn.commit()
         return token
 
@@ -276,3 +280,153 @@ def set_user_role(username: str, role: str) -> bool:
         )
         conn.commit()
         return cursor.rowcount > 0
+
+
+# ── 会话：access + refresh ──
+
+
+def _issue_session(
+    conn,
+    user_id: int,
+    session_id: Optional[str] = None,
+    user_agent: str = "",
+    ip: str = "",
+) -> tuple[str, str, str]:
+    """签发一对令牌，返回 (access, refresh, session_id)。"""
+    session_id = session_id or secrets.token_urlsafe(16)
+    access = secrets.token_urlsafe(32)
+    refresh = secrets.token_urlsafe(32)
+    conn.execute(
+        "INSERT INTO tokens (token, user_id, expires_at, session_id) VALUES (?, ?, ?, ?)",
+        (
+            _token_hash(access),
+            user_id,
+            _utc_after_str(ACCESS_TOKEN_EXPIRY_SECONDS),
+            session_id,
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO refresh_tokens
+            (token, user_id, session_id, expires_at, user_agent, ip)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _token_hash(refresh),
+            user_id,
+            session_id,
+            _utc_after_str(REFRESH_TOKEN_EXPIRY_SECONDS),
+            user_agent[:200],
+            ip,
+        ),
+    )
+    return access, refresh, session_id
+
+
+def login_user_with_refresh(
+    username: str, password: str, user_agent: str = "", ip: str = ""
+) -> Optional[dict]:
+    """登录并签发 access + refresh。"""
+    with _get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, password_hash, salt FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        if not row:
+            return None
+        pw_hash, _ = _hash_password(password, row["salt"])
+        if not hmac.compare_digest(pw_hash, row["password_hash"]):
+            return None
+        access, refresh, session_id = _issue_session(
+            conn, int(row["id"]), user_agent=user_agent, ip=ip
+        )
+        conn.commit()
+        return {
+            "token": access,
+            "refresh_token": refresh,
+            "session_id": session_id,
+            "expires_in": ACCESS_TOKEN_EXPIRY_SECONDS,
+        }
+
+
+def refresh_session(
+    refresh_token: str, user_agent: str = "", ip: str = ""
+) -> Optional[dict]:
+    """用 refresh 换一对新令牌，旧的立即作废（轮换）。
+
+    检测重放：已轮换过的 refresh 再次出现，说明它可能被盗，
+    此时吊销整条会话链而不是简单拒绝——盗用方和真实用户都得重新登录。
+    """
+    key = _token_hash(refresh_token)
+    with _get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM refresh_tokens WHERE token = ?", (key,)
+        ).fetchone()
+        if row is None:
+            return None
+
+        if row["rotated_to"] is not None:
+            conn.execute(
+                "UPDATE refresh_tokens SET revoked_at = datetime('now')"
+                " WHERE session_id = ? AND revoked_at IS NULL",
+                (row["session_id"],),
+            )
+            conn.execute(
+                "DELETE FROM tokens WHERE session_id = ?", (row["session_id"],)
+            )
+            conn.commit()
+            logger.warning(
+                "检测到已轮换的 refresh token 被重放，已吊销整条会话 user_id=%s",
+                row["user_id"],
+            )
+            return None
+
+        if row["revoked_at"] is not None or row["expires_at"] < _utc_now_str():
+            return None
+
+        user_id = int(row["user_id"])
+        session_id = row["session_id"]
+        # 旧 access 同时作废，避免一次登录留下多把有效钥匙
+        conn.execute("DELETE FROM tokens WHERE session_id = ?", (session_id,))
+        access, new_refresh, _ = _issue_session(
+            conn, user_id, session_id=session_id, user_agent=user_agent, ip=ip
+        )
+        conn.execute(
+            "UPDATE refresh_tokens SET revoked_at = datetime('now'), rotated_to = ?"
+            " WHERE token = ?",
+            (_token_hash(new_refresh), key),
+        )
+        conn.commit()
+        return {
+            "token": access,
+            "refresh_token": new_refresh,
+            "session_id": session_id,
+            "expires_in": ACCESS_TOKEN_EXPIRY_SECONDS,
+        }
+
+
+def revoke_all_sessions(user_id: int) -> int:
+    """登出全部设备。返回吊销的会话数。"""
+    with _get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE refresh_tokens SET revoked_at = datetime('now')"
+            " WHERE user_id = ? AND revoked_at IS NULL",
+            (user_id,),
+        )
+        conn.execute("DELETE FROM tokens WHERE user_id = ?", (user_id,))
+        conn.commit()
+        return cursor.rowcount
+
+
+def list_sessions(user_id: int) -> list[dict]:
+    """当前有效会话，供用户查看「哪些设备登录着」。"""
+    with _get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT session_id, created_at, expires_at, user_agent, ip
+            FROM refresh_tokens
+            WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?
+            ORDER BY created_at DESC
+            """,
+            (user_id, _utc_now_str()),
+        ).fetchall()
+        return [dict(r) for r in rows]
