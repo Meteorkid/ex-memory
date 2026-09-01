@@ -65,6 +65,18 @@ def test_import_route_is_sync():
     )
 
 
+def _await_task(task_id, timeout=10):
+    """等任务进入终态。worker 是线程池，调用方需自己等。"""
+    from core.tasks import get_task
+
+    deadline = time.time() + timeout
+    task = get_task(task_id)
+    while time.time() < deadline and task["status"] not in ("succeeded", "failed"):
+        time.sleep(0.05)
+        task = get_task(task_id)
+    return task
+
+
 def _grant_third_party_consent(client, headers):
     """FR-016：导入前必须有第三方数据处理的独立同意。"""
     from config import THIRD_PARTY_DATA_POLICY_VERSION
@@ -132,10 +144,18 @@ def test_import_success(env):
             data={"target_name": "ta"},
             headers=headers,
         )
+        assert resp.status_code == 200
+        task_id = resp.json()["task_id"]
+        assert task_id
 
-    assert resp.status_code == 200
-    assert "解析 1 条消息" in resp.json()["message"]
-    assert "入库 3 个切片" in resp.json()["message"]
+        # 导入改为异步：接口只受理，真正的结果在任务里。
+        # 等待必须留在 patch 上下文内——worker 在别的线程跑，
+        # 补丁一撤销它就会去调真实的 ingest。
+        task = _await_task(task_id)
+
+    assert task["status"] == "succeeded", task.get("error")
+    result = json.loads(task["result"])
+    assert result["messages"] == 1 and result["chunks"] == 3
     mock_ingest.assert_called_once()
 
 

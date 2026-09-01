@@ -2443,7 +2443,17 @@ $('create-submit').addEventListener('click', async () => {
             const importRes = await fetch(`${API}/exes/${slug}/import`, {method:'POST', headers, body: formData});
             if (importRes.status === 401) { logout(); return; }
             const importData = await importRes.json().catch(()=>({}));
-            importMsg = importRes.ok ? (' ' + importData.message) : ' 但导入失败';
+            if (!importRes.ok) {
+                importMsg = ' 但导入失败';
+            } else {
+                // 导入已改为异步：接口只受理，进度要轮询任务
+                const finished = await pollTask(importData.task_id, (t) => {
+                    result.textContent = `正在导入聊天记录… ${t.progress||0}%${t.detail ? ' · ' + t.detail : ''}`;
+                });
+                importMsg = finished && finished.status === 'succeeded'
+                    ? ' ' + ((finished.result && finished.result.message) || '导入完成')
+                    : ' 但导入失败' + (finished && finished.error ? '：' + finished.error : '');
+            }
         }
         result.textContent = `镜像 [${name}] 创建成功！${importMsg}`;
         result.style.color = 'var(--wechat-green)';
@@ -2463,6 +2473,29 @@ $('create-file').addEventListener('change', () => {
     const f = $('create-file').files[0];
     $('create-file-name').textContent = f ? f.name : '未选择文件';
 });
+
+// ═══════════════════════════════════════
+// 异步任务轮询
+// ═══════════════════════════════════════
+
+// 长任务（导入/反思/朋友圈/备份）都改成了提交后返回 task_id，
+// 这里统一轮询到终态。onProgress 用来更新进度文案。
+async function pollTask(taskId, onProgress, timeoutMs = 600000) {
+    if (!taskId) return null;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        let task;
+        try {
+            task = await api('GET', `/tasks/${taskId}`);
+        } catch (e) {
+            return null;
+        }
+        if (onProgress) { try { onProgress(task); } catch (e) {} }
+        if (task.status === 'succeeded' || task.status === 'failed') return task;
+        await new Promise(r => setTimeout(r, 800));
+    }
+    return null;
+}
 
 // ═══════════════════════════════════════
 // 红包系统

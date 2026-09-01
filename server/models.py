@@ -147,3 +147,11 @@ class ReviewResolution(BaseModel):
         description="safety: resolved/dismissed；subject: verifying/actioned/rejected"
     )
     note: str = Field(default="", max_length=1000)
+
+
+class TaskAccepted(BaseModel):
+    """长任务受理回执。任务真正的结果通过任务接口查询。"""
+
+    task_id: str
+    message: str
+    status: str = "queued"

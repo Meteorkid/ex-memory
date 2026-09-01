@@ -28,6 +28,12 @@ def create_app() -> FastAPI:
     # 失效处理器在 server.routes 导入时注册（每进程一次），这里只起订阅线程
     kv.start_invalidation_listener()
 
+    # 导入即注册任务处理器
+    import server.task_handlers  # noqa: F401
+    from core.tasks import reclaim_stale
+
+    reclaim_stale()
+
     from core.safety.resources import warn_if_unreviewed
 
     warn_if_unreviewed()

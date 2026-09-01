@@ -69,6 +69,12 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 异步任务 worker 线程数（FR-036）。进程内线程池，不需要额外部署拓扑。
+TASK_WORKER_THREADS = int(os.getenv("TASK_WORKER_THREADS", "4"))
+
+# 任务进度 SSE 的兜底超时：任务卡死时不能让连接永远挂着
+TASK_STREAM_TIMEOUT_SECONDS = int(os.getenv("TASK_STREAM_TIMEOUT_SECONDS", "600"))
+
 # 共享状态后端（FR-035）。为空时用进程内实现——仅适用于单副本部署。
 # 多副本必须配置，否则限流额度按副本数翻倍、用量统计对不上。
 REDIS_URL = os.getenv("REDIS_URL", "")

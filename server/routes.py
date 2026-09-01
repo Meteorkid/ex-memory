@@ -2,6 +2,8 @@
 
 import json
 import logging
+import shutil
+import uuid
 import threading
 import time
 from datetime import datetime
@@ -58,6 +60,7 @@ from server.models import (
     SubjectRequestPayload,
     PhoneCodeRequest,
     ReviewResolution,
+    TaskAccepted,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -526,7 +529,7 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
 MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
 
 
-@router.post("/exes/{slug}/import", response_model=StatusResponse)
+@router.post("/exes/{slug}/import", response_model=TaskAccepted)
 def import_data(
     slug: str,
     file: UploadFile = File(...),
@@ -557,91 +560,46 @@ def import_data(
             ),
         )
 
-    ex_dir = resolve_ex_dir(slug, user_id)
-
     if file.size is not None and file.size > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=413, detail="文件过大，最大支持 100MB")
-
-    import tempfile
-    import shutil
 
     try:
         safe_name = safe_filename(file.filename or "upload.dat")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    tmp_dir = Path(tempfile.mkdtemp())
-    tmp_path = tmp_dir / safe_name
-
+    # 落到暂存区而不是请求级临时目录：请求返回后 worker 还要读它。
+    # 任务处理器读完即删——原始聊天记录是最敏感的那份数据。
+    staging = config.PROJECT_DIR / "data" / "uploads" / uuid.uuid4().hex
+    staging.mkdir(parents=True, exist_ok=True)
+    staged_path = staging / safe_name
     try:
-        with open(tmp_path, "wb") as f:
-            try:
-                _copy_upload_limited(file.file, f, MAX_UPLOAD_SIZE)
-            except ValueError as e:
-                raise HTTPException(status_code=413, detail=str(e)) from e
-        _invalidate_engine(slug)
+        with open(staged_path, "wb") as f:
+            _copy_upload_limited(file.file, f, MAX_UPLOAD_SIZE)
+    except ValueError as e:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise HTTPException(status_code=413, detail=str(e)) from e
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
 
-        from config import get_embedding_config, get_collection_name
+    _invalidate_engine(slug)
 
-        emb_cfg = get_embedding_config()
-        if not emb_cfg["api_key"]:
-            raise HTTPException(status_code=500, detail="未配置 Embedding API Key")
+    from core.tasks import enqueue
+    from server.task_handlers import TASK_IMPORT
 
-        from memory.embedder import Embedder
-        from memory.vector_store import VectorStore
-
-        embedder = Embedder(
-            api_key=emb_cfg["api_key"],
-            base_url=emb_cfg["base_url"],
-            model=emb_cfg["model"],
-        )
-        vector_store = VectorStore(
-            persist_dir=str(ex_dir / "chroma_db"),
-            collection_name=get_collection_name(slug),
-        )
-
-        # 根据文件扩展名自动选择解析器
-        ext = Path(safe_name).suffix.lower()
-        if ext == ".mht" or ext == ".mhtml":
-            from memory.ingest import ingest_qq_file
-
-            messages, chunk_count = ingest_qq_file(
-                str(tmp_path), slug, target_name, vector_store, embedder
-            )
-        elif ext == ".txt":
-            # TXT 需要检测是微信还是 QQ 格式
-            from parsers.wechat_parser import detect_format
-
-            fmt = detect_format(str(tmp_path))
-            if fmt == "plaintext":
-                # 微信无法识别，尝试 QQ
-                from memory.ingest import ingest_qq_file
-
-                messages, chunk_count = ingest_qq_file(
-                    str(tmp_path), slug, target_name, vector_store, embedder
-                )
-            else:
-                from memory.ingest import ingest_wechat_file
-
-                messages, chunk_count = ingest_wechat_file(
-                    str(tmp_path), slug, target_name, vector_store, embedder
-                )
-        else:
-            # JSON/JSONL 默认微信
-            from memory.ingest import ingest_wechat_file
-
-            messages, chunk_count = ingest_wechat_file(
-                str(tmp_path), slug, target_name, vector_store, embedder
-            )
-
-        if not messages:
-            return StatusResponse(message="未提取到有效消息")
-
-        return StatusResponse(
-            message=f"导入完成：解析 {len(messages)} 条消息，入库 {chunk_count} 个切片"
-        )
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+    task_id = enqueue(
+        TASK_IMPORT,
+        user_id,
+        {
+            "slug": slug,
+            "owner": user_id,
+            "source_path": str(staged_path),
+            "target_name": target_name,
+        },
+        slug=slug,
+    )
+    return TaskAccepted(task_id=task_id, message="导入已开始，可通过任务接口查看进度")
 
 
 # --- 贴纸 ---
@@ -1076,20 +1034,18 @@ def update_exe(slug: str, req: UpdateRequest, user_id: int = Depends(require_aut
 # --- 反思 ---
 
 
-@router.post("/exes/{slug}/reflect", response_model=StatusResponse)
+@router.post("/exes/{slug}/reflect", response_model=TaskAccepted)
 def reflect_exe(slug: str, user_id: int = Depends(require_auth)):
     """关系反思分析。"""
     slug = _check_exe_access(slug, user_id)
 
-    from pipeline.reflector import run_reflection
+    from core.tasks import enqueue
+    from server.task_handlers import TASK_REFLECT
 
-    try:
-        run_reflection(slug, owner=user_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=400, detail="缺少 memory.md")
-    except RuntimeError:
-        raise HTTPException(status_code=500, detail=_INTERNAL_ERROR)
-    return StatusResponse(message="反思完成")
+    task_id = enqueue(
+        TASK_REFLECT, user_id, {"slug": slug, "owner": user_id}, slug=slug
+    )
+    return TaskAccepted(task_id=task_id, message="反思已开始")
 
 
 # --- 朋友圈 ---
@@ -1107,35 +1063,42 @@ def list_moments(slug: str, user_id: int = Depends(require_auth)):
     return {"moments": moments}
 
 
-@router.post("/exes/{slug}/moments/generate", response_model=StatusResponse)
+@router.post("/exes/{slug}/moments/generate", response_model=TaskAccepted)
 def generate_moment(slug: str, user_id: int = Depends(require_auth)):
     """生成一条朋友圈。"""
     slug = _check_exe_access(slug, user_id)
 
-    from pipeline.moment_generator import generate_moment as _gen
+    from core.tasks import enqueue
+    from server.task_handlers import TASK_MOMENT
 
-    try:
-        _gen(slug, owner=user_id)
-        return StatusResponse(message="朋友圈已生成")
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError:
-        raise HTTPException(status_code=500, detail=_INTERNAL_ERROR)
+    task_id = enqueue(TASK_MOMENT, user_id, {"slug": slug, "owner": user_id}, slug=slug)
+    return TaskAccepted(task_id=task_id, message="朋友圈生成中")
 
 
 # --- 版本管理 ---
 
 
-@router.post("/exes/{slug}/backup", response_model=StatusResponse)
+@router.post("/exes/{slug}/backup", response_model=TaskAccepted)
 def backup_exe(
     slug: str, req: Optional[BackupRequest] = None, user_id: int = Depends(require_auth)
 ):
     """备份版本。"""
     slug = _check_exe_access(slug, user_id)
-    from core.version_manager import backup
 
-    version = backup(slug, req.version_name if req else "", owner=user_id)
-    return StatusResponse(message=f"备份成功: {version}")
+    from core.tasks import enqueue
+    from server.task_handlers import TASK_BACKUP
+
+    task_id = enqueue(
+        TASK_BACKUP,
+        user_id,
+        {
+            "slug": slug,
+            "owner": user_id,
+            "version_name": req.version_name if req else "",
+        },
+        slug=slug,
+    )
+    return TaskAccepted(task_id=task_id, message="备份已开始")
 
 
 @router.post("/exes/{slug}/rollback", response_model=StatusResponse)
@@ -1741,3 +1704,87 @@ def resolve_subject_request_route(
         detail=f"request={request_id} status={req.status}",
     )
     return StatusResponse(message="已处置")
+
+
+# --- 异步任务（FR-036 / FR-037）---
+
+
+@router.get("/tasks")
+def list_user_tasks(limit: int = 20, user_id: int = Depends(require_auth)):
+    """本人的任务列表。"""
+    from core.tasks import list_tasks
+
+    return {"tasks": [_task_view(t) for t in list_tasks(user_id, min(limit, 100))]}
+
+
+@router.get("/tasks/{task_id}")
+def get_task_status(task_id: str, user_id: int = Depends(require_auth)):
+    """查询单个任务。"""
+    from core.tasks import get_task
+
+    task = get_task(task_id, user_id)
+    if task is None:
+        # 不区分「不存在」与「不属于你」，避免任务 ID 的存在性泄漏
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return _task_view(task)
+
+
+@router.post("/tasks/{task_id}/retry", response_model=TaskAccepted)
+def retry_task(task_id: str, user_id: int = Depends(require_auth)):
+    """重试失败的任务。只有失败态可重试。"""
+    from core.tasks import retry
+
+    if not retry(task_id, user_id):
+        raise HTTPException(status_code=400, detail="任务不存在或当前状态不可重试")
+    return TaskAccepted(task_id=task_id, message="已重新排队")
+
+
+@router.get("/tasks/{task_id}/stream")
+async def stream_task_progress(task_id: str, user_id: int = Depends(require_auth)):
+    """SSE 推送任务进度，终态后结束。
+
+    轮询接口已经够用，这个是给导入这类长任务的进度条用的——
+    每秒一次轮询在导入几分钟的场景下噪音太大。
+    """
+    from core.tasks import STATUS_FAILED, STATUS_SUCCEEDED, get_task
+
+    if get_task(task_id, user_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    async def generate():
+        import asyncio
+
+        last_payload = None
+        # 兜底超时：任务卡死时不能让连接永远挂着
+        for _ in range(int(config.TASK_STREAM_TIMEOUT_SECONDS * 2)):
+            task = get_task(task_id, user_id)
+            if task is None:
+                break
+            payload = _task_view(task)
+            if payload != last_payload:
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                last_payload = payload
+            if task["status"] in (STATUS_SUCCEEDED, STATUS_FAILED):
+                break
+            await asyncio.sleep(0.5)
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+def _task_view(task: dict) -> dict:
+    """任务的对外视图。不暴露 payload——里面可能有暂存文件路径。"""
+    result = task.get("result")
+    return {
+        "task_id": task["id"],
+        "type": task["task_type"],
+        "slug": task.get("slug"),
+        "status": task["status"],
+        "progress": task.get("progress", 0),
+        "detail": task.get("detail"),
+        "result": json.loads(result) if result else None,
+        "error": task.get("error"),
+        "attempts": task.get("attempts", 0),
+        "created_at": task.get("created_at"),
+        "finished_at": task.get("finished_at"),
+    }
