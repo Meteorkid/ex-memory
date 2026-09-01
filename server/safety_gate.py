@@ -64,6 +64,18 @@ def check_input(user_id: int, slug: str, message: str) -> Optional[dict]:
 
     result = moderate_input(message)
     if result.allowed:
+        # severity=flag 的类目放行但要留痕：它们不该拦人，但值得人工看一眼。
+        # 词表 README 承诺了这个行为，此前代码没有兑现。
+        if result.category:
+            record_safety_event(
+                user_id=user_id,
+                event_type="content_input",
+                severity=result.severity,
+                action_taken="flagged",
+                slug=slug,
+                detector=f"{result.detector}:{result.category}",
+                raw_text=message,
+            )
         return None
 
     record_safety_event(
@@ -131,6 +143,16 @@ def check_output(user_id: int, slug: str, text: str) -> Optional[dict]:
 
     result = moderate_output(text)
     if result.allowed:
+        if result.category:
+            record_safety_event(
+                user_id=user_id,
+                event_type="content_output",
+                severity=result.severity,
+                action_taken="flagged",
+                slug=slug,
+                detector=f"{result.detector}:{result.category}",
+                raw_text=text,
+            )
         return None
 
     record_safety_event(

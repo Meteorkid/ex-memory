@@ -29,4 +29,5 @@ from commands import (  # noqa: E402,F401
     cleanup,
     vector_rebuild,
     migrate_layout,
+    grant_admin,
 )

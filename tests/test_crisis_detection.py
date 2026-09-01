@@ -193,28 +193,108 @@ class TestResourceReviewGate:
         assert resp.hotlines == []
         resources.reset_cache()
 
-    def test_reviewed_content_exposes_only_filled_numbers(self, monkeypatch, tmp_path):
+    @staticmethod
+    def _write(tmp_path, monkeypatch, payload):
         from core.safety import resources
 
         path = tmp_path / "c.json"
-        path.write_text(
-            json.dumps(
-                {
-                    "reviewed": True,
-                    "reviewed_message": "已审阅文案",
-                    "hotlines": [
-                        {"name": "有效热线", "number": "12345"},
-                        {"name": "占位未填", "number": ""},
-                    ],
-                },
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         monkeypatch.setattr(resources, "CONTENT_PATH", path)
         resources.reset_cache()
+        return resources
 
+    _SIGNED_OFF = {
+        "reviewed": True,
+        "reviewed_by": "张三（注册心理师 XXXX）",
+        "reviewed_at": "2026-09-02",
+        "hotlines_verified_at": "2026-09-02",
+        "reviewed_message": "已审阅文案",
+    }
+
+    def test_reviewed_content_exposes_only_verified_numbers(
+        self, monkeypatch, tmp_path
+    ):
+        resources = self._write(
+            tmp_path,
+            monkeypatch,
+            {
+                **self._SIGNED_OFF,
+                "hotlines": [
+                    {"name": "已核实", "number": "12345", "verified_at": "2026-09-02"},
+                    {"name": "未核实", "number": "67890", "verified_at": ""},
+                    {"name": "占位未填", "number": ""},
+                ],
+            },
+        )
         resp = resources.get_crisis_response()
         assert resp.reviewed is True
-        assert [h["name"] for h in resp.hotlines] == ["有效热线"]
+        assert [h["name"] for h in resp.hotlines] == ["已核实"]
+        resources.reset_cache()
+
+    def test_reviewed_true_without_signoff_is_treated_as_unreviewed(
+        self, monkeypatch, tmp_path
+    ):
+        """🔴 光把 reviewed 写成 true 不算数，必须留下审阅痕迹。
+
+        否则一次顺手的改动就能让未经核对的号码上线。
+        """
+        resources = self._write(
+            tmp_path,
+            monkeypatch,
+            {
+                "reviewed": True,
+                "reviewed_message": "声称已审阅",
+                "fallback_message": "兜底文案",
+                "hotlines": [{"name": "热线", "number": "12345"}],
+            },
+        )
+        assert resources.is_reviewed() is False
+        resp = resources.get_crisis_response()
+        assert resp.hotlines == []
+        assert resp.message == "兜底文案"
+        resources.reset_cache()
+
+    def test_unverified_hotline_does_not_disable_the_others(
+        self, monkeypatch, tmp_path
+    ):
+        """一条未核实的备选不应让所有热线一起消失——那比它防的问题更糟。"""
+        resources = self._write(
+            tmp_path,
+            monkeypatch,
+            {
+                **self._SIGNED_OFF,
+                "hotlines": [
+                    {"name": "已核实", "number": "12345", "verified_at": "2026-09-02"},
+                    {"name": "待研究", "number": "67890", "verified_at": ""},
+                ],
+            },
+        )
+        resp = resources.get_crisis_response()
+        assert [h["name"] for h in resp.hotlines] == ["已核实"]
+        resources.reset_cache()
+
+    def test_no_verified_hotline_falls_back_to_non_promising_copy(
+        self, monkeypatch, tmp_path
+    ):
+        """已审阅但一条都没核实通过时，不能展示承诺了热线的文案。"""
+        resources = self._write(
+            tmp_path,
+            monkeypatch,
+            {
+                **self._SIGNED_OFF,
+                "fallback_message": "兜底文案",
+                "hotlines": [{"name": "热线", "number": "12345", "verified_at": ""}],
+            },
+        )
+        resp = resources.get_crisis_response()
+        assert resp.hotlines == []
+        assert resp.message == "兜底文案"
+        resources.reset_cache()
+
+    def test_shipped_content_file_is_not_marked_reviewed(self):
+        """仓库里带的文件必须始终是未审阅态——防止误提交一个已签字的版本。"""
+        from core.safety import resources
+
+        resources.reset_cache()
+        assert resources.is_reviewed() is False
         resources.reset_cache()

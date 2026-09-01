@@ -257,3 +257,22 @@ def clean_expired_tokens():
     with _get_conn() as conn:
         conn.execute("DELETE FROM tokens WHERE expires_at < datetime('now')")
         conn.commit()
+
+
+def get_user_role(user_id: int) -> str:
+    """读取用户角色。缺省 user——查不到时按最低权限处理。"""
+    with _get_conn() as conn:
+        row = conn.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+        return (row["role"] or "user") if row else "user"
+
+
+def set_user_role(username: str, role: str) -> bool:
+    """授予/撤销角色。返回是否命中了用户。"""
+    if role not in ("user", "admin"):
+        raise ValueError("角色只能是 user 或 admin")
+    with _get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE users SET role = ? WHERE username = ?", (role, username)
+        )
+        conn.commit()
+        return cursor.rowcount > 0

@@ -69,6 +69,15 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 账号注销时 safety_events 的处置方式："anonymize" 或 "delete"。
+#
+# 两条路都已实现，这是一个法务裁量点而非工程取舍，所以做成配置项：
+# 法务无论怎么裁都不必改代码。默认 anonymize 的理由见
+# docs/COMPLIANCE_DECISIONS.md 第 1 节。
+SAFETY_EVENT_DELETION_MODE = os.getenv("SAFETY_EVENT_DELETION_MODE", "anonymize")
+if SAFETY_EVENT_DELETION_MODE not in ("anonymize", "delete"):
+    raise ValueError("SAFETY_EVENT_DELETION_MODE 只能是 anonymize 或 delete")
+
 # 使用强度保护（FR-023）。默认 3 小时/日 + 1 小时冷静期。
 # 数值是保守起点，正式阈值应由产品结合真实分布决定。
 DAILY_USAGE_LIMIT_SECONDS = int(os.getenv("DAILY_USAGE_LIMIT_SECONDS", str(3 * 3600)))

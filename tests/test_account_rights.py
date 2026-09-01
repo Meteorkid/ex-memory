@@ -312,6 +312,29 @@ class TestDeletionCompleteness:
         assert rows[0]["input_hash"] is None
         assert rows[0]["event_type"] == "crisis"
 
+    def test_delete_mode_removes_rows_entirely(self, env, client, request, monkeypatch):
+        """法务若裁定连同删除，切配置即可，不必改代码。"""
+        monkeypatch.setattr("config.SAFETY_EVENT_DELETION_MODE", "delete")
+        headers, user_id = _register(client, request)
+        _populate_user_data(env, client, headers, user_id)
+
+        from server.account_lifecycle import delete_account, verify_deletion
+        from server.auth import _get_conn
+
+        receipt = delete_account(user_id)
+        assert receipt["safety_events"] == "deleted"
+        with _get_conn() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM safety_events").fetchone()[0] == 0
+        assert verify_deletion(user_id) == []
+
+    def test_anonymize_mode_is_reported_in_receipt(self, env, client, request):
+        headers, user_id = _register(client, request)
+        _populate_user_data(env, client, headers, user_id)
+
+        from server.account_lifecycle import delete_account
+
+        assert delete_account(user_id)["safety_events"] == "anonymized"
+
     def test_delete_endpoint_requires_confirmation(self, client, request):
         headers, _ = _register(client, request)
         resp = client.request(

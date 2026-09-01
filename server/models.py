@@ -138,3 +138,12 @@ class SubjectRequestPayload(BaseModel):
     identity_evidence: Optional[str] = Field(
         default=None, max_length=500, description="身份材料的引用，不在此提交材料本身"
     )
+
+
+class ReviewResolution(BaseModel):
+    """复核处置。"""
+
+    status: str = Field(
+        description="safety: resolved/dismissed；subject: verifying/actioned/rejected"
+    )
+    note: str = Field(default="", max_length=1000)

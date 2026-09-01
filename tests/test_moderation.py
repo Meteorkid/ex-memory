@@ -272,3 +272,51 @@ class TestLateProviderCheck:
         # 落库调用仍会发生，但内容已被清空，不留违规文本
         persisted = persist.call_args[0][3] if persist.call_args else ""
         assert persisted == ""
+
+
+class TestFlagSeverity:
+    def test_flagged_category_is_allowed_but_recorded(self, client, auth_headers):
+        """severity=flag 放行但留痕——词表 README 承诺了这个行为。"""
+        from unittest.mock import patch as _patch
+
+        engine = MagicMock()
+        engine.chat.return_value = ("好的", [], None)
+        with _patch("server.routes._get_engine", return_value=engine):
+            with _patch("server.routes._run_session_archive"):
+                resp = client.post(
+                    "/api/chat",
+                    json={"slug": "demo", "message": "你能不能冒充本人跟他说话"},
+                    headers=auth_headers,
+                )
+        # 放行：拿到了正常回复而不是拦截通知
+        assert resp.json().get("notice") is None
+        assert resp.json()["reply"] == "好的"
+
+        from server.auth import _get_conn
+
+        with _get_conn() as conn:
+            rows = conn.execute(
+                "SELECT action_taken, severity, detector FROM safety_events"
+                " WHERE event_type = 'content_input'"
+            ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]["action_taken"] == "flagged"
+        assert rows[0]["severity"] == "flag"
+        assert "impersonation" in rows[0]["detector"]
+
+    def test_clean_message_records_nothing(self, client, auth_headers):
+        from unittest.mock import patch as _patch
+
+        engine = MagicMock()
+        engine.chat.return_value = ("好的", [], None)
+        with _patch("server.routes._get_engine", return_value=engine):
+            with _patch("server.routes._run_session_archive"):
+                client.post(
+                    "/api/chat",
+                    json={"slug": "demo", "message": "今天天气真好"},
+                    headers=auth_headers,
+                )
+        from server.auth import _get_conn
+
+        with _get_conn() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM safety_events").fetchone()[0] == 0

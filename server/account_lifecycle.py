@@ -149,9 +149,9 @@ def _collect_feedback(user_id: int) -> list[dict]:
 def delete_account(user_id: int) -> dict:
     """级联删除账号的全部个人信息，返回删除回执。
 
-    safety_events 不整行删除，而是抹掉 user_id 与片段、只留类别与时间：
-    危机与违规事件的聚合统计有留存价值，但去掉关联后它不再是个人信息。
-    ⚠️ 这一条属于法务判断，若法务要求连同删除，改 _anonymize_safety_events。
+    safety_events 的处置由 config.SAFETY_EVENT_DELETION_MODE 决定：
+    anonymize（默认）抹掉关联只留类别与时间，delete 整行删除。
+    这是法务裁量点，两条路都已实现并各有测试，改配置即可切换。
     """
     from server.auth import _get_conn
 
@@ -172,7 +172,7 @@ def delete_account(user_id: int) -> dict:
     receipt["feedback_removed"] = _purge_feedback(user_id)
 
     with _get_conn() as conn:
-        _anonymize_safety_events(conn, user_id)
+        receipt["safety_events"] = _handle_safety_events(conn, user_id)
         for table in ("tokens", "consents", "user_activity", "external_identities"):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -183,7 +183,19 @@ def delete_account(user_id: int) -> dict:
     return receipt
 
 
-def _anonymize_safety_events(conn, user_id: int) -> None:
+def _handle_safety_events(conn, user_id: int) -> str:
+    """按配置处置安全事件，返回实际采取的方式。
+
+    anonymize 抹掉的是全部可关联字段（user_id / slug / 片段 / 输入哈希），
+    只留类别、严重度与时间——剩下的部分不再指向任何自然人。
+    delete 则整行清除，不留任何痕迹。
+    """
+    import config
+
+    if config.SAFETY_EVENT_DELETION_MODE == "delete":
+        conn.execute("DELETE FROM safety_events WHERE user_id = ?", (user_id,))
+        return "deleted"
+
     conn.execute(
         """
         UPDATE safety_events
@@ -192,6 +204,7 @@ def _anonymize_safety_events(conn, user_id: int) -> None:
         """,
         (user_id,),
     )
+    return "anonymized"
 
 
 def _purge_feedback(user_id: int) -> int:

@@ -71,6 +71,23 @@ def require_auth(
     return user_id
 
 
+def require_admin(user_id: int = Depends(require_auth)) -> int:
+    """管理员权限校验。
+
+    复核队列里是用户最脆弱时刻的记录与被模拟者的投诉，任何登录用户都能
+    翻看是不可接受的。users.role 字段一直存在但全仓无人读，这里第一次
+    真正用上它。
+
+    刻意不做「第一个用户自动是管理员」这类便利逻辑——权限提升必须是
+    显式动作，用 `python run.py` 的 /grant-admin 命令授予。
+    """
+    from server.auth import get_user_role
+
+    if get_user_role(user_id) != "admin":
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    return user_id
+
+
 def optional_auth(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),

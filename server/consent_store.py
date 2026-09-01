@@ -146,3 +146,26 @@ def list_subject_requests(status: str = "received", limit: int = 100) -> list[di
             (status, limit),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def resolve_subject_request(
+    request_id: int, handled_by: str, status: str, note: str = ""
+) -> bool:
+    """处置一条数据主体请求。status: verifying / actioned / rejected。"""
+    if status not in ("verifying", "actioned", "rejected"):
+        raise ValueError("状态只能是 verifying / actioned / rejected")
+    from server.auth import _get_conn
+
+    with _get_conn() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE subject_requests
+            SET status = ?, handled_by = ?, resolution_note = ?,
+                resolved_at = CASE WHEN ? IN ('actioned', 'rejected')
+                                   THEN datetime('now') ELSE resolved_at END
+            WHERE id = ?
+            """,
+            (status, handled_by, note, status, request_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0

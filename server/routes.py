@@ -35,7 +35,7 @@ from server.safety_gate import (
     check_output,
     check_output_streaming,
 )
-from server.middleware import require_auth, _get_client_ip, security
+from server.middleware import require_admin, require_auth, _get_client_ip, security
 from server.models import (
     AuthRequest,
     BackupRequest,
@@ -54,6 +54,7 @@ from server.models import (
     ConsentRequest,
     SubjectRequestPayload,
     PhoneCodeRequest,
+    ReviewResolution,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -1668,3 +1669,71 @@ def delete_account_data(req: DeleteRequest, user_id: int = Depends(require_auth)
         "account_deleted", username=f"user_id={user_id}", detail=str(receipt["exes"])
     )
     return StatusResponse(message="账号及全部数据已删除")
+
+
+# --- 管理员：安全复核与数据主体请求处置 ---
+#
+# 🔴 这些端点必须是管理员专属：复核队列里是用户最脆弱时刻的记录与
+# 被模拟者的投诉，任何登录用户都能翻看是不可接受的。
+
+
+@router.get("/admin/safety/reviews")
+def list_safety_reviews(limit: int = 50, admin_id: int = Depends(require_admin)):
+    """待人工复核的安全事件队列，高严重度优先。"""
+    from server.safety_store import list_pending_reviews
+
+    return {"events": list_pending_reviews(limit=min(limit, 200))}
+
+
+@router.post("/admin/safety/reviews/{event_id}", response_model=StatusResponse)
+def resolve_safety_review(
+    event_id: int, req: ReviewResolution, admin_id: int = Depends(require_admin)
+):
+    """标记安全事件的复核结果。"""
+    from server.safety_store import resolve_review
+
+    try:
+        ok = resolve_review(event_id, f"user_id={admin_id}", req.status, req.note)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not ok:
+        raise HTTPException(status_code=404, detail="事件不存在")
+    _audit(
+        "safety_review_resolved",
+        username=f"user_id={admin_id}",
+        detail=f"event={event_id} status={req.status}",
+    )
+    return StatusResponse(message="已记录复核结果")
+
+
+@router.get("/admin/subject-requests")
+def list_subject_request_queue(
+    status: str = "received", admin_id: int = Depends(require_admin)
+):
+    """被模拟者投诉与近亲属主张的工单队列。"""
+    from server.consent_store import list_subject_requests
+
+    return {"requests": list_subject_requests(status=status)}
+
+
+@router.post("/admin/subject-requests/{request_id}", response_model=StatusResponse)
+def resolve_subject_request_route(
+    request_id: int, req: ReviewResolution, admin_id: int = Depends(require_admin)
+):
+    """处置一条数据主体请求。"""
+    from server.consent_store import resolve_subject_request
+
+    try:
+        ok = resolve_subject_request(
+            request_id, f"user_id={admin_id}", req.status, req.note
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not ok:
+        raise HTTPException(status_code=404, detail="请求不存在")
+    _audit(
+        "subject_request_resolved",
+        username=f"user_id={admin_id}",
+        detail=f"request={request_id} status={req.status}",
+    )
+    return StatusResponse(message="已处置")

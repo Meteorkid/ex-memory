@@ -1,43 +1,128 @@
 {
   "_README": [
-    "本地内容审核兜底词表。它的定位是【第三方审核服务不可用时的降级方案】，",
+    "本地内容审核兜底词表。定位是【第三方审核服务不可用时的降级方案】，",
     "不是主通道，也不可能替代主通道。",
     "",
-    "【必须由运营方补全】",
-    "仓库里只带了少量结构性种子词，用于验证机制可用。真实词表应来自：",
-    "  1. 所选内容安全服务商提供的离线词库；",
-    "  2. 监管指引与行业规范；",
-    "  3. 自身运营中积累的案例。",
+    "【分类口径】",
+    "按《网络信息内容生态治理规定》的二分结构组织：",
+    "  severity=block —— 对应「违法信息」，直接拦截；",
+    "  severity=flag  —— 对应「不良信息」，放行但记事件供复核。",
     "",
-    "刻意不在代码仓库里堆砌敏感词清单：不完整的词表会制造虚假安全感，",
-    "而且这类清单需要随监管口径持续更新，属于运营数据而非代码。",
+    "【哪些类目仓库里给了种子词，哪些必须由运营方补】",
+    "  已给种子词：诈骗、赌博、毒品、枪支弹药、自伤鼓励、冒充与人格权侵害、",
+    "              色情招嫖。这些类目的表述相对固定，误伤风险可控。",
+    "  必须外部补：涉政、涉恐、涉邪教、民族宗教等。这类清单需随监管口径持续",
+    "              更新，且判定高度依赖语境，靠静态词表既做不准也不该由代码",
+    "              仓库来维护——应取自所选内容安全服务商的离线词库。",
+    "",
+    "刻意不在仓库里堆砌敏感词：不完整的词表会制造虚假安全感。",
+    "vendor_required 为 true 的类目当前 terms 为空是预期状态，不是遗漏。",
     "",
     "【与危机识别的关系】",
     "危机意念识别优先级高于本词表。一条消息既命中危机又命中违规词时，",
     "走危机流程——不能因为「违规」把正在求救的人挡回去。",
+    "self_harm_promotion 收的是「教唆/传授自伤方法」，不是「表达自伤意念」；",
+    "后者属于危机识别的范畴，两者不要混。",
     "",
-    "categories 里 severity 为 block 的直接拦截，flag 的放行但记录事件。"
+    "【维护提示】",
+    "命中是朴素子串匹配，加词时注意误伤：短词、常用词、可作为其他词一部分的",
+    "字串都容易误杀。宁可写长一点的搭配，也不要写单个字。"
   ],
   "categories": [
     {
-      "name": "illegal_transaction",
+      "name": "fraud",
+      "label": "诈骗与非法交易",
       "severity": "block",
-      "terms": ["代开发票", "办理假证", "枪支出售", "毒品交易"]
+      "vendor_required": false,
+      "terms": [
+        "代开发票",
+        "办理假证",
+        "刷单返利",
+        "包过网贷",
+        "无抵押秒下款",
+        "洗钱通道",
+        "买卖银行卡",
+        "出售身份证信息",
+        "代考包过"
+      ]
+    },
+    {
+      "name": "gambling",
+      "label": "赌博",
+      "severity": "block",
+      "vendor_required": false,
+      "terms": ["网上赌场", "博彩平台代理", "线上棋牌下注", "私彩投注"]
+    },
+    {
+      "name": "drugs",
+      "label": "毒品",
+      "severity": "block",
+      "vendor_required": false,
+      "terms": ["出售冰毒", "大麻代购", "毒品交易", "制毒方法"]
+    },
+    {
+      "name": "weapons",
+      "label": "枪支弹药与爆炸物",
+      "severity": "block",
+      "vendor_required": false,
+      "terms": ["枪支出售", "购买子弹", "自制炸药", "爆炸物制作"]
+    },
+    {
+      "name": "self_harm_promotion",
+      "label": "教唆或传授自伤方法",
+      "severity": "block",
+      "vendor_required": false,
+      "terms": [
+        "教你怎么自杀",
+        "无痛自杀方法",
+        "自杀方法推荐",
+        "怎样割腕不疼",
+        "约死群"
+      ]
     },
     {
       "name": "sexual_solicitation",
+      "label": "色情招嫖",
       "severity": "block",
-      "terms": ["约炮加微信", "上门特殊服务"]
+      "vendor_required": false,
+      "terms": ["约炮加微信", "上门特殊服务", "全套服务加V", "招嫖联系方式"]
     },
     {
-      "name": "self_harm_encouragement",
-      "severity": "block",
-      "terms": ["教你怎么自杀", "无痛自杀方法"]
-    },
-    {
-      "name": "impersonation_risk",
+      "name": "impersonation_and_personality_rights",
+      "label": "冒充他人与人格权侵害",
       "severity": "flag",
-      "terms": ["冒充本人", "假装是他本人去骗"]
+      "vendor_required": false,
+      "terms": [
+        "冒充本人",
+        "假装是他本人去骗",
+        "用他的名义借钱",
+        "拿这个去骗他家人"
+      ],
+      "note": "本产品特有风险：镜像可能被用于冒充被模拟者。命中不直接拦截，记事件供人工复核。"
+    },
+    {
+      "name": "political",
+      "label": "涉政",
+      "severity": "block",
+      "vendor_required": true,
+      "terms": [],
+      "note": "须由内容安全服务商提供离线词库。判定高度依赖语境，静态词表做不准。"
+    },
+    {
+      "name": "terrorism_extremism",
+      "label": "涉恐与极端主义",
+      "severity": "block",
+      "vendor_required": true,
+      "terms": [],
+      "note": "同上，由服务商词库覆盖。"
+    },
+    {
+      "name": "ethnic_religious",
+      "label": "民族宗教相关违法信息",
+      "severity": "block",
+      "vendor_required": true,
+      "terms": [],
+      "note": "同上，由服务商词库覆盖。"
     }
   ]
 }
