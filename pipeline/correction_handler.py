@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from config import get_llm_config, get_llm_client, get_ex_dir
+from config import get_llm_config, get_llm_client, resolve_ex_dir
 from core.file_utils import atomic_write
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
@@ -36,6 +36,7 @@ def handle_correction(
     user_msg: str,
     last_reply: str,
     history: list[dict],
+    owner=None,
 ) -> str:
     """处理用户纠正，生成修正内容并写入 corrections.md。
 
@@ -44,6 +45,7 @@ def handle_correction(
         user_msg: 用户的纠正消息
         last_reply: 被纠正的上一条回复
         history: 对话历史
+        owner: 镜像归属账号（多用户嵌套目录）
 
     Returns:
         处理结果的确认消息
@@ -53,7 +55,7 @@ def handle_correction(
         return "（未配置 LLM API Key，无法自动处理纠正。请手动编辑 corrections.md。）"
 
     client = get_llm_client()
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
 
     # 读取 correction_handler prompt
     prompt_template = (PROMPTS_DIR / "correction_handler.md").read_text(
@@ -104,22 +106,24 @@ def handle_correction(
     atomic_write(corrections_path, existing + new_correction)
 
     # 同时追加到 memory.md 的 Correction 记录节
-    _append_to_memory(slug, count + 1, timestamp, user_msg)
+    _append_to_memory(slug, count + 1, timestamp, user_msg, owner)
 
     # 将人格相关纠正合并到 persona.md
-    _patch_persona(slug, correction_content)
+    _patch_persona(slug, correction_content, owner)
 
     # 重新生成 SKILL.md
     from pipeline.skill_combiner import write_skill
 
-    write_skill(slug)
+    write_skill(slug, owner=owner)
 
     return f"已记录纠正 #{count + 1}，下条回复会体现。"
 
 
-def _append_to_memory(slug: str, correction_num: int, timestamp: str, user_msg: str):
+def _append_to_memory(
+    slug: str, correction_num: int, timestamp: str, user_msg: str, owner=None
+):
     """将纠正摘要追加到 memory.md 的 Correction 记录节。"""
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     memory_path = ex_dir / "memory.md"
 
     if not memory_path.exists():
@@ -139,9 +143,9 @@ def _append_to_memory(slug: str, correction_num: int, timestamp: str, user_msg: 
     atomic_write(memory_path, content)
 
 
-def _patch_persona(slug: str, correction_content: str):
+def _patch_persona(slug: str, correction_content: str, owner=None):
     """将纠正中的人格特征更新到 persona.md。"""
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     persona_path = ex_dir / "persona.md"
     if not persona_path.exists():
         return

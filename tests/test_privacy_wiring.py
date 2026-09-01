@@ -46,7 +46,7 @@ class TestAppendTurnMasks:
             source="web",
         )
 
-        msgs = load_jsonl_messages("m1")
+        msgs = load_jsonl_messages("m1", owner=1)
         contents = [m["content"] for m in msgs]
         joined = "\n".join(contents)
         assert "13812345678" not in joined

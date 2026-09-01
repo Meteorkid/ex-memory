@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Any
 
-from config import get_ex_dir
+from config import resolve_ex_dir
 from core.file_utils import atomic_write_json, locked_update_json
 
 logger = logging.getLogger("ex-memory")
@@ -67,24 +67,29 @@ RED_PACKET_TRIGGERS: dict[str, dict[str, Any]] = {
 # ── 钱包管理 ──
 
 
-def get_wallet_path(slug: str) -> Path:
-    return get_ex_dir(slug) / "wallet.json"
+def get_wallet_path(slug: str, owner: Optional[int] = None) -> Path:
+    return resolve_ex_dir(slug, owner) / "wallet.json"
 
 
-def load_wallet(slug: str) -> dict:
+def load_wallet(slug: str, owner: Optional[int] = None) -> dict:
     """加载钱包数据，不存在则初始化。"""
-    p = get_wallet_path(slug)
+    p = get_wallet_path(slug, owner)
     if p.exists():
         return json.loads(p.read_text(encoding="utf-8"))
     return {"balance": 0.0, "transactions": []}
 
 
-def save_wallet(slug: str, wallet: dict) -> None:
-    atomic_write_json(get_wallet_path(slug), wallet)
+def save_wallet(slug: str, wallet: dict, owner: Optional[int] = None) -> None:
+    atomic_write_json(get_wallet_path(slug, owner), wallet)
 
 
 def add_transaction(
-    slug: str, tx_type: str, amount: float, note: str = "", ref_id: str = ""
+    slug: str,
+    tx_type: str,
+    amount: float,
+    note: str = "",
+    ref_id: str = "",
+    owner: Optional[int] = None,
 ) -> dict:
     """添加一笔交易记录。返回更新后的钱包。"""
 
@@ -106,7 +111,7 @@ def add_transaction(
         return dict(wallet)
 
     return locked_update_json(
-        get_wallet_path(slug),
+        get_wallet_path(slug, owner),
         lambda: {"balance": 0.0, "transactions": []},
         update,
     )
@@ -115,22 +120,24 @@ def add_transaction(
 # ── 红包管理 ──
 
 
-def get_redpackets_path(slug: str) -> Path:
-    return get_ex_dir(slug) / "red_packets.json"
+def get_redpackets_path(slug: str, owner: Optional[int] = None) -> Path:
+    return resolve_ex_dir(slug, owner) / "red_packets.json"
 
 
-def load_redpackets(slug: str) -> list[dict]:
-    p = get_redpackets_path(slug)
+def load_redpackets(slug: str, owner: Optional[int] = None) -> list[dict]:
+    p = get_redpackets_path(slug, owner)
     if p.exists():
         return json.loads(p.read_text(encoding="utf-8"))
     return []
 
 
-def save_redpackets(slug: str, packets: list[dict]) -> None:
-    atomic_write_json(get_redpackets_path(slug), packets)
+def save_redpackets(slug: str, packets: list[dict], owner: Optional[int] = None) -> None:
+    atomic_write_json(get_redpackets_path(slug, owner), packets)
 
 
-def create_redpacket(slug: str, trigger: str = "random_cute") -> Optional[dict]:
+def create_redpacket(
+    slug: str, trigger: str = "random_cute", owner: Optional[int] = None
+) -> Optional[dict]:
     """生成一个红包。返回红包数据或 None（触发条件不满足时）。"""
 
     def update(packets: list[dict]) -> Optional[dict]:
@@ -161,10 +168,12 @@ def create_redpacket(slug: str, trigger: str = "random_cute") -> Optional[dict]:
         packets.append(rp)
         return dict(rp)
 
-    return locked_update_json(get_redpackets_path(slug), list, update)
+    return locked_update_json(get_redpackets_path(slug, owner), list, update)
 
 
-def open_redpacket(slug: str, rp_id: str) -> Optional[dict]:
+def open_redpacket(
+    slug: str, rp_id: str, owner: Optional[int] = None
+) -> Optional[dict]:
     """打开红包。返回红包数据，None 表示不存在或已开。"""
 
     def update(packets: list[dict]) -> Optional[dict]:
@@ -177,10 +186,15 @@ def open_redpacket(slug: str, rp_id: str) -> Optional[dict]:
             return dict(rp)
         return None
 
-    rp = locked_update_json(get_redpackets_path(slug), list, update)
+    rp = locked_update_json(get_redpackets_path(slug, owner), list, update)
     if rp is not None:
         add_transaction(
-            slug, "red_packet_received", rp["amount"], note=rp["note"], ref_id=rp_id
+            slug,
+            "red_packet_received",
+            rp["amount"],
+            note=rp["note"],
+            ref_id=rp_id,
+            owner=owner,
         )
     return rp
 
@@ -202,23 +216,27 @@ def detect_redpacket_trigger(user_message: str, ai_reply: str) -> Optional[str]:
 # ── 转账管理 ──
 
 
-def get_transfers_path(slug: str) -> Path:
-    return get_ex_dir(slug) / "transfers.json"
+def get_transfers_path(slug: str, owner: Optional[int] = None) -> Path:
+    return resolve_ex_dir(slug, owner) / "transfers.json"
 
 
-def load_transfers(slug: str) -> list[dict]:
-    p = get_transfers_path(slug)
+def load_transfers(slug: str, owner: Optional[int] = None) -> list[dict]:
+    p = get_transfers_path(slug, owner)
     if p.exists():
         return json.loads(p.read_text(encoding="utf-8"))
     return []
 
 
-def save_transfers(slug: str, transfers: list[dict]) -> None:
-    atomic_write_json(get_transfers_path(slug), transfers)
+def save_transfers(slug: str, transfers: list[dict], owner: Optional[int] = None) -> None:
+    atomic_write_json(get_transfers_path(slug, owner), transfers)
 
 
 def create_transfer(
-    slug: str, amount: float, note: str = "", direction: str = "ta_to_me"
+    slug: str,
+    amount: float,
+    note: str = "",
+    direction: str = "ta_to_me",
+    owner: Optional[int] = None,
 ) -> dict:
     """创建转账。"""
 
@@ -235,10 +253,12 @@ def create_transfer(
         transfers.append(tx)
         return dict(tx)
 
-    return locked_update_json(get_transfers_path(slug), list, update)
+    return locked_update_json(get_transfers_path(slug, owner), list, update)
 
 
-def confirm_transfer(slug: str, tx_id: str, action: str = "receive") -> Optional[dict]:
+def confirm_transfer(
+    slug: str, tx_id: str, action: str = "receive", owner: Optional[int] = None
+) -> Optional[dict]:
     """确认转账。action: receive / return"""
 
     def update(transfers: list[dict]) -> Optional[dict]:
@@ -254,12 +274,14 @@ def confirm_transfer(slug: str, tx_id: str, action: str = "receive") -> Optional
             return dict(tx)
         return None
 
-    tx = locked_update_json(get_transfers_path(slug), list, update)
+    tx = locked_update_json(get_transfers_path(slug, owner), list, update)
     if tx is None:
         return None
     if action == "receive":
         tx_type = (
             "transfer_received" if tx["direction"] == "ta_to_me" else "transfer_sent"
         )
-        add_transaction(slug, tx_type, tx["amount"], note=tx["note"], ref_id=tx_id)
+        add_transaction(
+            slug, tx_type, tx["amount"], note=tx["note"], ref_id=tx_id, owner=owner
+        )
     return tx

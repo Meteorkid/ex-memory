@@ -10,8 +10,9 @@ def exes_dir(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _read_raw(exes_dir, slug: str) -> list[str]:
-    path = exes_dir / slug / "conversations" / "conversation.jsonl"
+def _read_raw(exes_dir, slug: str, owner=None) -> list[str]:
+    base = exes_dir / str(owner) / slug if owner is not None else exes_dir / slug
+    path = base / "conversations" / "conversation.jsonl"
     if not path.exists():
         return []
     return path.read_text(encoding="utf-8").splitlines()
@@ -30,7 +31,7 @@ class TestAppendTurn:
             source="web",
         )
 
-        lines = _read_raw(exes_dir, "alpha")
+        lines = _read_raw(exes_dir, "alpha", owner=7)
         assert len(lines) == 2
 
         user_rec = json.loads(lines[0])
@@ -53,7 +54,7 @@ class TestAppendTurn:
         from core.conversation_store import append_turn
 
         append_turn("alpha", 7, "q", "a")
-        assistant_rec = json.loads(_read_raw(exes_dir, "alpha")[1])
+        assistant_rec = json.loads(_read_raw(exes_dir, "alpha", owner=7)[1])
         assert assistant_rec["stickers"] == []
         assert assistant_rec["source"] == "web"
 
@@ -62,7 +63,7 @@ class TestAppendTurn:
 
         append_turn("alpha", 7, "q1", "a1")
         append_turn("alpha", 7, "q2", "a2")
-        assert len(_read_raw(exes_dir, "alpha")) == 4
+        assert len(_read_raw(exes_dir, "alpha", owner=7)) == 4
 
 
 class TestLoadJsonlMessages:
@@ -72,7 +73,7 @@ class TestLoadJsonlMessages:
         assert load_jsonl_messages("ghost") == []
 
         append_turn("alpha", 7, "q", "a")
-        msgs = load_jsonl_messages("alpha")
+        msgs = load_jsonl_messages("alpha", owner=7)
         assert [m["role"] for m in msgs] == ["user", "assistant"]
         assert [m["content"] for m in msgs] == ["q", "a"]
 

@@ -1,17 +1,26 @@
-"""镜像访问控制：owner 绑定与单人模式。"""
+"""镜像访问控制：owner 绑定与单人模式。
+
+镜像目录布局：
+- 存量（迁移前）：exes/<slug>
+- 新建（按账号隔离）：exes/<owner>/<slug>
+
+所有关心租户边界的读写在多用户模式下都应携带 owner，
+通过 config.resolve_ex_dir 优先命中嵌套目录、回退扁平目录兼容存量镜像。
+"""
 
 import json
 import logging
 from typing import Optional
 
-from config import get_ex_dir
+from config import resolve_ex_dir
 from core.file_utils import atomic_write_json
 
 logger = logging.getLogger("ex-memory")
 
 
-def load_meta(slug: str) -> Optional[dict]:
-    meta_path = get_ex_dir(slug) / "meta.json"
+def load_meta(slug: str, owner: Optional[int] = None) -> Optional[dict]:
+    """读取镜像 meta.json。owner 为空时只查扁平目录（存量 / 无人格上下文）。"""
+    meta_path = resolve_ex_dir(slug, owner) / "meta.json"
     if not meta_path.exists():
         return None
     try:
@@ -20,16 +29,17 @@ def load_meta(slug: str) -> Optional[dict]:
         return None
 
 
-def get_owner_user_id(slug: str) -> Optional[int]:
-    meta = load_meta(slug)
+def get_owner_user_id(slug: str, owner: Optional[int] = None) -> Optional[int]:
+    """读取镜像绑定的 owner。优先解析到 owner 指定的命名空间目录。"""
+    meta = load_meta(slug, owner)
     if not meta:
         return None
-    owner = meta.get("owner_user_id")
-    return int(owner) if owner is not None else None
+    bound = meta.get("owner_user_id")
+    return int(bound) if bound is not None else None
 
 
 def set_owner_user_id(slug: str, user_id: int) -> None:
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, user_id)
     meta_path = ex_dir / "meta.json"
     if not meta_path.exists():
         raise FileNotFoundError(f"镜像 [{slug}] 不存在")
@@ -47,7 +57,7 @@ def _single_user_mode() -> bool:
 def user_owns_exe(slug: str, user_id: int) -> bool:
     if _single_user_mode():
         return True
-    owner = get_owner_user_id(slug)
+    owner = get_owner_user_id(slug, user_id)
     if owner is None:
         return False
     return owner == user_id
@@ -55,12 +65,12 @@ def user_owns_exe(slug: str, user_id: int) -> bool:
 
 def assert_exe_access(slug: str, user_id: int) -> None:
     """校验当前用户可访问该镜像。Raises PermissionError。"""
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, user_id)
     if not ex_dir.exists():
         raise FileNotFoundError(f"镜像 [{slug}] 不存在")
 
     if _single_user_mode():
-        owner = get_owner_user_id(slug)
+        owner = get_owner_user_id(slug, user_id)
         if owner is None:
             try:
                 set_owner_user_id(slug, user_id)
@@ -68,7 +78,7 @@ def assert_exe_access(slug: str, user_id: int) -> None:
                 logger.warning("无法绑定镜像 owner: %s", e)
         return
 
-    owner = get_owner_user_id(slug)
+    owner = get_owner_user_id(slug, user_id)
     if owner is None:
         raise PermissionError("该镜像未绑定用户，无法访问")
     if owner != user_id:
@@ -76,13 +86,24 @@ def assert_exe_access(slug: str, user_id: int) -> None:
 
 
 def iter_accessible_exes(user_id: int):
-    """迭代当前用户可访问的镜像目录。"""
+    """迭代当前用户可访问的镜像目录（含嵌套与扁平两种布局）。"""
     from config import EXES_DIR
 
     if not EXES_DIR.exists():
         return
-    for d in EXES_DIR.iterdir():
-        if not d.is_dir() or not (d / "meta.json").exists():
+
+    for top in sorted(EXES_DIR.iterdir()):
+        if not top.is_dir():
             continue
-        if _single_user_mode() or user_owns_exe(d.name, user_id):
-            yield d
+
+        # 扁平镜像：exes/<slug>（含 meta.json）
+        if (top / "meta.json").exists():
+            if _single_user_mode() or user_owns_exe(top.name, user_id):
+                yield top
+            continue
+
+        # 嵌套 owner 目录：exes/<owner>/<slug>
+        if _single_user_mode() or top.name == str(user_id):
+            for sub in sorted(top.iterdir()):
+                if sub.is_dir() and (sub / "meta.json").exists():
+                    yield sub

@@ -5,7 +5,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from config import get_llm_config, get_llm_client, get_ex_dir
+from config import get_llm_config, get_llm_client, resolve_ex_dir
 from core.file_utils import atomic_write_json
 
 logger = logging.getLogger("ex-memory")
@@ -15,11 +15,12 @@ PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 FAKE_LIKERS = ["小明", "阿花", "老王", "小红", "大壮", "美美"]
 
 
-def generate_moment(slug: str) -> str:
+def generate_moment(slug: str, owner=None) -> str:
     """为指定镜像生成一条朋友圈，含评论和点赞。
 
     Args:
         slug: 前任代号
+        owner: 镜像归属账号（多用户嵌套目录）
 
     Returns:
         生成的朋友圈内容
@@ -28,7 +29,7 @@ def generate_moment(slug: str) -> str:
         FileNotFoundError: 缺少 persona.md
         RuntimeError: 未配置 LLM
     """
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     persona_path = ex_dir / "persona.md"
     if not persona_path.exists():
         raise FileNotFoundError("缺少 persona.md")

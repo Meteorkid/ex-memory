@@ -10,6 +10,8 @@ from prompt_toolkit import prompt as pt_prompt
 from config import (
     get_ex_dir,
     ensure_ex_dirs,
+    resolve_ex_dir,
+    ensure_ex_dirs_owned,
     get_embedding_config,
     get_llm_config,
     get_collection_name,
@@ -326,7 +328,11 @@ def run_create_flow_api(
     """
 
     try:
-        ex_dir = get_ex_dir(slug) if resume else ensure_ex_dirs(slug)
+        ex_dir = (
+            resolve_ex_dir(slug, owner_user_id)
+            if resume
+            else ensure_ex_dirs_owned(slug, owner_user_id)
+        )
 
         # 恢复模式：读取已有 meta
         if resume:
@@ -368,7 +374,12 @@ def run_create_flow_api(
 
             # 事前备份
             try:
-                version_backup(slug, "pre_create", include_chroma=True)
+                version_backup(
+                    slug,
+                    "pre_create",
+                    include_chroma=True,
+                    owner=owner_user_id,
+                )
             except Exception as e:
                 logger.warning("镜像 [%s] 事前备份失败，本次无回滚点: %s", slug, e)
 
@@ -416,7 +427,7 @@ def run_create_flow_api(
 
         if start_idx <= 3:
             try:
-                write_skill(slug)
+                write_skill(slug, owner=owner_user_id)
             except Exception as e:
                 _save_failed_state(ex_dir, "skill", e)
                 return {"error": f"生成 SKILL.md 失败: {e}"}

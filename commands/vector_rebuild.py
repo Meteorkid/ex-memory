@@ -13,7 +13,12 @@
 import logging
 from pathlib import Path
 
-from config import CHUNK_TURNS, CHUNK_OVERLAP, get_ex_dir, get_collection_name
+from config import (
+    CHUNK_TURNS,
+    CHUNK_OVERLAP,
+    resolve_ex_dir,
+    get_collection_name,
+)
 from core.validation import validate_slug
 from commands import register
 
@@ -26,7 +31,7 @@ def _rebuild(slug: str, src_path: Path) -> str:
     from memory.embedder import Embedder
     from memory.vector_store import VectorStore
 
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug)
     emb_cfg = get_embedding_config()
     if not emb_cfg["api_key"]:
         raise RuntimeError("未配置 Embedding API Key，无法重建向量库")
@@ -96,7 +101,7 @@ def cmd_vector_rebuild(args: str) -> None:
     if not src_path.exists():
         print(f"源文件不存在: {src_path}")
         return
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug)
     if not ex_dir.exists():
         print(f"镜像 [{slug}] 不存在")
         return

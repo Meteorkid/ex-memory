@@ -5,6 +5,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 from dotenv import load_dotenv
 
 from core.logging import setup_logging
@@ -218,7 +219,47 @@ def get_embedding_config() -> dict:
 
 
 def get_ex_dir(slug: str) -> Path:
+    # 仅用于不含 owner 上下文的存量子流程（CLI、后台清理、测试）。
     return EXES_DIR / slug
+
+
+def get_ex_dir_owned(slug: str, owner: int) -> Path:
+    """按账号隔离的镜像目录：exes/<owner>/<slug>。
+
+    多用户模式下镜像按 owner 归位，避免跨用户 slug 冲突，
+    也不再用一个全局 slug 泄露其他用户的镜像名存在性。
+    """
+    return EXES_DIR / str(owner) / slug
+
+
+def resolve_ex_dir(slug: str, owner: Optional[int] = None) -> Path:
+    """解析便于访问的镜像目录：优先嵌套（新的按账号布局），回退扁平（存量布局）。
+
+    owner 为空时无法定位嵌套目录，退化为扁平目录（存量镜像 / 无人格的 CLI、后台任务）。
+    安全性始终由 meta.json 里的 owner_user_id 校验把关，目录布局只是命名空间，不是唯一防线。
+    """
+    if owner is not None:
+        owned = get_ex_dir_owned(slug, owner)
+        if owned.exists():
+            return owned
+    flat = get_ex_dir(slug)
+    if flat.exists():
+        return flat
+    return get_ex_dir_owned(slug, owner) if owner is not None else flat
+
+
+def ensure_ex_dirs_owned(slug: str, owner: Optional[int]) -> Path:
+    """在按账号隔离的目录下创建镜像骨架：exes/<owner>/<slug>。
+
+    owner 为空（单用户 CLI / Gradio 无账号上下文）时退化为扁平目录，
+    避免误建 exes/None/<slug> 这种伪命名空间。
+    """
+    if owner is None:
+        return ensure_ex_dirs(slug)
+    ex_dir = get_ex_dir_owned(slug, owner)
+    for sub in ["chroma_db", "sessions", "versions"]:
+        (ex_dir / sub).mkdir(parents=True, exist_ok=True)
+    return ex_dir
 
 
 def get_collection_name(slug: str) -> str:

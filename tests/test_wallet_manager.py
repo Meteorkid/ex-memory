@@ -9,7 +9,9 @@ def test_open_redpacket_is_single_settlement(tmp_path, monkeypatch):
 
     ex_dir = tmp_path / "exes" / "owned"
     ex_dir.mkdir(parents=True)
-    monkeypatch.setattr("core.wallet_manager.get_ex_dir", lambda s: ex_dir)
+    monkeypatch.setattr(
+        "core.wallet_manager.resolve_ex_dir", lambda s, owner=None: ex_dir
+    )
 
     packet = {
         "id": "rp_1",

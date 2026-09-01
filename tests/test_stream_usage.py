@@ -28,7 +28,7 @@ def _make_engine(tmpdir, skill_text=_BIG_SKILL):
     (tmpdir / "sessions").mkdir(exist_ok=True)
 
     with (
-        patch("core.engine.get_ex_dir", return_value=tmpdir),
+        patch("core.engine.resolve_ex_dir", return_value=tmpdir),
         patch(
             "core.engine.get_llm_config",
             return_value={

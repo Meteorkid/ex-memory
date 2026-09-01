@@ -2,18 +2,18 @@
 
 import json
 import logging
-from config import get_ex_dir
+from config import resolve_ex_dir
 
 logger = logging.getLogger("ex-memory")
 
 
-def combine(slug: str) -> str:
-    """读取 exes/{slug}/ 下的 memory.md 和 persona.md，生成 SKILL.md。
+def combine(slug: str, owner=None) -> str:
+    """读取 exes/{owner}/{slug}/ 或 exes/{slug}/ 下的 memory.md 和 persona.md，生成 SKILL.md。
 
     Returns:
         SKILL.md 的完整内容
     """
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
 
     meta_path = ex_dir / "meta.json"
     memory_path = ex_dir / "memory.md"
@@ -79,10 +79,10 @@ def combine(slug: str) -> str:
     return skill_md
 
 
-def write_skill(slug: str):
+def write_skill(slug: str, owner=None):
     """生成并写入 SKILL.md。"""
-    ex_dir = get_ex_dir(slug)
-    content = combine(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
+    content = combine(slug, owner)
     skill_path = ex_dir / "SKILL.md"
     skill_path.write_text(content, encoding="utf-8")
     logger.info("已生成 %s", skill_path)

@@ -16,8 +16,6 @@ def exe_dir(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setattr("config.EXES_DIR", tmp_path / "exes")
-    monkeypatch.setattr("config.get_ex_dir", lambda s: tmp_path / "exes" / s)
-    monkeypatch.setattr("core.exe_access.get_ex_dir", lambda s: tmp_path / "exes" / s)
     return slug
 
 

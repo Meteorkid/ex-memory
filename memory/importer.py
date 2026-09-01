@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import config
 
@@ -16,7 +17,9 @@ class ImportResult:
     chunk_count: int
 
 
-def import_chat_file(file_path: Path, slug: str, target_name: str) -> ImportResult:
+def import_chat_file(
+    file_path: Path, slug: str, target_name: str, owner: Optional[int] = None
+) -> ImportResult:
     """导入聊天记录文件，并返回解析消息数与入库切片数。"""
     emb_cfg = config.get_embedding_config()
     if not emb_cfg["api_key"]:
@@ -25,7 +28,7 @@ def import_chat_file(file_path: Path, slug: str, target_name: str) -> ImportResu
     from memory.embedder import Embedder
     from memory.vector_store import VectorStore
 
-    ex_dir = config.get_ex_dir(slug)
+    ex_dir = config.resolve_ex_dir(slug, owner)
     embedder = Embedder(
         api_key=emb_cfg["api_key"],
         base_url=emb_cfg["base_url"],

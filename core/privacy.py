@@ -4,6 +4,7 @@ import fcntl
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 # 敏感信息正则
 PATTERNS = {
@@ -59,7 +60,7 @@ def mask_sensitive(text: str) -> str:
     return result
 
 
-def clean_expired_conversations(slug: str, retention_days: int = 90) -> int:
+def clean_expired_conversations(slug: str, retention_days: int = 90, owner: Optional[int] = None) -> int:
     """清理过期的对话归档记录（按记录级 created_at 过滤后重写文件）。
 
     与 append_turn 共用同一把 .lock 文件锁，不会与并发写入互相破坏；
@@ -73,7 +74,7 @@ def clean_expired_conversations(slug: str, retention_days: int = 90) -> int:
     import config
     from core.file_utils import atomic_write, _lock
 
-    conv_dir = config.get_ex_dir(slug) / "conversations"
+    conv_dir = config.resolve_ex_dir(slug, owner) / "conversations"
     if not conv_dir.exists():
         return 0
 

@@ -22,7 +22,7 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from config import PROJECT_DIR, get_ex_dir, DISABLE_REGISTRATION
+from config import PROJECT_DIR, resolve_ex_dir, DISABLE_REGISTRATION
 from core.validation import validate_slug, validate_user_input, sanitize_chat_history
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
@@ -93,17 +93,17 @@ cache = SimpleCache(default_ttl=30)  # 30秒 TTL
 # ═══════════════════════════════════════
 
 
-def _load_meta(slug: str) -> dict:
+def _load_meta(slug: str, owner: Optional[int] = None) -> dict:
     """读取镜像 meta.json，不存在则抛 404。"""
-    meta_file = get_ex_dir(slug) / "meta.json"
+    meta_file = resolve_ex_dir(slug, owner) / "meta.json"
     if not meta_file.exists():
         raise HTTPException(status_code=404, detail="镜像不存在")
     return json.loads(meta_file.read_text(encoding="utf-8"))
 
 
-def _save_meta(slug: str, meta: dict) -> None:
+def _save_meta(slug: str, meta: dict, owner: Optional[int] = None) -> None:
     """写入镜像 meta.json。"""
-    meta_file = get_ex_dir(slug) / "meta.json"
+    meta_file = resolve_ex_dir(slug, owner) / "meta.json"
     meta_file.write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -128,12 +128,14 @@ _login_limiter = None
 _audit_logger = None
 
 
-def _load_history(slug: str, *, with_time: bool = False) -> list[dict]:
+def _load_history(slug: str, *, with_time: bool = False, owner: Optional[int] = None) -> list[dict]:
     """读取对话历史并归一化为 {role, content[, created_at]} 列表。"""
     from core.conversation_store import load_jsonl_messages
 
     keys = ("role", "content", "created_at") if with_time else ("role", "content")
-    return [{k: m.get(k, "") for k in keys} for m in load_jsonl_messages(slug)]
+    return [
+        {k: m.get(k, "") for k in keys} for m in load_jsonl_messages(slug, owner)
+    ]
 
 
 @router.get("/local-helper/config")
@@ -188,7 +190,7 @@ def _get_engine(slug: str, user_id: int):
             return engine
     from core.factory import create_engine_and_store
 
-    engine, _, _ = create_engine_and_store(slug)
+    engine, _, _ = create_engine_and_store(slug, owner=user_id)
     with _engine_cache_lock:
         if key not in _engine_cache:
             _engine_cache[key] = engine
@@ -256,12 +258,12 @@ def _persist_stream_turn(
         logger.warning("流式对话持久化失败 slug=%s: %s", slug, e)
 
 
-def _run_session_archive(slug: str, vector_store, embedder) -> None:
+def _run_session_archive(slug: str, vector_store, embedder, owner: Optional[int] = None) -> None:
     """后台任务：累计轮数达到阈值时归档会话并生成 LLM 摘要。"""
     from core.session_archive import maybe_archive
 
     try:
-        if maybe_archive(slug, vector_store=vector_store, embedder=embedder):
+        if maybe_archive(slug, vector_store=vector_store, embedder=embedder, owner=owner):
             # 摘要写入了 sessions/ 与 SKILL.md，缓存引擎需要重建才会带上记忆层
             _invalidate_engine(slug)
     except Exception as e:
@@ -365,7 +367,7 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, user_id)
     if ex_dir.exists():
         raise HTTPException(status_code=409, detail=f"镜像 [{slug}] 已存在")
 
@@ -400,7 +402,9 @@ def resume_exe(slug: str, req: ResumeRequest, user_id: int = Depends(require_aut
 
     from pipeline.orchestrator import run_create_flow_api
 
-    result = run_create_flow_api(slug=slug, name=req.name, answers=[], resume=True)
+    result = run_create_flow_api(
+        slug=slug, name=req.name, answers=[], resume=True, owner_user_id=user_id
+    )
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     # 恢复流程会重写 SKILL.md 等人格文件，缓存引擎已过期
@@ -414,7 +418,7 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
     if not req.confirm:
         raise HTTPException(status_code=400, detail="需要确认删除")
     slug = _check_exe_access(slug, user_id)
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, user_id)
     import shutil
 
     shutil.rmtree(ex_dir)
@@ -442,7 +446,7 @@ def import_data(
     必须声明为 def 让 FastAPI 放进线程池，否则会冻结整个事件循环。
     """
     slug = _check_exe_access(slug, user_id)
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, user_id)
 
     if file.size is not None and file.size > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=413, detail="文件过大，最大支持 100MB")
@@ -616,9 +620,9 @@ def get_wallet(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import load_wallet, load_redpackets, load_transfers
 
-    wallet = load_wallet(slug)
-    packets = load_redpackets(slug)
-    transfers = load_transfers(slug)
+    wallet = load_wallet(slug, owner=user_id)
+    packets = load_redpackets(slug, owner=user_id)
+    transfers = load_transfers(slug, owner=user_id)
     return {
         "balance": wallet["balance"],
         "transactions": wallet["transactions"],
@@ -636,7 +640,7 @@ def send_redpacket(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import create_redpacket
 
-    rp = create_redpacket(slug)
+    rp = create_redpacket(slug, owner=user_id)
     if rp is None:
         raise HTTPException(status_code=429, detail="红包太频繁，请稍后再试")
     return StatusResponse(message=f"红包已发送: {rp['note']} (¥{rp['amount']})")
@@ -648,7 +652,7 @@ def open_redpacket(slug: str, rp_id: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import open_redpacket
 
-    rp = open_redpacket(slug, rp_id)
+    rp = open_redpacket(slug, rp_id, owner=user_id)
     if rp is None:
         raise HTTPException(status_code=400, detail="红包不存在或已被打开")
     return {"amount": rp["amount"], "note": rp["note"], "status": "opened"}
@@ -665,7 +669,7 @@ def send_transfer(
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import create_transfer
 
-    create_transfer(slug, req.amount, req.note, req.direction)
+    create_transfer(slug, req.amount, req.note, req.direction, owner=user_id)
     return StatusResponse(message=f"转账已发起: {req.note} (¥{req.amount})")
 
 
@@ -680,7 +684,7 @@ def confirm_transfer(
     slug = _check_exe_access(slug, user_id)
     from core.wallet_manager import confirm_transfer
 
-    tx = confirm_transfer(slug, tx_id, req.action)
+    tx = confirm_transfer(slug, tx_id, req.action, owner=user_id)
     if tx is None:
         raise HTTPException(status_code=400, detail="转账不存在或已处理")
     return {"status": tx["status"], "amount": tx["amount"], "note": tx["note"]}
@@ -781,7 +785,7 @@ async def chat(
             logger.warning("对话持久化失败 slug=%s: %s", slug, e)
         # 满阈值时会话归档（含 LLM 摘要），放后台执行不阻塞响应
         background_tasks.add_task(
-            _run_session_archive, slug, engine.vector_store, engine.embedder
+            _run_session_archive, slug, engine.vector_store, engine.embedder, user_id
         )
 
         return ChatResponse(reply=reply, stickers=stickers, tokens=token_info)
@@ -863,7 +867,11 @@ async def chat_stream(
             if engine is not None and full_reply.strip():
                 # 满阈值时会话归档（含 LLM 摘要），放后台执行不阻塞流式响应
                 background_tasks.add_task(
-                    _run_session_archive, slug, engine.vector_store, engine.embedder
+                    _run_session_archive,
+                    slug,
+                    engine.vector_store,
+                    engine.embedder,
+                    user_id,
                 )
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -879,7 +887,7 @@ def update_exe(slug: str, req: UpdateRequest, user_id: int = Depends(require_aut
 
     from pipeline.merger import merge_new_material
 
-    result = merge_new_material(slug, req.content, req.source_type)
+    result = merge_new_material(slug, req.content, req.source_type, owner=user_id)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=_INTERNAL_ERROR)
     _invalidate_engine(slug)
@@ -897,7 +905,7 @@ def reflect_exe(slug: str, user_id: int = Depends(require_auth)):
     from pipeline.reflector import run_reflection
 
     try:
-        run_reflection(slug)
+        run_reflection(slug, owner=user_id)
     except FileNotFoundError:
         raise HTTPException(status_code=400, detail="缺少 memory.md")
     except RuntimeError:
@@ -912,7 +920,7 @@ def reflect_exe(slug: str, user_id: int = Depends(require_auth)):
 def list_moments(slug: str, user_id: int = Depends(require_auth)):
     """获取朋友圈时间线。"""
     slug = _check_exe_access(slug, user_id)
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, user_id)
     moments_path = ex_dir / "moments.json"
     if not moments_path.exists():
         return {"moments": []}
@@ -928,7 +936,7 @@ def generate_moment(slug: str, user_id: int = Depends(require_auth)):
     from pipeline.moment_generator import generate_moment as _gen
 
     try:
-        _gen(slug)
+        _gen(slug, owner=user_id)
         return StatusResponse(message="朋友圈已生成")
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -947,7 +955,7 @@ def backup_exe(
     slug = _check_exe_access(slug, user_id)
     from core.version_manager import backup
 
-    version = backup(slug, req.version_name if req else "")
+    version = backup(slug, req.version_name if req else "", owner=user_id)
     return StatusResponse(message=f"备份成功: {version}")
 
 
@@ -958,11 +966,11 @@ def rollback_exe(slug: str, req: RollbackRequest, user_id: int = Depends(require
     from core.version_manager import rollback, list_versions
 
     try:
-        rollback(slug, req.version)
+        rollback(slug, req.version, owner=user_id)
         _invalidate_engine(slug)
         return StatusResponse(message=f"已回滚到 {req.version}")
     except FileNotFoundError:
-        versions = list_versions(slug)
+        versions = list_versions(slug, owner=user_id)
         raise HTTPException(
             status_code=404,
             detail=f"版本 {req.version} 不存在。可用: {versions}",
@@ -975,7 +983,7 @@ def list_versions_route(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.version_manager import list_versions
 
-    return {"slug": slug, "versions": list_versions(slug)}
+    return {"slug": slug, "versions": list_versions(slug, owner=user_id)}
 
 
 # --- 对话搜索 ---
@@ -991,7 +999,7 @@ def search_messages(
     slug = _check_exe_access(slug, user_id)
     from core.conversation_store import load_jsonl_messages
 
-    messages = load_jsonl_messages(slug)
+    messages = load_jsonl_messages(slug, owner=user_id)
     q_lower = q.lower()
     results = []
     for msg in messages:
@@ -1026,8 +1034,8 @@ def get_stats(slug: str, user_id: int = Depends(require_auth)):
     """对话统计数据：总消息数、消息频率、活跃时段。"""
     slug = _check_exe_access(slug, user_id)
 
-    # 检查缓存
-    cache_key = f"stats:{slug}"
+    # 检查缓存（键含用户维度，避免同名镜像统计串号）
+    cache_key = f"stats:{user_id}:{slug}"
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -1035,7 +1043,7 @@ def get_stats(slug: str, user_id: int = Depends(require_auth)):
     from core.conversation_store import load_jsonl_messages
     from collections import Counter
 
-    messages = load_jsonl_messages(slug)
+    messages = load_jsonl_messages(slug, owner=user_id)
     total = len(messages)
     user_msgs = [m for m in messages if m.get("role") == "user"]
     assistant_msgs = [m for m in messages if m.get("role") == "assistant"]
@@ -1088,7 +1096,7 @@ def get_emotion(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.emotion_tracker import analyze_history, generate_emotion_curve
 
-    history = _load_history(slug)
+    history = _load_history(slug, owner=user_id)
     analysis = analyze_history(history)
     curve = generate_emotion_curve(history)
     return {"analysis": analysis, "curve": curve}
@@ -1131,9 +1139,9 @@ def mindful_message(user_id: int = Depends(require_auth)):
 def set_group(slug: str, group: str = Query(...), user_id: int = Depends(require_auth)):
     """设置镜像分组。"""
     slug = _check_exe_access(slug, user_id)
-    meta = _load_meta(slug)
+    meta = _load_meta(slug, user_id)
     meta["group"] = group
-    _save_meta(slug, meta)
+    _save_meta(slug, meta, user_id)
     return {"ok": True, "slug": slug, "group": group}
 
 
@@ -1168,7 +1176,7 @@ def list_groups(user_id: int = Depends(require_auth)):
 def get_stage(slug: str, user_id: int = Depends(require_auth)):
     """获取当前关系阶段。"""
     slug = _check_exe_access(slug, user_id)
-    meta = _load_meta(slug)
+    meta = _load_meta(slug, user_id)
     return {"stage": meta.get("stage", "dating")}
 
 
@@ -1179,9 +1187,9 @@ def set_stage(slug: str, stage: str = Query(...), user_id: int = Depends(require
     valid_stages = ["dating", "conflicted", "broken", "healing"]
     if stage not in valid_stages:
         raise HTTPException(status_code=400, detail=f"无效阶段，可选: {valid_stages}")
-    meta = _load_meta(slug)
+    meta = _load_meta(slug, user_id)
     meta["stage"] = stage
-    _save_meta(slug, meta)
+    _save_meta(slug, meta, user_id)
     # 缓存中的引擎还带着旧阶段，必须失效重建
     _invalidate_engine(slug)
     return {"ok": True, "slug": slug, "stage": stage}
@@ -1193,7 +1201,7 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.emotion_tracker import analyze_history
 
-    history = _load_history(slug)
+    history = _load_history(slug, owner=user_id)
     if len(history) < 10:
         return {"suggestion": None, "reason": "对话记录不足"}
 
@@ -1205,7 +1213,7 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
 
     # 读取当前阶段
     try:
-        meta = _load_meta(slug)
+        meta = _load_meta(slug, user_id)
         current_stage = meta.get("stage", "dating")
     except HTTPException:
         current_stage = "dating"
@@ -1297,7 +1305,7 @@ def get_emotional_memories(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.emotional_memory import load_emotional_memories
 
-    memories = load_emotional_memories(slug)
+    memories = load_emotional_memories(slug, owner=user_id)
     return {"memories": memories}
 
 
@@ -1310,10 +1318,10 @@ def extract_memories(slug: str, user_id: int = Depends(require_auth)):
         save_emotional_memories,
     )
 
-    history = _load_history(slug, with_time=True)
+    history = _load_history(slug, with_time=True, owner=user_id)
 
     memories = extract_emotional_memories(history)
-    save_emotional_memories(slug, memories)
+    save_emotional_memories(slug, memories, owner=user_id)
 
     return {"ok": True, "memories": memories}
 
@@ -1327,7 +1335,7 @@ def get_user_profile(slug: str, user_id: int = Depends(require_auth)):
     slug = _check_exe_access(slug, user_id)
     from core.personalization import load_user_profile
 
-    profile = load_user_profile(slug)
+    profile = load_user_profile(slug, owner=user_id)
     return {"profile": profile}
 
 
@@ -1341,7 +1349,7 @@ def analyze_user_profile(slug: str, user_id: int = Depends(require_auth)):
         save_user_profile,
     )
 
-    history = _load_history(slug, with_time=True)
+    history = _load_history(slug, with_time=True, owner=user_id)
 
     style = analyze_user_style(history)
     temperature = calculate_relationship_temperature(slug, history)
@@ -1352,7 +1360,7 @@ def analyze_user_profile(slug: str, user_id: int = Depends(require_auth)):
         "analyzed_at": datetime.now().isoformat(),
     }
 
-    save_user_profile(slug, profile)
+    save_user_profile(slug, profile, owner=user_id)
     return {"ok": True, "profile": profile}
 
 
@@ -1362,7 +1370,7 @@ def get_relationship_temperature(slug: str, user_id: int = Depends(require_auth)
     slug = _check_exe_access(slug, user_id)
     from core.personalization import calculate_relationship_temperature
 
-    history = _load_history(slug, with_time=True)
+    history = _load_history(slug, with_time=True, owner=user_id)
 
     temperature = calculate_relationship_temperature(slug, history)
     return {"temperature": temperature}

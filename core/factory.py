@@ -1,10 +1,14 @@
 """统一工厂：VectorStore + Embedder + ChatEngine 初始化。"""
 
-from config import get_ex_dir, get_collection_name, get_embedding_config
+from typing import Optional
+
+from config import resolve_ex_dir, get_collection_name, get_embedding_config
 
 
-def create_engine_and_store(slug: str):
+def create_engine_and_store(slug: str, owner: Optional[int] = None):
     """创建 ChatEngine、VectorStore、Embedder 的统一入口。
+
+    owner: 多用户模式下镜像归属账号，用于把各类文件定位到按账号隔离的目录。
 
     Returns:
         (ChatEngine, VectorStore | None, Embedder | None)
@@ -13,7 +17,7 @@ def create_engine_and_store(slug: str):
     from memory.vector_store import VectorStore
     from memory.embedder import Embedder
 
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     embedder = None
     vector_store = None
 

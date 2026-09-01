@@ -13,7 +13,7 @@ def _create_test_engine(tmpdir):
     sessions_dir.mkdir()
 
     with (
-        patch("core.engine.get_ex_dir", return_value=tmpdir),
+        patch("core.engine.resolve_ex_dir", return_value=tmpdir),
         patch(
             "core.engine.get_llm_config",
             return_value={

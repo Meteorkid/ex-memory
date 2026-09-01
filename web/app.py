@@ -9,7 +9,7 @@ import gradio as gr
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import EXES_DIR, init_app, get_llm_config
+from config import init_app, get_llm_config
 from core.validation import validate_slug, validate_user_input
 from core.factory import create_engine_and_store
 from core.sticker_selector import STICKERS
@@ -34,16 +34,17 @@ class AppState:
 
 
 def list_exes() -> list[list]:
-    """获取所有镜像列表，用于 Gradio DataFrame。"""
+    """获取所有镜像列表，用于 Gradio DataFrame（兼容嵌套与扁平布局）。"""
+    from config import EXES_DIR
+
     rows = []
     if not EXES_DIR.exists():
         return rows
-    for d in sorted(EXES_DIR.iterdir(), reverse=True):
-        if not d.is_dir():
-            continue
+
+    def _append(d: Path):
         meta_path = d / "meta.json"
         if not meta_path.exists():
-            continue
+            return
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             rows.append(
@@ -56,6 +57,18 @@ def list_exes() -> list[list]:
             )
         except (OSError, json.JSONDecodeError) as e:
             logger.warning("跳过损坏的 meta.json slug=%s: %s", d.name, e)
+
+    for d in sorted(EXES_DIR.iterdir(), reverse=True):
+        if not d.is_dir():
+            continue
+        if (d / "meta.json").exists():
+            # 扁平镜像：exes/<slug>
+            _append(d)
+        else:
+            # 嵌套 owner 目录：exes/<owner>/<slug>
+            for sub in sorted(d.iterdir(), reverse=True):
+                if sub.is_dir():
+                    _append(sub)
     return rows
 
 

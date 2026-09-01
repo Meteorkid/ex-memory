@@ -91,10 +91,12 @@ class TestGetMemoryContext:
     """记忆上下文生成。"""
 
     def test_with_memories(self, tmp_path, monkeypatch):
-        # Mock get_ex_dir
+        # resolve_ex_dir 定位到 tmp_path（emotional_memories.json 就写在这里）
         import config
 
-        monkeypatch.setattr(config, "get_ex_dir", lambda slug: tmp_path)
+        monkeypatch.setattr(
+            config, "resolve_ex_dir", lambda slug, owner=None: tmp_path
+        )
 
         # 创建记忆文件
         import json
@@ -126,7 +128,9 @@ class TestGetMemoryContext:
     def test_without_memories(self, tmp_path, monkeypatch):
         import config
 
-        monkeypatch.setattr(config, "get_ex_dir", lambda slug: tmp_path)
+        monkeypatch.setattr(
+            config, "resolve_ex_dir", lambda slug, owner=None: tmp_path
+        )
 
         context = get_memory_context("test")
         assert context == ""

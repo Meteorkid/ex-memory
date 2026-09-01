@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from config import get_ex_dir, ARCHIVE_THRESHOLD, PROJECT_DIR
+from config import resolve_ex_dir, ARCHIVE_THRESHOLD, PROJECT_DIR
 from core.file_utils import atomic_write, locked_update_json, _lock
 
 logger = logging.getLogger("ex-memory")
@@ -24,6 +24,7 @@ def maybe_archive(
     vector_store=None,
     embedder=None,
     threshold: int = ARCHIVE_THRESHOLD,
+    owner: Optional[int] = None,
 ) -> bool:
     """检查未归档轮数，达到阈值则归档一次会话。
 
@@ -34,12 +35,12 @@ def maybe_archive(
     Returns:
         是否触发了归档
     """
-    state_path = get_ex_dir(slug) / "sessions" / _STATE_FILENAME
+    state_path = resolve_ex_dir(slug, owner) / "sessions" / _STATE_FILENAME
 
     def _claim(state: dict) -> Optional[dict]:
         from core.conversation_store import load_jsonl_messages
 
-        messages = load_jsonl_messages(slug)
+        messages = load_jsonl_messages(slug, owner)
         total = len(messages)
         archived = int(state.get("archived_messages", 0))
         # 对话文件可能被留存策略清理而变短，重新对齐
@@ -64,9 +65,15 @@ def maybe_archive(
 
     from core.conversation_store import load_jsonl_messages
 
-    pending = load_jsonl_messages(slug)[claim["start"] : claim["end"]]
+    pending = load_jsonl_messages(slug, owner)[claim["start"] : claim["end"]]
     try:
-        archive_session(slug, pending, vector_store=vector_store, embedder=embedder)
+        archive_session(
+            slug,
+            pending,
+            vector_store=vector_store,
+            embedder=embedder,
+            owner=owner,
+        )
         return True
     except (OSError, ValueError) as e:
         # 归档失败不影响对话主流程；区间已认领，下个窗口继续
@@ -80,6 +87,7 @@ def archive_session(
     vector_store=None,
     embedder=None,
     engine=None,
+    owner: Optional[int] = None,
 ) -> Optional[dict]:
     """归档一次会话：写原始记录 → 生成 LLM 摘要 → 更新 SKILL.md 记忆段。
 
@@ -88,6 +96,7 @@ def archive_session(
         messages: [{role, content}] 列表
         vector_store / embedder: 可选，用于把摘要写入向量库
         engine: 可选，CLI 传入以即时更新 engine.session_summaries
+        owner: 多用户模式下镜像归属账号，用于定位按账号隔离的目录
 
     Returns:
         {"session_file": 归档文件名, "summary": 摘要文本或 None}；
@@ -96,7 +105,7 @@ def archive_session(
     if not messages:
         return None
 
-    sessions_dir = get_ex_dir(slug) / "sessions"
+    sessions_dir = resolve_ex_dir(slug, owner) / "sessions"
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -111,7 +120,14 @@ def archive_session(
     logger.info("对话已归档: %s", session_file.name)
 
     summary = _generate_summary(
-        slug, sessions_dir, timestamp, messages, vector_store, embedder, engine
+        slug,
+        sessions_dir,
+        timestamp,
+        messages,
+        vector_store,
+        embedder,
+        engine,
+        owner,
     )
     return {"session_file": session_file.name, "summary": summary}
 
@@ -124,6 +140,7 @@ def _generate_summary(
     vector_store,
     embedder,
     engine,
+    owner: Optional[int] = None,
 ) -> Optional[str]:
     """调用 LLM 生成会话语义摘要，用于下次启动时快速恢复上下文。"""
     from config import get_llm_config, get_llm_client
@@ -184,7 +201,7 @@ def _generate_summary(
                 logger.debug("摘要写入向量库失败（非关键）")
 
         # 同步更新 SKILL.md 的记忆段
-        update_skill_memory(slug, summary)
+        update_skill_memory(slug, summary, owner)
         return summary
     except Exception as e:
         # 与 CLI 原行为一致：摘要失败降级，原始归档完好，只告警不中断
@@ -192,9 +209,9 @@ def _generate_summary(
         return None
 
 
-def update_skill_memory(slug: str, new_summary: str) -> None:
+def update_skill_memory(slug: str, new_summary: str, owner: Optional[int] = None) -> None:
     """将新摘要追加到 SKILL.md 的 PART A 末尾（带文件锁的读-改-写）。"""
-    skill_path = get_ex_dir(slug) / "SKILL.md"
+    skill_path = resolve_ex_dir(slug, owner) / "SKILL.md"
     if not skill_path.exists():
         return
 

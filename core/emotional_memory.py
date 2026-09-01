@@ -2,6 +2,7 @@
 
 import json
 import logging
+from typing import Optional
 
 logger = logging.getLogger("ex-memory")
 
@@ -113,11 +114,11 @@ def extract_emotional_memories(messages: list[dict]) -> dict:
     }
 
 
-def save_emotional_memories(slug: str, memories: dict):
+def save_emotional_memories(slug: str, memories: dict, owner: Optional[int] = None):
     """保存情感记忆到文件。"""
-    from config import get_ex_dir
+    from config import resolve_ex_dir
 
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     memory_file = ex_dir / "emotional_memories.json"
 
     with open(memory_file, "w", encoding="utf-8") as f:
@@ -126,11 +127,11 @@ def save_emotional_memories(slug: str, memories: dict):
     logger.info("情感记忆已保存: %s", slug)
 
 
-def load_emotional_memories(slug: str) -> dict:
+def load_emotional_memories(slug: str, owner: Optional[int] = None) -> dict:
     """加载情感记忆。"""
-    from config import get_ex_dir
+    from config import resolve_ex_dir
 
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     memory_file = ex_dir / "emotional_memories.json"
 
     if not memory_file.exists():

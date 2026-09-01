@@ -22,7 +22,7 @@ def _make_engine(tmpdir, meta_extra: dict | None = None):
     )
 
     with (
-        patch("core.engine.get_ex_dir", return_value=tmpdir),
+        patch("core.engine.resolve_ex_dir", return_value=tmpdir),
         patch(
             "core.engine.get_llm_config",
             return_value={

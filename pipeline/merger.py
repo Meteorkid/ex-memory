@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from config import get_llm_config, get_llm_client, get_ex_dir
+from config import get_llm_config, get_llm_client, resolve_ex_dir
 from core.file_utils import atomic_write
 
 logger = logging.getLogger("ex-memory")
@@ -15,6 +15,7 @@ def merge_new_material(
     slug: str,
     new_materials: str,
     source_type: str = "oral",
+    owner=None,
 ) -> dict:
     """将新素材增量合并到现有的 memory.md 和 persona.md。
 
@@ -25,6 +26,7 @@ def merge_new_material(
         slug: 前任代号
         new_materials: 新的原材料摘要
         source_type: 来源类型（wechat/oral/photo）
+        owner: 镜像归属账号（多用户嵌套目录）
 
     Returns:
         包含更新状态的字典
@@ -34,7 +36,7 @@ def merge_new_material(
         return {"error": "未配置 LLM API Key"}
 
     client = get_llm_client()
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
 
     merger_prompt = (PROMPTS_DIR / "merger.md").read_text(encoding="utf-8")
 
@@ -54,7 +56,7 @@ def merge_new_material(
     try:
         from core.version_manager import backup as do_backup
 
-        do_backup(slug)
+        do_backup(slug, owner=owner)
         logger.info("合并前自动备份完成: %s", slug)
     except Exception as e:
         logger.warning("自动备份失败（继续合并）: %s", e)
@@ -93,7 +95,7 @@ def merge_new_material(
     # 重新生成 SKILL.md
     from pipeline.skill_combiner import write_skill
 
-    write_skill(slug)
+    write_skill(slug, owner=owner)
 
     # 更新 meta.json
     meta_path = ex_dir / "meta.json"

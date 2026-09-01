@@ -25,10 +25,12 @@ class ExportedConversation:
     filename: str
 
 
-def export_ex_memory_conversation(slug: str, fmt: str = "html") -> ExportedConversation:
+def export_ex_memory_conversation(
+    slug: str, fmt: str = "html", owner=None
+) -> ExportedConversation:
     """导出一个镜像的对话记录。"""
     fmt = _normalize_format(fmt)
-    messages = load_conversation_messages(slug)
+    messages = load_conversation_messages(slug, owner)
     content = _render(slug, messages, fmt)
     suffix = ".md" if fmt == "md" else f".{fmt}"
     tmp = tempfile.NamedTemporaryFile(
@@ -44,10 +46,10 @@ def export_ex_memory_conversation(slug: str, fmt: str = "html") -> ExportedConve
     )
 
 
-def load_conversation_messages(slug: str) -> list[dict]:
+def load_conversation_messages(slug: str, owner=None) -> list[dict]:
     """合并 Web/API JSONL 会话和 CLI Markdown 归档。"""
-    messages = load_jsonl_messages(slug)
-    messages.extend(_load_cli_session_messages(slug))
+    messages = load_jsonl_messages(slug, owner)
+    messages.extend(_load_cli_session_messages(slug, owner))
     return sorted(messages, key=lambda m: m.get("created_at", ""))
 
 
@@ -152,8 +154,8 @@ def _render_text(slug: str, messages: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _load_cli_session_messages(slug: str) -> list[dict]:
-    sessions_dir = config.get_ex_dir(slug) / "sessions"
+def _load_cli_session_messages(slug: str, owner=None) -> list[dict]:
+    sessions_dir = config.resolve_ex_dir(slug, owner) / "sessions"
     if not sessions_dir.exists():
         return []
 

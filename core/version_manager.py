@@ -3,22 +3,25 @@
 import shutil
 import json
 from datetime import datetime
-from config import get_ex_dir
+from config import resolve_ex_dir
 from core.path_safety import safe_version_name, resolve_under
 
 
-def backup(slug: str, version_name: str = "", include_chroma: bool = True) -> str:
+def backup(
+    slug: str, version_name: str = "", include_chroma: bool = True, owner=None
+) -> str:
     """备份当前镜像版本。
 
     Args:
         slug: 前任代号
         version_name: 自定义版本名（默认用时间戳）
         include_chroma: 是否同时备份向量库（大型库可跳过）
+        owner: 镜像归属账号（多用户嵌套目录）
 
     Returns:
         版本名称
     """
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     if not ex_dir.exists():
         raise FileNotFoundError(f"镜像不存在: {slug}")
 
@@ -64,12 +67,12 @@ def backup(slug: str, version_name: str = "", include_chroma: bool = True) -> st
     return version_name
 
 
-def rollback(slug: str, version_name: str):
+def rollback(slug: str, version_name: str, owner=None):
     """回滚到指定版本。
 
     回滚前自动创建安全备份，防止回滚出错后无法恢复。
     """
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     versions_dir = ex_dir / "versions"
     try:
         version_name = safe_version_name(version_name)
@@ -83,7 +86,7 @@ def rollback(slug: str, version_name: str):
     # 回滚前自动备份当前状态
     safety_backup = datetime.now().strftime("v%Y%m%d_%H%M%S") + "_pre_rollback"
     try:
-        backup(slug, safety_backup)
+        backup(slug, safety_backup, owner=owner)
     except Exception:
         pass  # 备份失败不阻塞回滚
 
@@ -108,13 +111,13 @@ def rollback(slug: str, version_name: str):
         shutil.copytree(chroma_src, current_chroma)
 
 
-def list_versions(slug: str) -> list[str]:
+def list_versions(slug: str, owner=None) -> list[str]:
     """列出所有版本。
 
     Returns:
         版本名称列表
     """
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     versions_dir = ex_dir / "versions"
 
     if not versions_dir.exists():

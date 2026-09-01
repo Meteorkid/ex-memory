@@ -23,8 +23,7 @@ def test_create_flow_api_success():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         with (
-            patch("pipeline.orchestrator.get_ex_dir", return_value=tmpdir),
-            patch("pipeline.orchestrator.ensure_ex_dirs", return_value=tmpdir),
+            patch("pipeline.orchestrator.ensure_ex_dirs_owned", return_value=tmpdir),
             patch(
                 "pipeline.orchestrator.get_embedding_config",
                 return_value={
@@ -62,7 +61,7 @@ def test_create_flow_api_success():
 
             assert result["state"] == "completed"
             assert result["slug"] == "test"
-            mock_write_skill.assert_called_once_with("test")
+            mock_write_skill.assert_called_once_with("test", owner=None)
 
             # 验证 meta.json 已更新
             meta = json.loads((tmpdir / "meta.json").read_text(encoding="utf-8"))
@@ -84,7 +83,7 @@ def test_create_flow_api_resume():
         (tmpdir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False))
 
         with (
-            patch("pipeline.orchestrator.get_ex_dir", return_value=tmpdir),
+            patch("pipeline.orchestrator.resolve_ex_dir", return_value=tmpdir),
             patch(
                 "pipeline.orchestrator.get_embedding_config",
                 return_value={
@@ -135,7 +134,7 @@ def test_create_flow_api_no_resume_no_meta():
     """恢复模式但找不到 meta.json。"""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
-        with patch("pipeline.orchestrator.get_ex_dir", return_value=tmpdir):
+        with patch("pipeline.orchestrator.resolve_ex_dir", return_value=tmpdir):
             from pipeline.orchestrator import run_create_flow_api
 
             result = run_create_flow_api(
@@ -154,7 +153,7 @@ def test_create_flow_api_resume_not_failed():
             "pipeline_state": "completed",
         }
         (tmpdir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False))
-        with patch("pipeline.orchestrator.get_ex_dir", return_value=tmpdir):
+        with patch("pipeline.orchestrator.resolve_ex_dir", return_value=tmpdir):
             from pipeline.orchestrator import run_create_flow_api
 
             result = run_create_flow_api(
@@ -168,8 +167,7 @@ def test_create_flow_api_memory_failure():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         with (
-            patch("pipeline.orchestrator.get_ex_dir", return_value=tmpdir),
-            patch("pipeline.orchestrator.ensure_ex_dirs", return_value=tmpdir),
+            patch("pipeline.orchestrator.ensure_ex_dirs_owned", return_value=tmpdir),
             patch(
                 "pipeline.orchestrator.get_embedding_config",
                 return_value={

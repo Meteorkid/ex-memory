@@ -10,7 +10,7 @@ from typing import Optional
 from config import (
     get_llm_config,
     get_llm_client,
-    get_ex_dir,
+    resolve_ex_dir,
     RECENT_SESSIONS,
     DEFAULT_TOP_K,
     RAG_THRESHOLD,
@@ -67,7 +67,7 @@ KEYWORD_EXPANSIONS = {
 
 
 class ChatEngine:
-    def __init__(self, slug: str, vector_store=None, embedder=None):
+    def __init__(self, slug: str, vector_store=None, embedder=None, owner=None):
         cfg = get_llm_config()
         self.client = get_llm_client()
         self.model = cfg["model"]
@@ -77,7 +77,8 @@ class ChatEngine:
         self.max_tokens = cfg["max_tokens"]
 
         self.slug = slug
-        self.ex_dir = get_ex_dir(slug)
+        self.owner = owner
+        self.ex_dir = resolve_ex_dir(slug, owner)
         self.vector_store = vector_store
         self.embedder = embedder
         self._rag_failures = 0
@@ -341,7 +342,7 @@ class ChatEngine:
 
         trigger = detect_redpacket_trigger(user_input, full_reply)
         if trigger:
-            rp = create_redpacket(self.slug, trigger)
+            rp = create_redpacket(self.slug, trigger, owner=self.owner)
             if rp:
                 yield {
                     "type": "red_packet",

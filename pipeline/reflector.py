@@ -5,18 +5,19 @@
 
 import logging
 from pathlib import Path
-from config import get_llm_config, get_llm_client, get_ex_dir
+from config import get_llm_config, get_llm_client, resolve_ex_dir
 from core.file_utils import atomic_write
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 logger = logging.getLogger("ex-memory")
 
 
-def run_reflection(slug: str) -> str:
+def run_reflection(slug: str, owner=None) -> str:
     """运行关系反思分析。
 
     Args:
         slug: 前任代号
+        owner: 镜像归属账号（多用户嵌套目录）
 
     Returns:
         反思分析文本
@@ -29,7 +30,7 @@ def run_reflection(slug: str) -> str:
     if not cfg["api_key"]:
         raise RuntimeError("未配置 LLM API Key")
 
-    ex_dir = get_ex_dir(slug)
+    ex_dir = resolve_ex_dir(slug, owner)
     memory_path = ex_dir / "memory.md"
     if not memory_path.exists():
         raise FileNotFoundError(f"镜像 [{slug}] 缺少 memory.md，请先完成创建流程")

@@ -28,7 +28,7 @@ def append_turn(
     手机号/身份证/银行卡/邮箱在落库前脱敏——这四类对语气还原没有价值，
     敏感信息不以明文入库。
     """
-    path = _conversation_path(slug)
+    path = _conversation_path(slug, user_id)
     turn_id = uuid.uuid4().hex
     created_at = datetime.now().isoformat()
     records = [
@@ -55,9 +55,9 @@ def append_turn(
     _append_jsonl(path, records)
 
 
-def load_jsonl_messages(slug: str) -> list[dict]:
+def load_jsonl_messages(slug: str, owner: Optional[int] = None) -> list[dict]:
     """读取 Web/API 对话归档。损坏行会被跳过。"""
-    directory = config.get_ex_dir(slug) / "conversations"
+    directory = config.resolve_ex_dir(slug, owner) / "conversations"
     if not directory.exists():
         return []
 
@@ -77,8 +77,8 @@ def load_jsonl_messages(slug: str) -> list[dict]:
     return messages
 
 
-def _conversation_path(slug: str) -> Path:
-    path = config.get_ex_dir(slug) / "conversations" / "conversation.jsonl"
+def _conversation_path(slug: str, owner: Optional[int] = None) -> Path:
+    path = config.resolve_ex_dir(slug, owner) / "conversations" / "conversation.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
