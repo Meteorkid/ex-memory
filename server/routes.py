@@ -116,7 +116,9 @@ _session_counters: dict[tuple[int, str], TokenCounter] = {}
 _counter_lock = threading.Lock()
 
 # Engine 缓存（避免每次请求重建 SKILL.md / ChromaDB 连接）
-_engine_cache: dict[str, object] = {}
+# 键必须含用户维度：slug 是全局命名空间，仅按 slug 缓存会在
+# 同名镜像删除重建后把上一任 owner 的人格内容泄漏给新用户
+_engine_cache: dict[tuple[int, str], object] = {}
 _engine_cache_lock = threading.Lock()
 
 # 登录限流 + 审计日志
@@ -175,19 +177,20 @@ def _audit(event: str, username: str = "", client_ip: str = "", detail: str = ""
         logger.warning("审计日志写入失败 event=%s: %s", event, e)
 
 
-def _get_engine(slug: str):
-    """获取或创建 ChatEngine（带缓存，锁内 double-check）。"""
+def _get_engine(slug: str, user_id: int):
+    """获取或创建 ChatEngine（按 (user_id, slug) 缓存，锁内 double-check）。"""
+    key = (user_id, slug)
     with _engine_cache_lock:
-        engine = _engine_cache.get(slug)
+        engine = _engine_cache.get(key)
         if engine is not None:
             return engine
     from core.factory import create_engine_and_store
 
     engine, _, _ = create_engine_and_store(slug)
     with _engine_cache_lock:
-        if slug not in _engine_cache:
-            _engine_cache[slug] = engine
-        return _engine_cache[slug]
+        if key not in _engine_cache:
+            _engine_cache[key] = engine
+        return _engine_cache[key]
 
 
 def _check_exe_access(slug: str, user_id: int) -> str:
@@ -217,9 +220,13 @@ def _copy_upload_limited(src, dest, max_bytes: int) -> int:
 
 
 def _invalidate_engine(slug: str):
-    """使缓存的 engine 失效（纠正/更新 SKILL.md 后调用）。"""
+    """使缓存的 engine 失效（纠正/更新/删除 SKILL.md 后调用）。
+
+    清掉该 slug 下所有用户的缓存条目。
+    """
     with _engine_cache_lock:
-        _engine_cache.pop(slug, None)
+        for key in [k for k in _engine_cache if k[1] == slug]:
+            del _engine_cache[key]
 
 
 # --- 用户认证 ---
@@ -322,6 +329,9 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
     if ex_dir.exists():
         raise HTTPException(status_code=409, detail=f"镜像 [{slug}] 已存在")
 
+    # 目录虽不存在，同名旧镜像的引擎可能仍残留在缓存中，必须先清掉
+    _invalidate_engine(slug)
+
     from pipeline.orchestrator import run_create_flow_api
 
     result = run_create_flow_api(
@@ -353,6 +363,8 @@ def resume_exe(slug: str, req: ResumeRequest, user_id: int = Depends(require_aut
     result = run_create_flow_api(slug=slug, name=req.name, answers=[], resume=True)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
+    # 恢复流程会重写 SKILL.md 等人格文件，缓存引擎已过期
+    _invalidate_engine(slug)
     return StatusResponse(message=f"镜像 [{slug}] 恢复创建成功")
 
 
@@ -366,6 +378,8 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
     import shutil
 
     shutil.rmtree(ex_dir)
+    # 不清缓存的话，同名镜像重建后会命中上一任 owner 的引擎（跨用户人格泄漏）
+    _invalidate_engine(slug)
     _audit("exe_deleted", username=f"user_id={user_id}", detail=f"slug={slug}")
     return StatusResponse(message=f"镜像 [{slug}] 已删除")
 
@@ -685,7 +699,7 @@ async def chat(req: ChatRequest, user_id: int = Depends(require_auth)):
     history = sanitize_chat_history(req.history)
 
     try:
-        engine = _get_engine(slug)
+        engine = _get_engine(slug, user_id)
         reply, stickers, usage = await run_in_threadpool(engine.chat, message, history)
 
         token_info = None
@@ -755,7 +769,7 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
     async def generate():
         full_reply = ""
         try:
-            engine = _get_engine(slug)
+            engine = _get_engine(slug, user_id)
             for item in engine.chat_stream(message, history):
                 if item.get("type") == "text":
                     full_reply += item.get("content", "")
