@@ -17,18 +17,19 @@ def cmd_cleanup(_arg: str = ""):
         return
 
     total = 0
-    for d in sorted(config.EXES_DIR.iterdir()):
-        if not d.is_dir():
-            continue
+    # 必须用 iter_exe_dirs：嵌套布局下 EXES_DIR.iterdir() 只能看到 owner 目录，
+    # 会把账号 ID 当成 slug，导致所有按账号隔离的镜像永远清理不到
+    for slug, owner, _path in config.iter_exe_dirs(require_meta=False):
+        label = f"{owner}/{slug}" if owner is not None else slug
         try:
             removed = clean_expired_conversations(
-                d.name, config.CONVERSATION_RETENTION_DAYS
+                slug, config.CONVERSATION_RETENTION_DAYS, owner=owner
             )
         except OSError as e:
-            logger.warning("清理镜像 %s 失败: %s", d.name, e)
+            logger.warning("清理镜像 %s 失败: %s", label, e)
             continue
         if removed:
-            print(f"  {d.name}: 清理 {removed} 条过期对话")
+            print(f"  {label}: 清理 {removed} 条过期对话")
         total += removed
 
     print(

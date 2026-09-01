@@ -5,7 +5,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 from dotenv import load_dotenv
 
 from core.logging import setup_logging
@@ -260,6 +260,78 @@ def ensure_ex_dirs_owned(slug: str, owner: Optional[int]) -> Path:
     for sub in ["chroma_db", "sessions", "versions"]:
         (ex_dir / sub).mkdir(parents=True, exist_ok=True)
     return ex_dir
+
+
+def iter_exe_dirs(
+    require_meta: bool = True,
+) -> Iterator[tuple[str, Optional[int], Path]]:
+    """遍历全部镜像，兼容扁平（exes/<slug>）与嵌套（exes/<owner>/<slug>）两种布局。
+
+    平台级任务（过期清理、盘点）必须走这个入口：直接 EXES_DIR.iterdir()
+    在嵌套布局下会把 owner 目录当成镜像本身，从而漏掉其下所有真实镜像。
+
+    Args:
+        require_meta: 是否只认带 meta.json 的目录。展示类场景用默认值；
+            留存清理这类合规任务应传 False —— meta.json 损坏或缺失的残缺
+            镜像同样要被清理，漏删比多删风险更大。
+
+    Yields:
+        (slug, owner, path)，扁平布局的 owner 为 None
+    """
+    if not EXES_DIR.exists():
+        return
+    for top in sorted(EXES_DIR.iterdir()):
+        if not top.is_dir():
+            continue
+        # 扁平镜像优先按 meta.json 判定，这样名字恰好是数字的存量镜像（如 exes/1）
+        # 不会被误当成 owner 命名空间
+        if (top / "meta.json").exists():
+            yield top.name, None, top
+            continue
+        # owner 目录名恒为账号 ID（str(owner)）
+        if top.name.isdigit():
+            for sub in sorted(top.iterdir()):
+                if sub.is_dir() and (not require_meta or (sub / "meta.json").exists()):
+                    yield sub.name, int(top.name), sub
+            continue
+        if not require_meta:
+            yield top.name, None, top
+
+
+def find_ex_dir(slug: str) -> Optional[Path]:
+    """无 owner 上下文时定位镜像目录（CLI / Gradio 用）。
+
+    扁平布局优先。嵌套布局下若多个账号有同名镜像，抛错而不是随便选一个——
+    CLI 没有身份上下文，猜错等于操作了别人的镜像。
+
+    Raises:
+        ValueError: 多个账号存在同名镜像，无法在无身份上下文下消歧
+    """
+    flat = get_ex_dir(slug)
+    if flat.exists():
+        return flat
+    matches = [path for s, _owner, path in iter_exe_dirs() if s == slug]
+    if len(matches) > 1:
+        raise ValueError(f"镜像 [{slug}] 在多个账号下存在，请在 Web 端操作")
+    return matches[0] if matches else None
+
+
+def find_ex_dir_with_owner(slug: str) -> tuple[Optional[Path], Optional[int]]:
+    """定位镜像目录并给出其所属账号（CLI / Gradio 这类无身份上下文的入口用）。
+
+    owner 由目录布局推出：嵌套布局的父目录名即账号 ID，扁平布局为 None。
+    调用方拿到 owner 后要继续传给 pipeline / factory，否则它们会退回扁平目录。
+
+    Returns:
+        (目录, owner)；镜像不存在时为 (None, None)
+    """
+    path = find_ex_dir(slug)
+    if path is None:
+        return None, None
+    parent = path.parent
+    if parent != EXES_DIR and parent.name.isdigit():
+        return path, int(parent.name)
+    return path, None
 
 
 def get_collection_name(slug: str) -> str:

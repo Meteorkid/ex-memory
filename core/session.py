@@ -1,13 +1,13 @@
 """ChatSession：CLI 主循环、指令分发、轮次计数、归档触发。"""
 
-from typing import Callable
+from typing import Callable, Optional
 import json
 import logging
 import sys
 from datetime import datetime
 from prompt_toolkit import prompt as pt_prompt
 
-from config import get_ex_dir, ARCHIVE_THRESHOLD
+from config import find_ex_dir, find_ex_dir_with_owner, ARCHIVE_THRESHOLD
 from core.token_counter import TokenCounter
 from core.factory import create_engine_and_store
 from core.validation import validate_user_input
@@ -31,6 +31,8 @@ class ChatSession:
         self.engine = None
         self.running = True
         self.slug = ""
+        # 镜像归属账号：CLI 无身份上下文，靠目录布局推出后再传给 pipeline / factory
+        self.owner: Optional[int] = None
         self.turn_count = 0
         self.commands: dict[str, Callable[[str], None]] = {}
         self.relationship_stage = "dating"  # 默认热恋期
@@ -50,12 +52,18 @@ class ChatSession:
             print(f"错误: {e}")
             sys.exit(1)
 
-        ex_dir = get_ex_dir(self.slug)
-        if not ex_dir.exists():
+        try:
+            ex_dir, self.owner = find_ex_dir_with_owner(self.slug)
+        except ValueError as e:
+            print(f"错误: {e}")
+            sys.exit(1)
+        if ex_dir is None:
             print(f"错误: 镜像 [{self.slug}] 不存在。请先用 /create 创建。")
             sys.exit(1)
 
-        self.engine, vector_store, embedder = create_engine_and_store(self.slug)
+        self.engine, vector_store, embedder = create_engine_and_store(
+            self.slug, owner=self.owner
+        )
         self.vector_store = vector_store
         self.embedder = embedder
         if vector_store:
@@ -68,10 +76,15 @@ class ChatSession:
         stage_label = RELATIONSHIP_STAGES.get(self.relationship_stage, "未知")
         print(f"--- 关系阶段: {stage_label} ({self.relationship_stage}) ---")
 
+    def _meta_path(self):
+        """定位 meta.json：CLI 无身份上下文，需在扁平与嵌套两种布局中查找。"""
+        ex_dir = find_ex_dir(self.slug)
+        return (ex_dir / "meta.json") if ex_dir else None
+
     def _load_stage(self):
         """从 meta.json 加载关系阶段。"""
-        meta_path = get_ex_dir(self.slug) / "meta.json"
-        if meta_path.exists():
+        meta_path = self._meta_path()
+        if meta_path and meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
                 stage = meta.get("relationship_stage", "dating")
@@ -82,8 +95,8 @@ class ChatSession:
 
     def _save_stage(self):
         """保存关系阶段到 meta.json。"""
-        meta_path = get_ex_dir(self.slug) / "meta.json"
-        if meta_path.exists():
+        meta_path = self._meta_path()
+        if meta_path and meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
@@ -187,6 +200,7 @@ class ChatSession:
             vector_store=self.vector_store,
             embedder=self.embedder,
             engine=self.engine,
+            owner=self.owner,
         )
         if result:
             print(f"--- 对话已归档: {result['session_file']} ---")

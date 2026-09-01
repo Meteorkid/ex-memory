@@ -1,7 +1,7 @@
 """/{slug} — 进入指定镜像的对话模式。"""
 
 import logging
-from config import get_ex_dir, ARCHIVE_THRESHOLD
+from config import find_ex_dir_with_owner, ARCHIVE_THRESHOLD
 from core.validation import validate_slug, validate_user_input
 
 logger = logging.getLogger("ex-memory")
@@ -15,8 +15,12 @@ def cmd_chat(slug: str):
         print(f"错误: {e}")
         return
 
-    ex_dir = get_ex_dir(slug)
-    if not ex_dir.exists():
+    try:
+        ex_dir, owner = find_ex_dir_with_owner(slug)
+    except ValueError as e:
+        print(f"错误: {e}")
+        return
+    if ex_dir is None:
         print(f"镜像 [{slug}] 不存在。输入 /create 创建。")
         return
 
@@ -26,8 +30,9 @@ def cmd_chat(slug: str):
 
     session = ChatSession()
     session.slug = slug
+    session.owner = owner
 
-    session.engine, _, _ = create_engine_and_store(slug)
+    session.engine, _, _ = create_engine_and_store(slug, owner=owner)
 
     session.register_command("backup", lambda _: _do_backup(slug), "备份当前镜像版本")
     session.register_command("reflect", lambda _: _do_reflect(slug), "关系反思分析")
@@ -55,6 +60,7 @@ def cmd_chat(slug: str):
                     user_msg=user_msg,
                     last_reply=reply,
                     history=session.history,
+                    owner=owner,
                 )
                 print(result)
                 session.engine._load()

@@ -1,7 +1,7 @@
 """/update — 向已有镜像追加新素材。"""
 
 from pathlib import Path
-from config import get_ex_dir, get_embedding_config, get_collection_name
+from config import find_ex_dir, get_embedding_config, get_collection_name
 from core.validation import validate_slug
 from commands import register
 
@@ -17,8 +17,12 @@ def cmd_update(slug: str):
         print(f"错误: {e}")
         return
 
-    ex_dir = get_ex_dir(slug)
-    if not ex_dir.exists():
+    try:
+        ex_dir = find_ex_dir(slug)
+    except ValueError as e:
+        print(f"错误: {e}")
+        return
+    if ex_dir is None:
         print(f"镜像 [{slug}] 不存在。")
         return
 

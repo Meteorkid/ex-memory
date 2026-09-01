@@ -2,7 +2,7 @@
 
 import shutil
 import logging
-from config import get_ex_dir
+from config import find_ex_dir
 from commands import register
 
 logger = logging.getLogger("ex-memory")
@@ -13,8 +13,12 @@ def cmd_let_go(slug: str):
         print("用法: /let-go {镜像名称}")
         return
 
-    ex_dir = get_ex_dir(slug)
-    if not ex_dir.exists():
+    try:
+        ex_dir = find_ex_dir(slug)
+    except ValueError as e:
+        print(f"错误: {e}")
+        return
+    if ex_dir is None:
         print(f"镜像 [{slug}] 不存在。")
         return
 
