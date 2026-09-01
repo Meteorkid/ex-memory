@@ -131,7 +131,9 @@ def load_redpackets(slug: str, owner: Optional[int] = None) -> list[dict]:
     return []
 
 
-def save_redpackets(slug: str, packets: list[dict], owner: Optional[int] = None) -> None:
+def save_redpackets(
+    slug: str, packets: list[dict], owner: Optional[int] = None
+) -> None:
     atomic_write_json(get_redpackets_path(slug, owner), packets)
 
 
@@ -227,7 +229,9 @@ def load_transfers(slug: str, owner: Optional[int] = None) -> list[dict]:
     return []
 
 
-def save_transfers(slug: str, transfers: list[dict], owner: Optional[int] = None) -> None:
+def save_transfers(
+    slug: str, transfers: list[dict], owner: Optional[int] = None
+) -> None:
     atomic_write_json(get_transfers_path(slug, owner), transfers)
 
 

@@ -128,14 +128,14 @@ _login_limiter = None
 _audit_logger = None
 
 
-def _load_history(slug: str, *, with_time: bool = False, owner: Optional[int] = None) -> list[dict]:
+def _load_history(
+    slug: str, *, with_time: bool = False, owner: Optional[int] = None
+) -> list[dict]:
     """读取对话历史并归一化为 {role, content[, created_at]} 列表。"""
     from core.conversation_store import load_jsonl_messages
 
     keys = ("role", "content", "created_at") if with_time else ("role", "content")
-    return [
-        {k: m.get(k, "") for k in keys} for m in load_jsonl_messages(slug, owner)
-    ]
+    return [{k: m.get(k, "") for k in keys} for m in load_jsonl_messages(slug, owner)]
 
 
 @router.get("/local-helper/config")
@@ -258,12 +258,16 @@ def _persist_stream_turn(
         logger.warning("流式对话持久化失败 slug=%s: %s", slug, e)
 
 
-def _run_session_archive(slug: str, vector_store, embedder, owner: Optional[int] = None) -> None:
+def _run_session_archive(
+    slug: str, vector_store, embedder, owner: Optional[int] = None
+) -> None:
     """后台任务：累计轮数达到阈值时归档会话并生成 LLM 摘要。"""
     from core.session_archive import maybe_archive
 
     try:
-        if maybe_archive(slug, vector_store=vector_store, embedder=embedder, owner=owner):
+        if maybe_archive(
+            slug, vector_store=vector_store, embedder=embedder, owner=owner
+        ):
             # 摘要写入了 sessions/ 与 SKILL.md，缓存引擎需要重建才会带上记忆层
             _invalidate_engine(slug)
     except Exception as e:

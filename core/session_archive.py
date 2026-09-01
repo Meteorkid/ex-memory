@@ -209,7 +209,9 @@ def _generate_summary(
         return None
 
 
-def update_skill_memory(slug: str, new_summary: str, owner: Optional[int] = None) -> None:
+def update_skill_memory(
+    slug: str, new_summary: str, owner: Optional[int] = None
+) -> None:
     """将新摘要追加到 SKILL.md 的 PART A 末尾（带文件锁的读-改-写）。"""
     skill_path = resolve_ex_dir(slug, owner) / "SKILL.md"
     if not skill_path.exists():
