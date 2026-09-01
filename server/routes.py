@@ -28,6 +28,7 @@ from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessibl
 from core.path_safety import safe_filename
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
+from server.usage_guard import check_limit
 from server.safety_gate import (
     check_crisis,
     check_input,
@@ -52,6 +53,7 @@ from server.models import (
     UpdateRequest,
     ConsentRequest,
     SubjectRequestPayload,
+    PhoneCodeRequest,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -307,6 +309,31 @@ def register(req: AuthRequest, request: Request):
         raise HTTPException(status_code=403, detail="注册已关闭")
     client_ip = _get_client_ip(request)
     _get_login_limiter().check(req.username, client_ip)
+
+    from server.phone_verify import (
+        bind_phone,
+        get_user_id_by_username,
+        mark_age_confirmed,
+        normalize_phone,
+        phone_in_use,
+        verify_code,
+    )
+
+    # 年龄门槛：本产品服务的是失恋、丧失等情绪场景，性质不适合未成年人
+    if config.REQUIRE_AGE_CONFIRMATION and not req.age_confirmed:
+        raise HTTPException(status_code=400, detail="请确认你已年满 18 周岁")
+
+    phone = None
+    if config.REQUIRE_PHONE_VERIFICATION:
+        try:
+            phone = normalize_phone(req.phone or "")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if phone_in_use(phone):
+            raise HTTPException(status_code=400, detail="该手机号已注册")
+        if not verify_code(phone, req.code or ""):
+            raise HTTPException(status_code=400, detail="验证码错误或已过期")
+
     from server.auth import register_user
 
     error = register_user(req.username, req.password)
@@ -315,8 +342,37 @@ def register(req: AuthRequest, request: Request):
             "register_failed", username=req.username, client_ip=client_ip, detail=error
         )
         raise HTTPException(status_code=400, detail=error)
+
+    new_user_id = get_user_id_by_username(req.username)
+    if new_user_id is not None:
+        if phone:
+            bind_phone(new_user_id, phone)
+        if req.age_confirmed:
+            mark_age_confirmed(new_user_id)
+
     _audit("register_success", username=req.username, client_ip=client_ip)
     return StatusResponse(message="注册成功，请登录")
+
+
+@router.post("/auth/phone/send-code", response_model=StatusResponse)
+def send_phone_code(req: PhoneCodeRequest, request: Request):
+    """签发注册用的手机验证码。"""
+    from server.phone_verify import issue_code, normalize_phone, phone_in_use
+
+    client_ip = _get_client_ip(request)
+    _get_login_limiter().check(f"sms:{req.phone[:20]}", client_ip)
+
+    try:
+        phone = normalize_phone(req.phone)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if phone_in_use(phone):
+        raise HTTPException(status_code=400, detail="该手机号已注册")
+
+    ok, message = issue_code(phone)
+    if not ok:
+        raise HTTPException(status_code=429, detail=message)
+    return StatusResponse(message=message)
 
 
 @router.post("/auth/login")
@@ -797,6 +853,11 @@ async def chat(
     if notice is not None:
         return ChatResponse(reply="", stickers=[], tokens=None, notice=notice)
 
+    # 🔴 强度保护排在危机之后：达到时长上限的用户仍然拿得到危机响应
+    limit_notice = check_limit(user_id)
+    if limit_notice is not None:
+        return ChatResponse(reply="", stickers=[], tokens=None, notice=limit_notice)
+
     # 内容审核排在危机之后：既命中危机又命中违规词时走危机流程，
     # 不能因为「违规」把正在求救的人挡回去
     blocked = check_input(user_id, slug, message)
@@ -894,6 +955,15 @@ async def chat_stream(
             yield "data: [DONE]\n\n"
 
         return StreamingResponse(crisis_stream(), media_type="text/event-stream")
+
+    limit_notice = check_limit(user_id)
+    if limit_notice is not None:
+
+        async def limit_stream():
+            yield f"data: {json.dumps(limit_notice)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(limit_stream(), media_type="text/event-stream")
 
     blocked = check_input(user_id, slug, message)
     if blocked is not None:
@@ -1222,10 +1292,14 @@ def health_check(user_id: int = Depends(require_auth)):
 
 @router.get("/user/health/stats")
 def health_stats(user_id: int = Depends(require_auth)):
-    """获取用户使用统计。"""
-    from core.health_tracker import health_tracker
+    """获取用户使用统计。
 
-    return health_tracker.get_usage_stats(user_id)
+    数据源已从 HealthTracker 的进程内字典改为 user_activity 表：
+    原实现重启清零、多设备各算各的，多副本下彻底错乱。
+    """
+    from server.usage_guard import status
+
+    return status(user_id)
 
 
 @router.get("/user/health/mindful")

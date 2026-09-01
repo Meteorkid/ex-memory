@@ -100,6 +100,16 @@ class ErrorResponse(BaseModel):
 class AuthRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=64)
     password: str = Field(..., min_length=6, max_length=128)
+    # 实名与年龄门槛（FR-020 / FR-022）。登录时不需要，仅注册校验。
+    phone: Optional[str] = Field(default=None, max_length=20)
+    code: Optional[str] = Field(default=None, max_length=10)
+    age_confirmed: bool = Field(
+        default=False, description="确认已成年。本产品性质不适合未成年人"
+    )
+
+
+class PhoneCodeRequest(BaseModel):
+    phone: str = Field(..., max_length=20)
 
 
 class LogoutRequest(BaseModel):

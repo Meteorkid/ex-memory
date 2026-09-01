@@ -58,6 +58,24 @@ RECENT_SESSIONS = 3
 # 对话留存天数：超过留存期的记录由 /cleanup 命令（配 cron）清理
 CONVERSATION_RETENTION_DAYS = int(os.getenv("CONVERSATION_RETENTION_DAYS", "90"))
 
+# 准入门槛。默认开启——实名与年龄确认是合规底线，不能靠默认值失守。
+# 自托管/开发环境可显式关闭。
+REQUIRE_PHONE_VERIFICATION = os.getenv(
+    "REQUIRE_PHONE_VERIFICATION", "true"
+).lower() in ("1", "true", "yes")
+REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# 使用强度保护（FR-023）。默认 3 小时/日 + 1 小时冷静期。
+# 数值是保守起点，正式阈值应由产品结合真实分布决定。
+DAILY_USAGE_LIMIT_SECONDS = int(os.getenv("DAILY_USAGE_LIMIT_SECONDS", str(3 * 3600)))
+USAGE_COOLDOWN_SECONDS = int(os.getenv("USAGE_COOLDOWN_SECONDS", str(3600)))
+# 两次请求间隔小于此值时按连续使用计入时长，超过则按一次新交互计 30 秒
+USAGE_GAP_THRESHOLD_SECONDS = int(os.getenv("USAGE_GAP_THRESHOLD_SECONDS", "300"))
+
 # 协议版本。改版后旧同意自动失效，用户须重新勾选——
 # 只记「同意过」而不记版本等于没有留痕。
 THIRD_PARTY_DATA_POLICY_VERSION = os.getenv("THIRD_PARTY_DATA_POLICY_VERSION", "v1")

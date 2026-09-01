@@ -87,6 +87,11 @@ def export_account(user_id: int) -> Path:
 
         manifest = {
             "format": "ex-memory-account-export-v1",
+            # FR-021：导出内容须带 AI 生成声明
+            "ai_generated_notice": (
+                "本导出包中的镜像人格、对话回复等内容由 AI 生成，"
+                "不代表被模拟者本人的真实言论或意愿。"
+            ),
             "exported_at": datetime.now(timezone.utc).isoformat(),
             "account": dict(user_row),
             "consents": list_consents(user_id),

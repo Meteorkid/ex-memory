@@ -25,6 +25,18 @@ def isolate_exes_dir(tmp_path, monkeypatch):
     return exes
 
 
+@pytest.fixture(autouse=True)
+def relax_registration_gates(monkeypatch):
+    """测试默认关闭实名与年龄门槛。
+
+    与既有的「测试里关掉登录限流」同理：绝大多数用例注册账号只是为了拿到
+    身份，不该被准入流程拖累。门槛本身由 tests/test_registration_gates.py
+    显式打开后专门验证。
+    """
+    monkeypatch.setattr("config.REQUIRE_PHONE_VERIFICATION", False)
+    monkeypatch.setattr("config.REQUIRE_AGE_CONFIRMATION", False)
+
+
 @pytest.fixture
 def sample_wechat_messages():
     """模拟微信聊天记录。"""

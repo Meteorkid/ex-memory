@@ -26,6 +26,19 @@ def create_app() -> FastAPI:
 
     warn_if_unreviewed()
 
+    # 实名开启但未接短信服务商时装上开发用实现并告警。
+    # 不静默关闭实名——合规底线不能靠默认值失守。
+    if config.REQUIRE_PHONE_VERIFICATION:
+        from core.safety import sms
+
+        if sms.get_provider() is None:
+            sms.set_provider(sms.ConsoleProvider())
+            logger_ = __import__("logging").getLogger("ex-memory")
+            logger_.warning(
+                "已开启手机号实名但未配置短信服务商，当前使用开发用 ConsoleProvider"
+                "（验证码只打日志，不真发短信）。生产环境必须注入真实实现。"
+            )
+
     app = FastAPI(
         title="ex-memory API",
         description="前任记忆智能体 REST API",

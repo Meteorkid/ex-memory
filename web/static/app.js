@@ -1332,6 +1332,9 @@ function enterChat(slug, name) {
     }
     // 持久化当前聊天状态
     localStorage.setItem('ex-memory-current-chat', JSON.stringify({slug, name}));
+    // AI 生成内容标识随对话区一起显示（FR-021）
+    const aiNotice = $('ai-notice');
+    if (aiNotice) aiNotice.style.display = '';
     setTimeout(() => $('msg-input').focus(), 300);
 }
 
