@@ -121,3 +121,17 @@ class TestCleanupCoversNestedLayout:
 
         assert "清理 1 条过期对话" in capsys.readouterr().out
         assert conv_file.read_text(encoding="utf-8") == ""
+
+
+def test_exes_dir_is_isolated_from_real_data():
+    """兜底：任何测试都不得指向仓库里真实的 exes/ 目录。
+
+    conftest 的 isolate_exes_dir 一旦被摘掉或失效，这条会立刻失败——
+    曾有用例把真实 exes/test/meta.json 覆盖掉，那是用户数据。
+    """
+    from pathlib import Path
+
+    import config
+
+    real_exes = Path(__file__).resolve().parent.parent / "exes"
+    assert config.EXES_DIR != real_exes

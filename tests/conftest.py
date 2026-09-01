@@ -7,6 +7,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
+@pytest.fixture(autouse=True)
+def isolate_exes_dir(tmp_path, monkeypatch):
+    """把镜像根目录统一指向临时目录，禁止测试碰真实 exes/。
+
+    没有这道兜底时，任何一个漏打桩的用例都会写进用户的真实镜像：
+    test_create_flow_api_no_llm_key 只 patch 了 get_llm_config，
+    orchestrator 内部的 get_ex_dir("test") 就落到了真实 exes/test，
+    把那里的 meta.json 覆盖掉。
+
+    需要特定布局的用例仍可自行 monkeypatch config.EXES_DIR 覆盖本 fixture。
+    """
+    # 刻意不预建目录：多数用例把 EXES_DIR 指向 tmp_path 本身，这里若真建了
+    # 目录，反而会被它们当成一个镜像扫描到。需要时由被测代码自己 mkdir。
+    exes = tmp_path / "_isolated_exes"
+    monkeypatch.setattr("config.EXES_DIR", exes)
+    return exes
+
+
 @pytest.fixture
 def sample_wechat_messages():
     """模拟微信聊天记录。"""
