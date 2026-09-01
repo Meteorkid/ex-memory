@@ -16,6 +16,7 @@ def cmd_help(_=""):
   /let-go {名称}   删除镜像（不可逆）
   /export {名称} [html|md|json|txt]  导出 ex-memory 对话记录
   /export-wechat {备份目录} {输出目录} {账号} [会话名...]  调用外部 WechatExporter
+  /cleanup         清理超过留存期的对话归档（配 cron 定期执行）
   /keychain        管理 API Key（macOS Keychain）
   /web             启动 Web 界面（Gradio）
   /help            显示帮助

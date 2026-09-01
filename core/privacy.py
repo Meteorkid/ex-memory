@@ -1,5 +1,6 @@
 """隐私安全：敏感信息检测、数据脱敏、过期清理。"""
 
+import fcntl
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -59,28 +60,56 @@ def mask_sensitive(text: str) -> str:
 
 
 def clean_expired_conversations(slug: str, retention_days: int = 90) -> int:
-    """清理过期的对话归档文件。
+    """清理过期的对话归档记录（按记录级 created_at 过滤后重写文件）。
+
+    与 append_turn 共用同一把 .lock 文件锁，不会与并发写入互相破坏；
+    解析失败或缺少时间戳的行保守保留。
 
     Returns:
-        删除的文件数量
+        删除的记录条数
     """
-    conv_dir = Path(f"exes/{slug}/conversations")
+    import json
+
+    import config
+    from core.file_utils import atomic_write, _lock
+
+    conv_dir = config.get_ex_dir(slug) / "conversations"
     if not conv_dir.exists():
         return 0
 
     cutoff = datetime.now() - timedelta(days=retention_days)
-    deleted = 0
+    removed = 0
 
-    for f in conv_dir.glob("*.jsonl"):
-        try:
-            mtime = datetime.fromtimestamp(f.stat().st_mtime)
-            if mtime < cutoff:
-                f.unlink()
-                deleted += 1
-        except (OSError, ValueError):
-            pass
+    for path in sorted(conv_dir.glob("*.jsonl")):
+        lock_path = path.with_name(path.name + ".lock")
+        with open(lock_path, "a+", encoding="utf-8") as lock_file:
+            _lock(lock_file, fcntl.LOCK_EX)
+            kept_lines: list[str] = []
+            file_removed = 0
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    try:
+                        record = json.loads(stripped)
+                        created_at = datetime.fromisoformat(record["created_at"])
+                    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+                        # 无法判断时间的行保守保留
+                        kept_lines.append(stripped)
+                        continue
+                    if created_at < cutoff:
+                        file_removed += 1
+                    else:
+                        kept_lines.append(stripped)
+            if file_removed:
+                atomic_write(
+                    path,
+                    "\n".join(kept_lines) + "\n" if kept_lines else "",
+                )
+                removed += file_removed
 
-    return deleted
+    return removed
 
 
 def scan_conversation(slug: str) -> dict:

@@ -26,4 +26,5 @@ from commands import (  # noqa: E402,F401
     web,
     export,
     export_wechat,
+    cleanup,
 )

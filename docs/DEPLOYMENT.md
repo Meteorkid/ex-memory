@@ -132,6 +132,7 @@ sudo certbot --nginx -d your-domain.com
 | `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | 否 | Embedding 端点 |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | 否 | Embedding 模型 |
 | `CORS_ORIGINS` | `http://localhost:8000,http://localhost:7860` | 否 | 允许的来源 |
+| `CONVERSATION_RETENTION_DAYS` | `90` | 否 | 对话留存天数，超期记录由 `/cleanup` 命令清理 |
 | `SINGLE_USER_MODE` | `false` | 否 | 单人本机模式，跳过镜像归属校验 |
 | `LOCAL_WECHAT_HELPER_ENABLED` | `false` | 否 | 启用 macOS 本地助手下载入口 |
 | `LOCAL_WECHAT_HELPER_VERSION` | 空 | 否 | 本站发布的本地助手版本 |
@@ -174,6 +175,23 @@ sudo certbot --nginx -d your-domain.com
   地忽略该头并按直连 IP 限流——这意味着所有请求会被算作同一个来源。
 - SSO 模式下 `X-Ex-Memory-User-Id` 是身份的唯一依据，Nginx 必须先清空再写入，
   否则浏览器可自带该头冒充任意用户（见上方 Nginx 示例）。
+
+## 对话留存与隐私清理
+
+- **落库脱敏**：导入聊天记录与对话落库时，手机号 / 身份证 / 银行卡 / 邮箱四类敏感信息自动脱敏后才入库。这四类对语气还原没有价值，脱敏不影响拟真度。
+- **留存天数**：由 `CONVERSATION_RETENTION_DAYS` 控制（默认 90 天）。
+- **清理方式**：服务本身不会自动清理，需要配置 cron 定期执行 `/cleanup` 命令（清理所有镜像中超过留存期的对话记录）：
+
+```bash
+# 宿主机 cron：每天 04:00 清理过期对话（路径按实际部署调整）
+0 4 * * * cd /path/to/ex-memory && python run.py /cleanup >> logs/cleanup.log 2>&1
+```
+
+Docker 部署时可改为在容器内执行：
+
+```bash
+0 4 * * * docker compose exec -T ex-memory python run.py /cleanup >> logs/cleanup.log 2>&1
+```
 
 ## 数据备份
 

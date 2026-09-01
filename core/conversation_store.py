@@ -10,6 +10,8 @@ from typing import Optional
 
 import config
 
+from core.privacy import mask_sensitive
+
 LOCK_TIMEOUT = 5
 
 
@@ -21,7 +23,11 @@ def append_turn(
     stickers: Optional[list[str]] = None,
     source: str = "web",
 ) -> None:
-    """追加一轮对话到 `conversations/conversation.jsonl`。"""
+    """追加一轮对话到 `conversations/conversation.jsonl`。
+
+    手机号/身份证/银行卡/邮箱在落库前脱敏——这四类对语气还原没有价值，
+    敏感信息不以明文入库。
+    """
     path = _conversation_path(slug)
     turn_id = uuid.uuid4().hex
     created_at = datetime.now().isoformat()
@@ -30,7 +36,7 @@ def append_turn(
             "id": f"{turn_id}-user",
             "turn_id": turn_id,
             "role": "user",
-            "content": user_message,
+            "content": mask_sensitive(user_message),
             "created_at": created_at,
             "source": source,
             "user_id": user_id,
@@ -39,7 +45,7 @@ def append_turn(
             "id": f"{turn_id}-assistant",
             "turn_id": turn_id,
             "role": "assistant",
-            "content": assistant_reply,
+            "content": mask_sensitive(assistant_reply),
             "created_at": datetime.now().isoformat(),
             "source": source,
             "user_id": user_id,

@@ -2,7 +2,21 @@
 
 import logging
 
+from core.privacy import mask_sensitive
+
 logger = logging.getLogger("ex-memory")
+
+
+def _mask_messages(messages: list[dict]) -> list[dict]:
+    """导入内容脱敏：手机号/身份证/银行卡/邮箱不以明文入向量库。
+
+    仅处理这四类对语气还原无价值的模式，不扩大脱敏范围。
+    """
+    for msg in messages:
+        content = msg.get("content")
+        if content:
+            msg["content"] = mask_sensitive(content)
+    return messages
 
 
 def ingest_wechat_file(
@@ -27,7 +41,7 @@ def ingest_wechat_file(
     from parsers.wechat_parser import parse as wechat_parse
     from memory.chunker import Chunker
 
-    messages = wechat_parse(file_path, target_name=target_name)
+    messages = _mask_messages(wechat_parse(file_path, target_name=target_name))
     logger.info("解析完成: %d 条消息", len(messages))
 
     if not messages:
@@ -66,7 +80,7 @@ def ingest_qq_file(
     from parsers.qq_parser import parse as qq_parse
     from memory.chunker import Chunker
 
-    messages = qq_parse(file_path, target_name=target_name)
+    messages = _mask_messages(qq_parse(file_path, target_name=target_name))
     logger.info("QQ 解析完成: %d 条消息", len(messages))
 
     if not messages:
@@ -98,7 +112,7 @@ def ingest_text(
     from memory.chunker import Chunker
 
     chunker = Chunker()
-    chunks = chunker.chunk_text(text, source=source)
+    chunks = chunker.chunk_text(mask_sensitive(text), source=source)
     if chunks:
         vector_store.ingest(chunks, embedder)
     return len(chunks)
