@@ -190,9 +190,10 @@ class TestCodeLifecycle:
         phone = "13800000005"
         api.post("/api/auth/phone/send-code", json={"phone": phone})
 
-        # 直接把过期时间拨到过去，比 mock 时钟更直观
-        with phone_verify._lock:
-            phone_verify._codes[phone]["expires_at"] = 0
+        # 验证码的 TTL 由共享 KV 负责，过期等价于键消失
+        from core import kv
+
+        kv.delete(phone_verify._code_key(phone))
         assert phone_verify.verify_code(phone, sent[phone]) is False
 
     def test_brute_force_invalidates_code(self, client, gates_on):

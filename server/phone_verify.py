@@ -18,8 +18,21 @@ PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 MAX_ATTEMPTS = 5
 RESEND_INTERVAL_SECONDS = 60
 
-_codes: dict[str, dict] = {}
+# 验证码走共享 KV：多副本下若存在进程内，换台机器验证就失效。
+# TTL 由 KV 负责，不需要自己清理。
 _lock = threading.Lock()
+
+
+def _code_key(phone: str) -> str:
+    return f"sms:code:{phone}"
+
+
+def _attempt_key(phone: str) -> str:
+    return f"sms:attempts:{phone}"
+
+
+def _issued_key(phone: str) -> str:
+    return f"sms:issued:{phone}"
 
 
 def normalize_phone(phone: str) -> str:
@@ -37,25 +50,22 @@ def issue_code(phone: str) -> tuple[bool, str]:
     """签发验证码，返回 (是否成功, 提示)。"""
     from core.safety.sms import CODE_TTL_SECONDS, generate_code, send_code
 
+    from core import kv
+
     phone = normalize_phone(phone)
-    now = time.time()
-    with _lock:
-        existing = _codes.get(phone)
-        if existing and now - existing["issued_at"] < RESEND_INTERVAL_SECONDS:
-            wait = int(RESEND_INTERVAL_SECONDS - (now - existing["issued_at"]))
-            return False, f"请 {wait} 秒后再试"
+    issued_at = kv.get(_issued_key(phone))
+    if issued_at:
+        elapsed = time.time() - float(issued_at)
+        if elapsed < RESEND_INTERVAL_SECONDS:
+            return False, f"请 {int(RESEND_INTERVAL_SECONDS - elapsed)} 秒后再试"
 
     code = generate_code()
     if not send_code(phone, code):
         return False, "验证码发送失败，请稍后重试"
 
-    with _lock:
-        _codes[phone] = {
-            "hash": _hash(code),
-            "issued_at": now,
-            "expires_at": now + CODE_TTL_SECONDS,
-            "attempts": 0,
-        }
+    kv.set(_code_key(phone), _hash(code), ttl_seconds=CODE_TTL_SECONDS)
+    kv.set(_issued_key(phone), str(time.time()), ttl_seconds=RESEND_INTERVAL_SECONDS)
+    kv.delete(_attempt_key(phone))
     return True, "验证码已发送"
 
 
@@ -66,29 +76,31 @@ def verify_code(phone: str, code: str) -> bool:
     except ValueError:
         return False
 
+    from core import kv
+    from core.safety.sms import CODE_TTL_SECONDS
+
     with _lock:
-        record = _codes.get(phone)
-        if record is None:
-            return False
-        if time.time() > record["expires_at"]:
-            del _codes[phone]
-            return False
-        record["attempts"] += 1
-        if record["attempts"] > MAX_ATTEMPTS:
+        stored = kv.get(_code_key(phone))
+        if stored is None:
+            return False  # 不存在或已过期，TTL 由 KV 负责
+        attempts = kv.incr_by(_attempt_key(phone), 1, ttl_seconds=CODE_TTL_SECONDS)
+        if attempts > MAX_ATTEMPTS:
             # 暴力尝试直接作废，而不是继续给机会
-            del _codes[phone]
+            kv.delete(_code_key(phone))
             logger.warning("验证码尝试次数超限，已作废 phone=%s", phone[:3] + "****")
             return False
-        if hmac.compare_digest(record["hash"], _hash(code or "")):
-            del _codes[phone]
+        if hmac.compare_digest(stored, _hash(code or "")):
+            kv.delete(_code_key(phone))
+            kv.delete(_attempt_key(phone))
             return True
         return False
 
 
 def reset() -> None:
-    """测试用。"""
-    with _lock:
-        _codes.clear()
+    """测试用：验证码状态随 KV 一起重置。"""
+    from core import kv
+
+    kv.reset_for_tests()
 
 
 def phone_in_use(phone: str) -> bool:

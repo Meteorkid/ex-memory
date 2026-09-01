@@ -69,6 +69,10 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 共享状态后端（FR-035）。为空时用进程内实现——仅适用于单副本部署。
+# 多副本必须配置，否则限流额度按副本数翻倍、用量统计对不上。
+REDIS_URL = os.getenv("REDIS_URL", "")
+
 # 单次请求的总 token 预算（FR-039 / D-08）。
 # 原先 LLM_MAX_CONTEXT_CHARS 只约束 system prompt，history 上限是
 # 100 轮 x 4000 字符 ≈ 26 万 tokens，远超模型上下文；超限必然报错，

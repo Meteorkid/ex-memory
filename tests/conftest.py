@@ -26,6 +26,21 @@ def isolate_exes_dir(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def isolate_shared_kv():
+    """每个用例重置共享 KV。
+
+    限流窗口是跨用例累积的：不重置的话跑到第 60 个请求就开始 429，
+    失败原因还极难定位。默认用进程内后端，不依赖外部 Redis。
+    """
+    from core import kv
+
+    kv.reset_for_tests()
+    kv.configure("")
+    yield
+    kv.reset_for_tests()
+
+
+@pytest.fixture(autouse=True)
 def relax_registration_gates(monkeypatch):
     """测试默认关闭实名与年龄门槛。
 

@@ -27,6 +27,7 @@ from core.validation import validate_slug, validate_user_input, sanitize_chat_hi
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
 import config
+from core import kv
 from core.bounded_cache import BoundedCache
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
@@ -145,6 +146,15 @@ _engine_cache = BoundedCache(
     ttl_seconds=config.ENGINE_CACHE_TTL_SECONDS,
 )
 
+
+def _evict_engines_for_slug(slug: str) -> None:
+    """清掉本副本上该 slug 的全部引擎缓存（所有用户）。"""
+    _engine_cache.evict_where(lambda key: key[1] == slug)
+
+
+# 模块导入时注册一次：放在 create_app 里会每建一次 app 就追加一个处理器
+kv.on_invalidate(_evict_engines_for_slug)
+
 # 登录限流 + 审计日志
 _login_limiter = None
 _audit_logger = None
@@ -243,7 +253,9 @@ def _invalidate_engine(slug: str):
 
     清掉该 slug 下所有用户的缓存条目。
     """
-    _engine_cache.evict_where(lambda key: key[1] == slug)
+    # 广播而非只清本地：多副本下用户纠正「ta 不会这样」若只在一个副本生效，
+    # 其余副本会继续用旧人格回话
+    kv.broadcast_invalidate(slug)
 
 
 # 流式输出审核策略：下发前对「累计全文」过一遍本地词表。

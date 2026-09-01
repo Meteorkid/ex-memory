@@ -5,7 +5,6 @@ import os
 import time
 import uuid
 import logging
-from collections import defaultdict
 from fastapi import Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -141,54 +140,35 @@ def _get_client_ip(request: Request) -> str:
 
 
 class RateLimiter:
-    """简单的内存限流器，支持代理穿透和定期清理。"""
+    """全局限流。计数走共享 KV，多副本共用同一份窗口。
+
+    此前是进程内 dict：启动第二个 worker 就等于把限流额度翻倍。
+    """
 
     def __init__(self, max_requests: int = 60, window_seconds: int = 60):
         self.max_requests = max_requests
         self.window = window_seconds
-        self._store: dict[str, list[float]] = defaultdict(list)
-        self._last_cleanup = time.time()
 
     async def __call__(self, request: Request, call_next):
+        from core import kv
+
         client_ip = _get_client_ip(request)
-        now = time.time()
-
-        # 定期清理过期 IP 条目，防止 _store 无限增长
-        if now - self._last_cleanup > 300:  # 每 5 分钟
-            self._cleanup(now)
-            self._last_cleanup = now
-
-        # 清理该 IP 的过期记录
-        window_start = now - self.window
-        self._store[client_ip] = [t for t in self._store[client_ip] if t > window_start]
-
-        if len(self._store[client_ip]) >= self.max_requests:
+        hits = kv.incr_window(f"rl:ip:{client_ip}", self.window)
+        if hits > self.max_requests:
             logger.warning("rate limit hit for %s", client_ip)
             return JSONResponse(
                 status_code=429,
                 content={"detail": "请求过于频繁，请稍后再试"},
             )
-
-        self._store[client_ip].append(now)
-        response = await call_next(request)
-        return response
-
-    def _cleanup(self, now: float):
-        """清除所有过期的 IP 条目。"""
-        window_start = now - self.window
-        stale = [
-            ip
-            for ip, ts_list in self._store.items()
-            if not any(t > window_start for t in ts_list)
-        ]
-        for ip in stale:
-            del self._store[ip]
-        if stale:
-            logger.debug("rate limiter cleaned %d stale IP entries", len(stale))
+        return await call_next(request)
 
 
 class LoginRateLimiter:
-    """登录接口独立限流：5 次/分钟/用户名，15 次/分钟/IP。"""
+    """登录接口独立限流：5 次/分钟/用户名，15 次/分钟/IP。
+
+    同样走共享 KV——按用户名限流若只在单副本内生效，暴力破解换个
+    连接落到另一个副本就绕过去了。
+    """
 
     def __init__(
         self, max_per_user: int = 5, max_per_ip: int = 15, window_seconds: int = 60
@@ -196,47 +176,16 @@ class LoginRateLimiter:
         self.max_per_user = max_per_user
         self.max_per_ip = max_per_ip
         self.window = window_seconds
-        self._user_store: dict[str, list[float]] = defaultdict(list)
-        self._ip_store: dict[str, list[float]] = defaultdict(list)
-        self._last_cleanup = time.time()
 
     def check(self, username: str, client_ip: str) -> None:
-        now = time.time()
-        if now - self._last_cleanup > 300:
-            self._cleanup(now)
-            self._last_cleanup = now
+        from core import kv
 
-        window_start = now - self.window
-
-        # 按用户名限流
-        self._user_store[username] = [
-            t for t in self._user_store[username] if t > window_start
-        ]
-        if len(self._user_store[username]) >= self.max_per_user:
+        if kv.incr_window(f"rl:login:user:{username}", self.window) > self.max_per_user:
             logger.warning("login rate limit (user) hit for %s", username)
             raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
-
-        # 按 IP 限流
-        self._ip_store[client_ip] = [
-            t for t in self._ip_store[client_ip] if t > window_start
-        ]
-        if len(self._ip_store[client_ip]) >= self.max_per_ip:
+        if kv.incr_window(f"rl:login:ip:{client_ip}", self.window) > self.max_per_ip:
             logger.warning("login rate limit (IP) hit for %s", client_ip)
             raise HTTPException(status_code=429, detail="登录尝试过于频繁，请稍后再试")
-
-        self._user_store[username].append(now)
-        self._ip_store[client_ip].append(now)
-
-    def _cleanup(self, now: float):
-        window_start = now - self.window
-        for store in (self._user_store, self._ip_store):
-            stale = [
-                k
-                for k, ts_list in store.items()
-                if not any(t > window_start for t in ts_list)
-            ]
-            for k in stale:
-                del store[k]
 
 
 class RequestLoggingMiddleware:

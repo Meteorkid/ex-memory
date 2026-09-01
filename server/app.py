@@ -22,6 +22,12 @@ def create_app() -> FastAPI:
     init_db()
 
     # 危机文案未经专业审阅时不阻止启动，但必须让运维看见
+    from core import kv
+
+    kv.configure(config.REDIS_URL)
+    # 失效处理器在 server.routes 导入时注册（每进程一次），这里只起订阅线程
+    kv.start_invalidation_listener()
+
     from core.safety.resources import warn_if_unreviewed
 
     warn_if_unreviewed()
