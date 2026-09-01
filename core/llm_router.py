@@ -128,14 +128,19 @@ class LLMRouter:
             logger.error("全部 LLM 供应商处于熔断状态，强制尝试主供应商")
             candidates = self._providers[:1]
 
+        from core.observability import observe_llm
+
         last_error: Optional[Exception] = None
         for provider in candidates:
             breaker = self._breakers[provider.name]
+            started = time.monotonic()
             try:
                 result = invoke(self._client_for(provider), provider.model, **kwargs)
                 breaker.record_success()
+                observe_llm(provider.name, "success", time.monotonic() - started)
                 return result, provider
             except Exception as e:  # noqa: BLE001 — 要按错误类型决定是否换供应商
+                observe_llm(provider.name, "failure", time.monotonic() - started)
                 last_error = e
                 if not is_retryable(e):
                     # 请求本身有问题（400/422 之类），换供应商也是一样的结果

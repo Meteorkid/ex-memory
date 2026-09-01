@@ -189,15 +189,33 @@ class LoginRateLimiter:
 
 
 class RequestLoggingMiddleware:
-    """请求日志中间件：记录 method、path、status、duration_ms、request_id。"""
+    """请求日志 + 指标 + 链路上下文。
+
+    路径按路由模板归一化后再做指标标签：直接用原始 path 会让
+    /exes/{slug}/... 每个 slug 各占一条时间序列，指标基数爆炸。
+    """
 
     async def __call__(self, request: Request, call_next):
+        from core import observability
+
         request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:12])
+        trace_id = request.headers.get("X-Trace-ID") or observability.new_trace_id()
         request.state.request_id = request_id
+        observability.set_context(trace_id=trace_id, request_id=request_id)
 
         start = time.time()
-        response = await call_next(request)
-        duration_ms = int((time.time() - start) * 1000)
+        with observability.span(
+            "http.request",
+            **{"http.method": request.method, "http.route": request.url.path},
+        ):
+            response = await call_next(request)
+        duration = time.time() - start
+
+        route = request.scope.get("route")
+        template = getattr(route, "path", None) or "unmatched"
+        observability.observe_http(
+            request.method, template, response.status_code, duration
+        )
 
         logger.info(
             "request_id=%s method=%s path=%s status=%d duration_ms=%d",
@@ -205,7 +223,8 @@ class RequestLoggingMiddleware:
             request.method,
             request.url.path,
             response.status_code,
-            duration_ms,
+            int(duration * 1000),
         )
         response.headers["X-Request-ID"] = request_id
+        response.headers["X-Trace-ID"] = trace_id
         return response

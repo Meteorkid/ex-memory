@@ -69,6 +69,12 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 可观测性（NFR-031 / NFR-032）。
+# METRICS_TOKEN 未配置时 /metrics 直接不启用：指标会泄漏运营信息
+# （用量、错误率、供应商），不能默认公开。
+METRICS_TOKEN = os.getenv("METRICS_TOKEN", "")
+OTLP_ENDPOINT = os.getenv("OTLP_ENDPOINT", "")
+
 # LLM 多供应商与熔断（FR-038）。
 # LLM_PROVIDERS 是 JSON 数组，形如
 #   [{"name":"deepseek","api_key":"...","base_url":"...","model":"..."}, ...]

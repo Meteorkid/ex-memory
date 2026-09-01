@@ -1,12 +1,34 @@
 """结构化日志系统。"""
 
+import json
 import logging
+import os
 import sys
 from typing import Optional
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 _logger = None
+
+
+class _JsonFormatter(logging.Formatter):
+    """结构化输出。日志系统按字段检索，文本行做不到。"""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "line": f"{record.module}:{record.lineno}",
+            "message": record.getMessage(),
+        }
+        for key in ("trace_id", "request_id", "user_id", "slug"):
+            value = getattr(record, key, "")
+            if value:
+                payload[key] = value
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
 
 
 def setup_logging(
@@ -19,10 +41,20 @@ def setup_logging(
     logger = logging.getLogger("ex-memory")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
-    fmt = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    if os.getenv("LOG_FORMAT", "text").lower() == "json":
+        fmt: logging.Formatter = _JsonFormatter()
+    else:
+        fmt = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d "
+            "trace=%(trace_id)s user=%(user_id)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+    # 上下文过滤器：trace_id / user_id 等由 contextvars 自动注入，
+    # 业务代码不必层层传参
+    from core.observability import ContextFilter
+
+    logger.addFilter(ContextFilter())
 
     # 控制台 handler
     console = logging.StreamHandler(sys.stderr)

@@ -49,7 +49,11 @@ def record_safety_event(
     落库失败不抛异常：这条路径挂在对话主链路上，审计写失败不能连带
     把危机响应也弄没了。但必须留日志，否则审计缺口无人察觉。
     """
+    from core.observability import observe_safety_event
     from server.auth import _get_conn
+
+    # 指标先记：即便落库失败，「发生了多少危机事件」这个信号也不能丢
+    observe_safety_event(event_type, action_taken)
 
     try:
         with _get_conn() as conn:

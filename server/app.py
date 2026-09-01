@@ -1,6 +1,8 @@
 """FastAPI 应用入口。"""
 
-from fastapi import FastAPI
+import hmac
+
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -22,7 +24,10 @@ def create_app() -> FastAPI:
     init_db()
 
     # 危机文案未经专业审阅时不阻止启动，但必须让运维看见
-    from core import kv
+    from core import kv, observability
+
+    observability.init_metrics()
+    observability.init_tracing(otlp_endpoint=config.OTLP_ENDPOINT)
 
     kv.configure(config.REDIS_URL)
     # 失效处理器在 server.routes 导入时注册（每进程一次），这里只起订阅线程
@@ -101,6 +106,28 @@ def create_app() -> FastAPI:
                 )
             return HTMLResponse(document, headers={"Cache-Control": "no-store"})
         return {"message": "ex-memory API", "docs": "/api/docs"}
+
+    @app.get("/metrics")
+    def metrics(request: Request):
+        """Prometheus 抓取端点。
+
+        未配置 METRICS_TOKEN 时返回 404 而非空指标：指标暴露的是运营
+        信息（用量、错误率、供应商），默认公开是不可接受的。
+        """
+        if not config.METRICS_TOKEN:
+            raise HTTPException(status_code=404, detail="Not found")
+        provided = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        if not hmac.compare_digest(provided, config.METRICS_TOKEN):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+        from core import kv
+
+        gauge = observability.metric("kv_degraded")
+        if gauge is not None:
+            gauge.set(1 if kv.is_degraded() else 0)
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     @app.get("/health")
     def health():

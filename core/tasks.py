@@ -20,6 +20,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
+from core.observability import observe_task
+
 logger = logging.getLogger("ex-memory")
 
 STATUS_QUEUED = "queued"
@@ -128,6 +130,7 @@ def _run(task_id: str) -> None:
     payload = json.loads(task["payload"] or "{}")
     try:
         result = handler(TaskProgress(task_id), **payload)
+        observe_task(task["task_type"], STATUS_SUCCEEDED)
         _update_task(
             task_id,
             status=STATUS_SUCCEEDED,
@@ -139,6 +142,7 @@ def _run(task_id: str) -> None:
         logger.error(
             "任务失败 id=%s type=%s: %s", task_id, task["task_type"], e, exc_info=True
         )
+        observe_task(task["task_type"], STATUS_FAILED)
         _update_task(
             task_id,
             status=STATUS_FAILED,
