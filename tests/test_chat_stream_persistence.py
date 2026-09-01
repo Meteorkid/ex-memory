@@ -131,13 +131,17 @@ class TestStreamPersists:
 
 class TestStreamInterrupted:
     def test_client_disconnect_persists_partial_reply(self, env):
-        """客户端中断（GeneratorExit）时，已生成部分必须落库。"""
+        """客户端中断（GeneratorExit）时，已生成部分必须落库。
+
+        分块要长于 _HOLDBACK_CHARS，否则尾部保留策略下循环中不会下发任何
+        事件，测不出「生成到一半被打断」这个场景。
+        """
         _make_exe(env, "s3")
         engine = _mock_engine(
             [
-                {"type": "text", "content": "第一段"},
-                {"type": "text", "content": "第二段"},
-                {"type": "text", "content": "第三段"},
+                {"type": "text", "content": "第一段" * 10},
+                {"type": "text", "content": "第二段" * 10},
+                {"type": "text", "content": "第三段" * 10},
             ]
         )
 
@@ -157,7 +161,8 @@ class TestStreamInterrupted:
         turns = _read_turns(env, "s3")
         assert len(turns) == 2, "回归：中断后已生成部分未落库"
         assert turns[0]["content"] == "hi"
-        assert turns[1]["content"] == "第一段"
+        # 断连时第二、三段尚未生成，落库的正是已生成的那部分
+        assert turns[1]["content"] == "第一段" * 10
 
     def test_error_mid_stream_persists_partial_reply(self, env):
         """生成中途异常：已生成的部分同样落库，且不影响错误事件下发。"""

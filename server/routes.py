@@ -28,7 +28,12 @@ from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessibl
 from core.path_safety import safe_filename
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
-from server.safety_gate import check_crisis
+from server.safety_gate import (
+    check_crisis,
+    check_input,
+    check_output,
+    check_output_streaming,
+)
 from server.middleware import require_auth, _get_client_ip, security
 from server.models import (
     AuthRequest,
@@ -232,6 +237,16 @@ def _invalidate_engine(slug: str):
     with _engine_cache_lock:
         for key in [k for k in _engine_cache if k[1] == slug]:
             del _engine_cache[key]
+
+
+# 流式输出审核策略：下发前对「累计全文」过一遍本地词表。
+#
+# 保证由此而来——违规词一旦完整出现就被拦下，承载它的那个分块不会下发，
+# 所以完整的违规词到不了客户端。曾额外做过「扣住尾部若干字符」的设计，
+# 实测去掉后保证依然成立（累计审核已经覆盖），属于纯粹的延迟浪费，已移除。
+#
+# 热路径只用本地词表：主通道若逐块调用，就是每个分块一次网络请求，
+# 延迟与成本都不可接受。完整的主通道检查放在流结束后做一次。
 
 
 def _persist_stream_turn(
@@ -762,9 +777,22 @@ async def chat(
     if notice is not None:
         return ChatResponse(reply="", stickers=[], tokens=None, notice=notice)
 
+    # 内容审核排在危机之后：既命中危机又命中违规词时走危机流程，
+    # 不能因为「违规」把正在求救的人挡回去
+    blocked = check_input(user_id, slug, message)
+    if blocked is not None:
+        return ChatResponse(reply="", stickers=[], tokens=None, notice=blocked)
+
     try:
         engine = _get_engine(slug, user_id)
         reply, stickers, usage = await run_in_threadpool(engine.chat, message, history)
+
+        # 违规输出既不下发也不落库
+        blocked_output = check_output(user_id, slug, reply)
+        if blocked_output is not None:
+            return ChatResponse(
+                reply="", stickers=[], tokens=None, notice=blocked_output
+            )
 
         token_info = None
         if usage:
@@ -847,6 +875,15 @@ async def chat_stream(
 
         return StreamingResponse(crisis_stream(), media_type="text/event-stream")
 
+    blocked = check_input(user_id, slug, message)
+    if blocked is not None:
+
+        async def blocked_stream():
+            yield f"data: {json.dumps(blocked)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(blocked_stream(), media_type="text/event-stream")
+
     async def generate():
         full_reply = ""
         collected_stickers: list[str] = []
@@ -854,14 +891,38 @@ async def chat_stream(
         engine = None
         try:
             engine = _get_engine(slug, user_id)
+            released = 0  # 已下发字符数
             for item in engine.chat_stream(message, history):
                 if item.get("type") == "text":
                     full_reply += item.get("content", "")
+                    hit = check_output_streaming(user_id, slug, full_reply)
+                    if hit is not None:
+                        # 违规词所在的这一块尚未下发，回退到已下发部分
+                        full_reply = full_reply[:released]
+                        yield f"data: {json.dumps(hit)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+                    if len(full_reply) > released:
+                        segment = full_reply[released:]
+                        released = len(full_reply)
+                        yield f"data: {json.dumps({'type': 'text', 'content': segment})}\n\n"
+                    continue
                 elif item.get("type") == "sticker" and item.get("id"):
                     collected_stickers.append(item["id"])
                 elif item.get("type") == "usage":
                     stream_usage = item
                 yield f"data: {json.dumps(item)}\n\n"
+
+            # 收尾：对完整回复做一次主通道检查。此时文本已下发，只能事后
+            # 撤回并且不落库——这是流式与「违规内容一个字都不到前端」之间
+            # 无法两全的地方，本地词表挡住已知词，主通道兜住其余。
+            if full_reply.strip():
+                late_hit = check_output(user_id, slug, full_reply)
+                if late_hit is not None:
+                    full_reply = ""
+                    yield f"data: {json.dumps(late_hit)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
 
             # 计量优先用真实 usage（engine 已开 stream_options，端点不支持时
             # 退回含 system prompt 的估算），口径与 /chat 一致

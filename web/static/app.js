@@ -342,9 +342,9 @@ async function parseChatStream(res, msgsEl) {
             if (d === '[DONE]') continue;
             try {
                 const item = JSON.parse(d);
-                if (item.type === 'crisis') {
+                if (item.type === 'crisis' || item.type === 'blocked') {
                     replyRow.remove();
-                    msgsEl.appendChild(crisisMsg(item));
+                    msgsEl.appendChild(noticeMsg(item));
                 } else if (item.error) {
                     assistantDiv.textContent = item.error;
                     replyRow.className = 'msg-row sys';
@@ -1572,8 +1572,8 @@ async function sendMessage() {
     msgsEl.scrollTop = msgsEl.scrollHeight;
 }
 
-function crisisMsg(notice) {
-    // 危机干预以平台身份呈现，绝不能渲染成镜像说的话。
+function noticeMsg(notice) {
+    // 危机干预与内容拦截都以平台身份呈现，绝不能渲染成镜像说的话。
     // 复用既有 sys 样式，不新增 CSS class（app.js 与 style.css 之间是隐式契约）。
     const row = document.createElement('div');
     row.className = 'msg-row sys';
@@ -2961,7 +2961,7 @@ async function sendVoiceMessage(duration, sttText) {
                 if (d === '[DONE]') continue;
                 try {
                     const item = JSON.parse(d);
-                    if (item.type === 'crisis') { replyRow.remove(); msgsEl.appendChild(crisisMsg(item)); }
+                    if (item.type === 'crisis' || item.type === 'blocked') { replyRow.remove(); msgsEl.appendChild(noticeMsg(item)); }
                     else if (item.error) { assistantDiv.textContent = item.error; replyRow.className = 'msg-row sys'; }
                     else if (item.type === 'text' && item.content) { assistantDiv.textContent += item.content; }
                     else if (item.type === 'sticker' && item.id) { msgsEl.appendChild(stickerMsg(item.id)); }
