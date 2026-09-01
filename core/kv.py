@@ -104,7 +104,9 @@ class RedisBackend:
     def __init__(self, url: str):
         import redis
 
-        self._client = redis.Redis.from_url(
+        # redis-py 的 from_url 在 decode_responses 分支上类型标注不一致，
+        # 标成 Any 而不是到处 cast
+        self._client: Any = redis.Redis.from_url(
             url, decode_responses=True, socket_timeout=1.0, socket_connect_timeout=1.0
         )
         self._client.ping()
@@ -267,7 +269,8 @@ def start_invalidation_listener() -> bool:
 
     def _listen() -> None:
         try:
-            pubsub = current.raw().pubsub(ignore_subscribe_messages=True)
+            client = getattr(current, "raw")()
+            pubsub = client.pubsub(ignore_subscribe_messages=True)
             pubsub.subscribe(INVALIDATION_CHANNEL)
             for message in pubsub.listen():
                 slug = message.get("data")
