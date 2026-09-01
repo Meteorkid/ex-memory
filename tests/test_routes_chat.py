@@ -32,8 +32,8 @@ def isolated_db(tmp_path, monkeypatch):
     noop_limiter.check = MagicMock()
     routes_mod._login_limiter = noop_limiter
 
-    # 这些用例未隔离 EXES_DIR，会读写仓库真实的 exes/test；
-    # 归档后台任务必须打桩，否则会基于真实对话记录发起 LLM 调用
+    # EXES_DIR 已由 conftest 的 isolate_exes_dir 统一隔离到临时目录；
+    # 归档后台任务仍须打桩，否则会发起真实 LLM 调用
     archive_patcher = patch("server.routes._run_session_archive")
     archive_patcher.start()
     yield

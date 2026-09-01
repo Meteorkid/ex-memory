@@ -81,6 +81,9 @@ class ChatResponse(BaseModel):
     reply: str
     stickers: list[str] = Field(default_factory=list, description="AI 选择的贴纸 ID")
     tokens: Optional[dict] = None
+    # 平台身份的通知（当前只有危机干预）。存在时 reply 为空，
+    # 前端必须按系统消息渲染，不能显示成镜像说的话。
+    notice: Optional[dict] = Field(default=None, description="平台通知，如危机干预响应")
 
 
 class StatusResponse(BaseModel):

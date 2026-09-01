@@ -17,8 +17,10 @@ CREATE INDEX IF NOT EXISTS idx_consents_user
     ON consents(user_id, policy_type, granted_at);
 
 -- 内容安全与危机事件。
--- 刻意不存用户原话明文：这是关于用户最脆弱时刻的记录，泄露后果极重。
--- excerpt 只保留脱敏截断片段，input_hash 用于去重与关联，不可逆推原文。
+-- excerpt 存脱敏并截断后的片段：复核者要看得懂内容才能分辨真实求救与误报，
+-- 全哈希会让复核队列失去意义。注意短消息的片段就等于整条（已脱敏）消息，
+-- 所以这张表必须按敏感数据对待，访问要受权限控制。
+-- input_hash 用于去重与关联，不可逆推原文。
 CREATE TABLE IF NOT EXISTS safety_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,

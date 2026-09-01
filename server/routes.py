@@ -28,6 +28,7 @@ from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessibl
 from core.path_safety import safe_filename
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
+from server.safety_gate import check_crisis
 from server.middleware import require_auth, _get_client_ip, security
 from server.models import (
     AuthRequest,
@@ -754,6 +755,13 @@ async def chat(
 
     history = sanitize_chat_history(req.history)
 
+    # 🔴 安全闸门必须在这里：构建人格 prompt、检索 RAG、调用 LLM 之前。
+    # 命中危机时直接返回，绝不进入人格模拟——「前任」的回应恰恰可能是
+    # 最危险的那类内容。
+    notice = check_crisis(user_id, slug, message)
+    if notice is not None:
+        return ChatResponse(reply="", stickers=[], tokens=None, notice=notice)
+
     try:
         engine = _get_engine(slug, user_id)
         reply, stickers, usage = await run_in_threadpool(engine.chat, message, history)
@@ -827,6 +835,17 @@ async def chat_stream(
         raise HTTPException(status_code=400, detail="消息不能为空")
 
     history = sanitize_chat_history(req.history)
+
+    # 🔴 与 /chat 同一道闸门，且同样在进入 generate()、拿 engine 之前。
+    # 两条路径必须都接——M-1 的教训就是流式漏了落库，整个功能形同虚设。
+    notice = check_crisis(user_id, slug, message)
+    if notice is not None:
+
+        async def crisis_stream():
+            yield f"data: {json.dumps(notice)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(crisis_stream(), media_type="text/event-stream")
 
     async def generate():
         full_reply = ""

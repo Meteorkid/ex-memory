@@ -21,6 +21,11 @@ def create_app() -> FastAPI:
 
     init_db()
 
+    # 危机文案未经专业审阅时不阻止启动，但必须让运维看见
+    from core.safety.resources import warn_if_unreviewed
+
+    warn_if_unreviewed()
+
     app = FastAPI(
         title="ex-memory API",
         description="前任记忆智能体 REST API",

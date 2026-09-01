@@ -342,7 +342,10 @@ async function parseChatStream(res, msgsEl) {
             if (d === '[DONE]') continue;
             try {
                 const item = JSON.parse(d);
-                if (item.error) {
+                if (item.type === 'crisis') {
+                    replyRow.remove();
+                    msgsEl.appendChild(crisisMsg(item));
+                } else if (item.error) {
                     assistantDiv.textContent = item.error;
                     replyRow.className = 'msg-row sys';
                 } else if (item.type === 'text' && item.content) {
@@ -1567,6 +1570,24 @@ async function sendMessage() {
     input.disabled = false; btn.disabled = false;
     input.focus();
     msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+function crisisMsg(notice) {
+    // 危机干预以平台身份呈现，绝不能渲染成镜像说的话。
+    // 复用既有 sys 样式，不新增 CSS class（app.js 与 style.css 之间是隐式契约）。
+    const row = document.createElement('div');
+    row.className = 'msg-row sys';
+    const div = document.createElement('div');
+    div.className = 'msg';
+    const lines = [notice.message || ''];
+    (notice.hotlines || []).forEach(h => {
+        if (h && h.number) lines.push(`${h.name || '求助热线'}：${h.number}${h.hours ? '（' + h.hours + '）' : ''}`);
+    });
+    if (notice.followup) lines.push(notice.followup);
+    div.textContent = lines.filter(Boolean).join('\n');
+    div.style.whiteSpace = 'pre-wrap';
+    row.appendChild(div);
+    return row;
 }
 
 function sysMsg(text) {
@@ -2940,7 +2961,8 @@ async function sendVoiceMessage(duration, sttText) {
                 if (d === '[DONE]') continue;
                 try {
                     const item = JSON.parse(d);
-                    if (item.error) { assistantDiv.textContent = item.error; replyRow.className = 'msg-row sys'; }
+                    if (item.type === 'crisis') { replyRow.remove(); msgsEl.appendChild(crisisMsg(item)); }
+                    else if (item.error) { assistantDiv.textContent = item.error; replyRow.className = 'msg-row sys'; }
                     else if (item.type === 'text' && item.content) { assistantDiv.textContent += item.content; }
                     else if (item.type === 'sticker' && item.id) { msgsEl.appendChild(stickerMsg(item.id)); }
                     else if (item.type === 'red_packet') { msgsEl.appendChild(redPacketBubble(item)); }
