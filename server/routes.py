@@ -229,6 +229,31 @@ def _invalidate_engine(slug: str):
             del _engine_cache[key]
 
 
+def _persist_stream_turn(
+    slug: str,
+    user_id: int,
+    message: str,
+    full_reply: str,
+    stickers: list[str],
+) -> None:
+    """流式对话落库，口径与 /chat 一致：剥离贴纸标签、source=web。
+
+    持久化失败只记日志，不影响响应；无正文时不落库。
+    """
+    if not full_reply.strip():
+        return
+    from core.conversation_store import append_turn
+    from core.engine import ChatEngine
+
+    clean_reply, inline_stickers = ChatEngine._extract_sticker_tags(full_reply)
+    merged = list(dict.fromkeys(inline_stickers + stickers))
+    try:
+        append_turn(slug, user_id, message, clean_reply, stickers=merged, source="web")
+    except (OSError, ValueError) as e:
+        # 持久化失败不影响本次回复，但会造成搜索/统计缺数据
+        logger.warning("流式对话持久化失败 slug=%s: %s", slug, e)
+
+
 # --- 用户认证 ---
 
 
@@ -768,11 +793,14 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
 
     async def generate():
         full_reply = ""
+        collected_stickers: list[str] = []
         try:
             engine = _get_engine(slug, user_id)
             for item in engine.chat_stream(message, history):
                 if item.get("type") == "text":
                     full_reply += item.get("content", "")
+                elif item.get("type") == "sticker" and item.get("id"):
+                    collected_stickers.append(item["id"])
                 yield f"data: {json.dumps(item)}\n\n"
 
             # 流式无法获取精确 usage，用 token 估算
@@ -800,6 +828,11 @@ async def chat_stream(req: ChatRequest, user_id: int = Depends(require_auth)):
         except Exception as e:
             logger.error("流式对话失败: %s", e, exc_info=True)
             yield f"data: {json.dumps({'error': _INTERNAL_ERROR})}\n\n"
+        finally:
+            # 正常结束、生成异常、客户端中断（GeneratorExit/CancelledError，
+            # 均非 Exception 子类，不会被上面捕获）都走这里：已生成的部分必须落库。
+            # 注意 finally 里禁止 yield（GeneratorExit 期间 yield 会直接报错）
+            _persist_stream_turn(slug, user_id, message, full_reply, collected_stickers)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
