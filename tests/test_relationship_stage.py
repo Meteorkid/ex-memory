@@ -33,7 +33,7 @@ def _make_engine(tmpdir, meta_extra: dict | None = None):
                 "max_tokens": 4096,
             },
         ),
-        patch("core.engine.get_llm_client") as mock_client,
+        patch("config.get_llm_client") as mock_client,
     ):
         mock_client.return_value = MagicMock()
         return ChatEngine("test", vector_store=None, embedder=None)

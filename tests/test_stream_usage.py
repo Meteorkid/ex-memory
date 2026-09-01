@@ -8,6 +8,7 @@
 import json
 import tempfile
 from types import SimpleNamespace
+from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -16,6 +17,23 @@ from fastapi.testclient import TestClient
 # SKILL.md 填充到 3000 个汉字：估算约 2000 tokens，
 # 若流式估算漏算 system prompt，prompt_tokens 只会是个位数
 _BIG_SKILL = "# 人格档案\n" + "细节描述" * 750
+
+
+@contextmanager
+def stub_llm():
+    """把 LLM 客户端打桩，并重置路由让它重新取配置。
+
+    引擎不再自持客户端（由 core.llm_router 统一持有），所以打桩范围必须
+    覆盖到「调用时刻」，不能只覆盖构造。
+    """
+    from core import llm_router
+
+    llm_router.reset_for_tests()
+    with patch("config.get_llm_client") as factory:
+        client = MagicMock()
+        factory.return_value = client
+        yield client
+    llm_router.reset_for_tests()
 
 
 def _make_engine(tmpdir, skill_text=_BIG_SKILL):
@@ -39,9 +57,7 @@ def _make_engine(tmpdir, skill_text=_BIG_SKILL):
                 "max_tokens": 4096,
             },
         ),
-        patch("core.engine.get_llm_client") as mock_client,
     ):
-        mock_client.return_value = MagicMock()
         from core.engine import ChatEngine
 
         return ChatEngine("test", vector_store=None, embedder=None)
@@ -66,21 +82,21 @@ def _usage_chunk(prompt_tokens, completion_tokens):
 class TestEngineStreamUsage:
     def test_stream_options_requested(self):
         """_call_stream 必须带 stream_options include_usage。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, stub_llm() as llm_client:
             engine = _make_engine(tmpdir)
-            engine.client.chat.completions.create.return_value = iter(
+            llm_client.chat.completions.create.return_value = iter(
                 [_text_chunk("好"), _usage_chunk(1, 1)]
             )
             list(engine.chat_stream("hi", []))
 
-            kwargs = engine.client.chat.completions.create.call_args.kwargs
+            kwargs = llm_client.chat.completions.create.call_args.kwargs
             assert kwargs["stream_options"] == {"include_usage": True}
 
     def test_real_usage_passthrough(self):
         """带 usage 的最终 chunk → usage 事件透出真实值。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, stub_llm() as llm_client:
             engine = _make_engine(tmpdir)
-            engine.client.chat.completions.create.return_value = iter(
+            llm_client.chat.completions.create.return_value = iter(
                 [_text_chunk("你好"), _usage_chunk(5691, 12)]
             )
 
@@ -95,9 +111,9 @@ class TestEngineStreamUsage:
         """端点不支持 stream_options（流中无 usage）→ 回退估算必须计入 system prompt。"""
         from core.validation import estimate_tokens
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, stub_llm() as llm_client:
             engine = _make_engine(tmpdir)
-            engine.client.chat.completions.create.return_value = iter(
+            llm_client.chat.completions.create.return_value = iter(
                 [_text_chunk("嗯嗯")]
             )
 

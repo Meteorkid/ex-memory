@@ -9,7 +9,6 @@ from typing import Optional
 
 from config import (
     get_llm_config,
-    get_llm_client,
     resolve_ex_dir,
     RECENT_SESSIONS,
     DEFAULT_TOP_K,
@@ -70,7 +69,8 @@ KEYWORD_EXPANSIONS = {
 class ChatEngine:
     def __init__(self, slug: str, vector_store=None, embedder=None, owner=None):
         cfg = get_llm_config()
-        self.client = get_llm_client()
+        # 客户端由 core.llm_router 统一持有：多供应商时每家一个连接池，
+        # 引擎自己再存一个只会造成两份配置
         self.model = cfg["model"]
         self.temperature = cfg["temperature"]
         self.top_p = cfg["top_p"]
@@ -90,6 +90,8 @@ class ChatEngine:
         self.session_summaries: list[str] = []
         self.corrections = ""
         self.relationship_stage = "dating"  # 默认热恋期
+        # 实际服务本次请求的供应商，供成本归集与观测
+        self.last_provider = ""
 
         self._load()
 
@@ -237,17 +239,31 @@ class ChatEngine:
                 logger.warning(msg, exc_info=True)
             return []
 
-    @retry_api(max_attempts=3, base_delay=1.0)
+    def _sampling_kwargs(self) -> dict:
+        return {
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "frequency_penalty": self.frequency_penalty,
+            "max_tokens": self.max_tokens,
+        }
+
     def _call_api(self, messages: list[dict]):
-        return self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            frequency_penalty=self.frequency_penalty,
-            max_tokens=self.max_tokens,
-            stream=False,
-        )
+        """经路由调用。重试负责单供应商的偶发失败，路由负责供应商级故障。
+
+        每家重试 2 次而非 3 次：叠上故障转移后总尝试次数会翻倍，
+        再按 3 次算延迟就太长了。
+        """
+        from core.llm_router import get_router
+
+        @retry_api(max_attempts=2, base_delay=1.0)
+        def invoke(client, model, **kwargs):
+            return client.chat.completions.create(
+                model=model, messages=messages, stream=False, **kwargs
+            )
+
+        response, provider = get_router().call(invoke, **self._sampling_kwargs())
+        self.last_provider = provider.name
+        return response
 
     def _prepare_messages(self, user_input: str, history: list[dict]) -> list[dict]:
         """构建完整的消息列表（system + history + user）。"""
@@ -322,20 +338,23 @@ class ChatEngine:
                 all_stickers.append(sid)
         return reply, all_stickers, response.usage
 
-    @retry_api(max_attempts=3, base_delay=1.0)
     def _call_stream(self, messages):
-        return self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            frequency_penalty=self.frequency_penalty,
-            max_tokens=self.max_tokens,
-            stream=True,
-            # 让最后一个 chunk 携带真实 usage，供计量使用；
-            # 不支持的端点不会报错，只是流里没有 usage，走估算兜底
-            stream_options={"include_usage": True},
-        )
+        """流式同样经路由。"""
+        from core.llm_router import get_router
+
+        @retry_api(max_attempts=2, base_delay=1.0)
+        def invoke(client, model, **kwargs):
+            return client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+                stream_options={"include_usage": True},
+                **kwargs,
+            )
+
+        stream, provider = get_router().call(invoke, **self._sampling_kwargs())
+        self.last_provider = provider.name
+        return stream
 
     def chat_stream(self, user_input: str, history: list[dict]):
         """流式对话，yield dict: {type: text|sticker|usage|red_packet, content/id: ...}"""

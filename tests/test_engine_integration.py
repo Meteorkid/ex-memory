@@ -2,10 +2,29 @@
 
 import tempfile
 from pathlib import Path
+from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
 
 
+@contextmanager
+def stub_llm():
+    """把 LLM 客户端打桩，并重置路由让它重新取配置。
+
+    引擎不再自持客户端（由 core.llm_router 统一持有），所以打桩范围必须
+    覆盖到「调用时刻」，不能只覆盖构造。
+    """
+    from core import llm_router
+
+    llm_router.reset_for_tests()
+    with patch("config.get_llm_client") as factory:
+        client = MagicMock()
+        factory.return_value = client
+        yield client
+    llm_router.reset_for_tests()
+
+
 def _create_test_engine(tmpdir):
+    """构造引擎。LLM 客户端由调用方用 stub_llm 打桩。"""
     """创建一个用于测试的 ChatEngine。"""
     tmpdir = Path(tmpdir)
     (tmpdir / "SKILL.md").write_text("# 测试人格\n你是一个测试助手。")
@@ -24,19 +43,16 @@ def _create_test_engine(tmpdir):
                 "max_tokens": 4096,
             },
         ),
-        patch("core.engine.get_llm_client") as mock_client,
     ):
-        mock_client.return_value = MagicMock()
         from core.engine import ChatEngine
 
-        engine = ChatEngine("test", vector_store=None, embedder=None)
-        return engine, mock_client.return_value
+        return ChatEngine("test", vector_store=None, embedder=None)
 
 
 def test_chat_returns_reply():
     """chat 方法返回正常回复。"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine, mock_client = _create_test_engine(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, stub_llm() as mock_client:
+        engine = _create_test_engine(tmpdir)
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="你好！"))]
@@ -51,8 +67,8 @@ def test_chat_returns_reply():
 
 def test_chat_stream_yields_text():
     """chat_stream 方法 yield 文本。"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine, mock_client = _create_test_engine(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, stub_llm() as mock_client:
+        engine = _create_test_engine(tmpdir)
 
         chunk1 = MagicMock()
         chunk1.choices = [MagicMock(delta=MagicMock(content="你"))]
@@ -91,8 +107,8 @@ def test_extract_sticker_tags_no_tags():
 
 def test_rag_degradation():
     """RAG 降级逻辑：连续 3 次失败后进入降级。"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine, _ = _create_test_engine(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, stub_llm():
+        engine = _create_test_engine(tmpdir)
 
         assert not engine._is_rag_degraded()
 
@@ -102,8 +118,8 @@ def test_rag_degradation():
 
 def test_build_system_prompt_includes_skill():
     """system prompt 包含 SKILL.md 内容。"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine, _ = _create_test_engine(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, stub_llm():
+        engine = _create_test_engine(tmpdir)
         prompt = engine._build_system_prompt()
         assert "测试人格" in prompt
         assert "可用图片表情包" in prompt
@@ -111,8 +127,8 @@ def test_build_system_prompt_includes_skill():
 
 def test_build_system_prompt_with_rag():
     """system prompt 包含 RAG 检索结果。"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine, _ = _create_test_engine(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, stub_llm():
+        engine = _create_test_engine(tmpdir)
         rag_results = [{"display_text": "ta 真实说过的话", "score": 0.9}]
         prompt = engine._build_system_prompt(rag_results=rag_results)
         assert "ta 真实说过的话" in prompt
@@ -121,8 +137,8 @@ def test_build_system_prompt_with_rag():
 
 def test_build_system_prompt_rag_below_threshold():
     """低于阈值的 RAG 结果不出现在 prompt 中。"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine, _ = _create_test_engine(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, stub_llm():
+        engine = _create_test_engine(tmpdir)
         from config import RAG_THRESHOLD
 
         rag_results = [{"display_text": "低分结果", "score": RAG_THRESHOLD - 0.1}]
@@ -132,8 +148,8 @@ def test_build_system_prompt_rag_below_threshold():
 
 def test_chat_with_history():
     """chat 方法传递历史消息。"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        engine, mock_client = _create_test_engine(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir, stub_llm() as mock_client:
+        engine = _create_test_engine(tmpdir)
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="继续聊"))]

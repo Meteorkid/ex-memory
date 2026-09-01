@@ -69,6 +69,14 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# LLM 多供应商与熔断（FR-038）。
+# LLM_PROVIDERS 是 JSON 数组，形如
+#   [{"name":"deepseek","api_key":"...","base_url":"...","model":"..."}, ...]
+# 为空时退化为单供应商，用下方既有的 LLM_* 配置，行为与改造前一致。
+LLM_PROVIDERS = os.getenv("LLM_PROVIDERS", "")
+LLM_BREAKER_THRESHOLD = int(os.getenv("LLM_BREAKER_THRESHOLD", "3"))
+LLM_BREAKER_COOLDOWN_SECONDS = float(os.getenv("LLM_BREAKER_COOLDOWN_SECONDS", "60"))
+
 # 异步任务 worker 线程数（FR-036）。进程内线程池，不需要额外部署拓扑。
 TASK_WORKER_THREADS = int(os.getenv("TASK_WORKER_THREADS", "4"))
 
