@@ -168,8 +168,12 @@ class ChatEngine:
         budget = int(LLM_MAX_CONTEXT_CHARS * 0.5)
 
         def _assemble(sums: list[str]) -> str:
+            # 顺序按「稳定在前、易变在后」排（FR-054 / D-18）。
+            # 供应商的上下文缓存按前缀命中：时间感知块含分钟、RAG 每轮都变，
+            # 夹在中间会把后面所有稳定内容一起挤出缓存。实测每轮 system
+            # prompt 约 5691 tokens，稳定部分占大头，值得为它调顺序。
             p = [self.skill_content]
-            p.append(time_context)
+
             # 关系阶段决定整体语气基调（热恋/磨合/分手/治愈）
             stage_instruction = STAGE_INSTRUCTIONS.get(
                 self.relationship_stage, STAGE_INSTRUCTIONS["dating"]
@@ -181,6 +185,14 @@ class ChatEngine:
                     p.append(f"### 第 {i} 次\n{summary}\n")
             if self.corrections.strip():
                 p.append(f"\n---\n## 用户纠正记录（优先级最高）\n{self.corrections}\n")
+            p.append(
+                f"\n---\n## 可用图片表情包\n你可以在回复中使用图片表情包来表达情绪。"
+                f"在回复文本末尾加上 [sticker:贴纸ID] 标记即可。\n可用贴纸：{sticker_list}\n"
+                f"示例：哈哈哈 [sticker:builtin_happy_laugh]\n"
+            )
+
+            # ↓ 以下每轮/每分钟变化，必须排在全部稳定内容之后
+            p.append(time_context)
             if rag_results:
                 filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
                 if filtered:
@@ -191,11 +203,6 @@ class ChatEngine:
                     for r in filtered:
                         p.append(f"- {r.get('display_text', '')}")
                     p.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
-            p.append(
-                f"\n---\n## 可用图片表情包\n你可以在回复中使用图片表情包来表达情绪。"
-                f"在回复文本末尾加上 [sticker:贴纸ID] 标记即可。\n可用贴纸：{sticker_list}\n"
-                f"示例：哈哈哈 [sticker:builtin_happy_laugh]\n"
-            )
             return "\n".join(p)
 
         while len(summaries) > 1 and estimate_tokens(_assemble(summaries)) > budget:

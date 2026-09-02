@@ -33,6 +33,7 @@ from core import kv
 from core.bounded_cache import BoundedCache
 from core.token_counter import TokenCounter
 from core.logging import get_audit_logger
+from server.billing_gate import QuotaBlocked, release, reserve, settle
 from server.usage_guard import check_limit
 from server.safety_gate import (
     check_crisis,
@@ -62,6 +63,8 @@ from server.models import (
     ReviewResolution,
     TaskAccepted,
     RefreshRequest,
+    SubscribeRequest,
+    ActivateSubscriptionRequest,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -843,6 +846,13 @@ async def chat(
     if blocked is not None:
         return ChatResponse(reply="", stickers=[], tokens=None, notice=blocked)
 
+    # 配额预扣排在审核之后：被危机或内容审核拦下的请求根本没调 LLM，
+    # 不该扣用户额度
+    try:
+        account_id, _outcome = reserve(user_id)
+    except QuotaBlocked as e:
+        return ChatResponse(reply="", stickers=[], tokens=None, notice=e.notice)
+
     try:
         engine = _get_engine(slug, user_id)
         reply, stickers, usage = await run_in_threadpool(engine.chat, message, history)
@@ -884,8 +894,17 @@ async def chat(
             _run_session_archive, slug, engine.vector_store, engine.embedder, user_id
         )
 
+        settle(
+            account_id,
+            usage,
+            user_id=user_id,
+            slug=slug,
+            provider=getattr(engine, "last_provider", ""),
+            model=getattr(engine, "model", ""),
+        )
         return ChatResponse(reply=reply, stickers=stickers, tokens=token_info)
     except Exception as e:
+        release(account_id)
         logger.error("对话失败: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=_INTERNAL_ERROR)
 
@@ -940,8 +959,21 @@ async def chat_stream(
 
         return StreamingResponse(limit_stream(), media_type="text/event-stream")
 
+    try:
+        account_id, _outcome = reserve(user_id)
+    except QuotaBlocked as exc:
+        # 先取出来：except 块结束时 Python 会删掉 exc，闭包里再引用会炸
+        quota_notice = exc.notice
+
+        async def quota_stream():
+            yield f"data: {json.dumps(quota_notice)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(quota_stream(), media_type="text/event-stream")
+
     blocked = check_input(user_id, slug, message)
     if blocked is not None:
+        release(account_id)
 
         async def blocked_stream():
             yield f"data: {json.dumps(blocked)}\n\n"
@@ -991,6 +1023,19 @@ async def chat_stream(
 
             # 计量优先用真实 usage（engine 已开 stream_options，端点不支持时
             # 退回含 system prompt 的估算），口径与 /chat 一致
+            settle(
+                account_id,
+                SimpleNamespace(
+                    prompt_tokens=int((stream_usage or {}).get("prompt_tokens") or 0),
+                    completion_tokens=int(
+                        (stream_usage or {}).get("completion_tokens") or 0
+                    ),
+                ),
+                user_id=user_id,
+                slug=slug,
+                provider=getattr(engine, "last_provider", ""),
+                model=getattr(engine, "model", ""),
+            )
             if stream_usage is not None:
                 usage_obj = SimpleNamespace(
                     prompt_tokens=int(stream_usage.get("prompt_tokens") or 0),
@@ -1002,6 +1047,7 @@ async def chat_stream(
 
             yield "data: [DONE]\n\n"
         except Exception as e:
+            release(account_id)
             logger.error("流式对话失败: %s", e, exc_info=True)
             yield f"data: {json.dumps({'error': _INTERNAL_ERROR})}\n\n"
         finally:
@@ -1832,3 +1878,104 @@ def list_active_sessions(user_id: int = Depends(require_auth)):
     from server.auth import list_sessions
 
     return {"sessions": list_sessions(user_id)}
+
+
+# --- 账户、配额与订阅（M2）---
+
+
+@router.get("/account")
+def get_account(user_id: int = Depends(require_auth)):
+    """账户与配额概览。"""
+    from core.billing import PLANS, ensure_account, quota_status
+
+    account_id = ensure_account(user_id)
+    status = quota_status(account_id)
+    plan = PLANS[status["plan"]]
+    return {
+        "account_id": account_id,
+        **status,
+        "max_mirrors": plan.max_mirrors,
+        "price_micros": plan.price_micros,
+    }
+
+
+@router.get("/account/usage")
+def get_account_usage(period: str = "", user_id: int = Depends(require_auth)):
+    """本账号的用量与成本。"""
+    from core.billing import account_cost_summary, ensure_account
+
+    account_id = ensure_account(user_id)
+    summary = account_cost_summary(account_id, period or None)
+    # 用户侧不展示毛利，那是运营视角
+    summary.pop("revenue_micros", None)
+    summary.pop("margin_micros", None)
+    summary.pop("is_loss_making", None)
+    return summary
+
+
+@router.get("/account/subscriptions")
+def get_account_subscriptions(user_id: int = Depends(require_auth)):
+    from core.billing import ensure_account
+    from core.payments import list_subscriptions
+
+    return {"subscriptions": list_subscriptions(ensure_account(user_id))}
+
+
+@router.post("/account/subscribe")
+def subscribe(req: SubscribeRequest, user_id: int = Depends(require_auth)):
+    """创建订阅并返回支付意图。"""
+    from core.billing import ensure_account
+    from core.payments import create_subscription
+
+    try:
+        return create_subscription(ensure_account(user_id), req.plan)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/admin/billing/margins")
+def billing_margins(period: str = "", admin_id: int = Depends(require_admin)):
+    """各账号的成本与毛利，用于识别亏损用户（FR-056）。"""
+    from core.billing import account_cost_summary
+    from server.auth import _get_conn
+
+    with _get_conn() as conn:
+        rows = conn.execute("SELECT id FROM accounts ORDER BY id").fetchall()
+    summaries = [account_cost_summary(int(r["id"]), period or None) for r in rows]
+    return {
+        "accounts": summaries,
+        "loss_making": [s for s in summaries if s["is_loss_making"]],
+    }
+
+
+@router.post("/admin/billing/activate", response_model=StatusResponse)
+def activate_subscription_route(
+    req: ActivateSubscriptionRequest, admin_id: int = Depends(require_admin)
+):
+    """确认到账并激活订阅。手工开通与支付回调都走这里。"""
+    from core.payments import activate_subscription
+
+    if not activate_subscription(req.payment_ref, req.days):
+        raise HTTPException(status_code=404, detail="订单不存在")
+    _audit(
+        "subscription_activated",
+        username=f"user_id={admin_id}",
+        detail=f"ref={req.payment_ref}",
+    )
+    return StatusResponse(message="订阅已激活")
+
+
+@router.post("/admin/billing/refund", response_model=StatusResponse)
+def refund_subscription_route(
+    req: ActivateSubscriptionRequest, admin_id: int = Depends(require_admin)
+):
+    from core.payments import refund_subscription
+
+    if not refund_subscription(req.payment_ref):
+        raise HTTPException(status_code=404, detail="订单不存在或已退款")
+    _audit(
+        "subscription_refunded",
+        username=f"user_id={admin_id}",
+        detail=f"ref={req.payment_ref}",
+    )
+    return StatusResponse(message="已退款并降回免费套餐")

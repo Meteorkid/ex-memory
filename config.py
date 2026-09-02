@@ -1,5 +1,6 @@
 """全局配置：从 .env 加载，启动校验，隐私提示。"""
 
+import json
 import logging
 import os
 import re
@@ -68,6 +69,13 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "true",
     "yes",
 )
+
+# LLM 单价表（FR-050）。JSON，形如
+#   {"deepseek-chat": {"prompt_per_1k": 200, "completion_per_1k": 800}}
+# 单位是百万分之一元/1000 tokens。真实单价随供应商与合同变动，
+# 仓库里的缺省值只是量级参考，上线前必须按实际合同覆盖。
+_pricing_raw = os.getenv("LLM_PRICING", "")
+LLM_PRICING = json.loads(_pricing_raw) if _pricing_raw else {}
 
 # 对象存储（FR-034 / NFR-033）。当前用于备份与恢复，不是运行时文件访问。
 # BLOB_BUCKET 为空时用本地目录 data/blobs，仅适合单机。

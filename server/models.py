@@ -159,3 +159,12 @@ class TaskAccepted(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=8, max_length=256)
+
+
+class SubscribeRequest(BaseModel):
+    plan: str = Field(..., description="standard / premium")
+
+
+class ActivateSubscriptionRequest(BaseModel):
+    payment_ref: str = Field(..., min_length=4, max_length=128)
+    days: int = Field(default=30, ge=1, le=3650)
