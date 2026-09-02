@@ -16,6 +16,7 @@ TASK_IMPORT = "import_chat"
 TASK_REFLECT = "reflect"
 TASK_MOMENT = "generate_moment"
 TASK_BACKUP = "backup"
+TASK_PROACTIVE = "proactive_tick"
 
 
 @register(TASK_IMPORT)
@@ -110,3 +111,32 @@ def handle_backup(
     progress.update(10, "正在打包")
     version = backup(slug, version_name, owner=owner)
     return {"version": version, "message": f"备份成功: {version}"}
+
+
+@register(TASK_PROACTIVE)
+def handle_proactive_tick(progress: TaskProgress, *, slug: str, owner: int) -> dict:
+    """为一个镜像判定并生成主动消息。
+
+    生成走同一个引擎，所以人格、风格、时间感知全都一致——另写一套模板会让
+    主动消息一眼看出是系统发的。
+    """
+    from core.conversation_store import load_jsonl_messages
+    from core.proactive import compose, decide_trigger, queue_message
+    from core.factory import create_engine_and_store
+
+    history = load_jsonl_messages(slug, owner)
+    last_seen = history[-1].get("created_at") if history else None
+
+    trigger = decide_trigger(slug, owner, owner=owner, last_seen_iso=last_seen)
+    if trigger is None:
+        return {"sent": False, "reason": "当前不满足触发条件"}
+
+    progress.update(40, "正在生成")
+    engine, _store, _embedder = create_engine_and_store(slug, owner=owner)
+    content = compose(engine, trigger)
+    message_id = queue_message(slug, owner, trigger, content, owner=owner)
+    return {
+        "sent": message_id is not None,
+        "trigger": trigger,
+        "message_id": message_id,
+    }

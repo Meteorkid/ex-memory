@@ -31,4 +31,5 @@ from commands import (  # noqa: E402,F401
     migrate_layout,
     grant_admin,
     backup_platform,
+    proactive_tick,
 )

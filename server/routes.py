@@ -67,6 +67,8 @@ from server.models import (
     ActivateSubscriptionRequest,
     TimelineEventRequest,
     ExeStateRequest,
+    ProactiveConfigRequest,
+    DeliverProactiveRequest,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -2092,3 +2094,54 @@ def update_exe_state(
     # 状态进了 prompt 的稳定区，改完必须让缓存里的引擎失效
     _invalidate_engine(slug)
     return StatusResponse(message="已更新")
+
+
+# --- 主动发起对话（FR-071 / FR-072）---
+
+
+@router.get("/exes/{slug}/proactive")
+def get_proactive(slug: str, user_id: int = Depends(require_auth)):
+    """待送达的主动消息 + 当前配置。"""
+    from core.proactive import get_config, pending_messages
+
+    slug = _check_exe_access(slug, user_id)
+    return {
+        "config": get_config(slug, user_id),
+        "pending": pending_messages(user_id, slug),
+    }
+
+
+@router.post("/exes/{slug}/proactive/config", response_model=StatusResponse)
+def update_proactive_config(
+    slug: str, req: ProactiveConfigRequest, user_id: int = Depends(require_auth)
+):
+    """主动消息配置。默认关闭——主动消息是打扰，得用户明确开启。"""
+    from core.proactive import set_config
+
+    slug = _check_exe_access(slug, user_id)
+    try:
+        merged = set_config(
+            slug,
+            owner=user_id,
+            enabled=req.enabled,
+            max_per_day=req.max_per_day,
+            quiet_start=req.quiet_start,
+            quiet_end=req.quiet_end,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return StatusResponse(
+        message=f"已更新（{'开启' if merged['enabled'] else '关闭'}）"
+    )
+
+
+@router.post("/exes/{slug}/proactive/deliver", response_model=StatusResponse)
+def deliver_proactive(
+    slug: str, req: DeliverProactiveRequest, user_id: int = Depends(require_auth)
+):
+    """标记主动消息已展示给用户。"""
+    from core.proactive import mark_delivered
+
+    slug = _check_exe_access(slug, user_id)
+    count = mark_delivered(req.message_ids, user_id)
+    return StatusResponse(message=f"已标记 {count} 条")

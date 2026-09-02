@@ -122,3 +122,29 @@ def resolve_review(
         )
         conn.commit()
         return cursor.rowcount > 0
+
+
+def has_recent_crisis(user_id: int, within_hours: int = 72) -> bool:
+    """该用户近期是否有危机事件。
+
+    主动消息要用它做闸门：刚经历过危机的人，最不该收到的就是「ta 突然
+    发来一条消息」——那会把人拉回去。
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from server.auth import _get_conn
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=within_hours)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    try:
+        with _get_conn() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM safety_events"
+                " WHERE user_id = ? AND event_type = 'crisis' AND created_at > ?",
+                (user_id, cutoff),
+            ).fetchone()
+        return int(row["n"]) > 0
+    except Exception as e:  # noqa: BLE001 — 查不到时保守当作有，宁可不推
+        logger.warning("查询危机事件失败，保守视为存在 user=%s: %s", user_id, e)
+        return True

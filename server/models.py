@@ -179,3 +179,14 @@ class TimelineEventRequest(BaseModel):
 class ExeStateRequest(BaseModel):
     mood: Optional[str] = Field(default=None, max_length=100)
     recent_context: Optional[str] = Field(default=None, max_length=500)
+
+
+class ProactiveConfigRequest(BaseModel):
+    enabled: Optional[bool] = None
+    max_per_day: Optional[int] = Field(default=None, ge=0, le=10)
+    quiet_start: Optional[int] = Field(default=None, ge=0, le=23)
+    quiet_end: Optional[int] = Field(default=None, ge=0, le=23)
+
+
+class DeliverProactiveRequest(BaseModel):
+    message_ids: list[int] = Field(default_factory=list)
