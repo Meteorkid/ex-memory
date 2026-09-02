@@ -179,6 +179,22 @@ def _generate_summary(
         summary_file.write_text(summary, encoding="utf-8")
         logger.info("会话摘要已生成: %s", summary_file.name)
 
+        # 登记进记忆索引并跑一次衰减（FR-068）。
+        # 衰减不是删除——久远的低重要度记忆会变模糊，那比全都记得更像人。
+        try:
+            from core.memory_decay import (
+                MemoryIndex,
+                MEMORY_INDEX_FILE,
+                run_decay_cycle,
+            )
+
+            index = MemoryIndex(sessions_dir.parent / MEMORY_INDEX_FILE)
+            index.add(summary_file.name, summary, source="session")
+            index.save()
+            run_decay_cycle(sessions_dir.parent)
+        except Exception as e:  # noqa: BLE001 — 记忆衰减是锦上添花，不该拖垮归档
+            logger.warning("记忆索引登记失败: %s", e)
+
         # 追加到引擎的 session_summaries（当前会话可能还没结束，但预先加载）
         if engine is not None:
             engine.session_summaries.append(summary)

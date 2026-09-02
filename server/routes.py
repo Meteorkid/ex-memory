@@ -65,6 +65,8 @@ from server.models import (
     RefreshRequest,
     SubscribeRequest,
     ActivateSubscriptionRequest,
+    TimelineEventRequest,
+    ExeStateRequest,
 )
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -529,6 +531,10 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
     import shutil
 
     shutil.rmtree(ex_dir)
+    # 时间线与状态在数据库里，不会随目录一起消失，必须显式清理
+    from core.relationship import clear_for_mirror
+
+    clear_for_mirror(slug, user_id)
     # 不清缓存的话，同名镜像重建后会命中上一任 owner 的引擎（跨用户人格泄漏）
     _invalidate_engine(slug)
     _audit("exe_deleted", username=f"user_id={user_id}", detail=f"slug={slug}")
@@ -2017,3 +2023,72 @@ def refund_subscription_route(
         detail=f"ref={req.payment_ref}",
     )
     return StatusResponse(message="已退款并降回免费套餐")
+
+
+# --- 关系时间线与状态（FR-065 / FR-066）---
+
+
+@router.get("/exes/{slug}/timeline")
+def get_timeline(slug: str, user_id: int = Depends(require_auth)):
+    """共同经历时间线。"""
+    from core.relationship import list_events
+
+    slug = _check_exe_access(slug, user_id)
+    return {"events": list_events(slug, user_id)}
+
+
+@router.post("/exes/{slug}/timeline", response_model=StatusResponse)
+def add_timeline_event(
+    slug: str, req: TimelineEventRequest, user_id: int = Depends(require_auth)
+):
+    from core.relationship import add_event
+
+    slug = _check_exe_access(slug, user_id)
+    try:
+        event_id = add_event(
+            slug,
+            req.event,
+            owner=user_id,
+            happened_at=req.happened_at,
+            emotion=req.emotion,
+            source="manual",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    _invalidate_engine(slug)
+    return StatusResponse(message=f"已记录，编号 {event_id}")
+
+
+@router.delete("/exes/{slug}/timeline/{event_id}", response_model=StatusResponse)
+def remove_timeline_event(
+    slug: str, event_id: int, user_id: int = Depends(require_auth)
+):
+    from core.relationship import delete_event
+
+    slug = _check_exe_access(slug, user_id)
+    if not delete_event(event_id, slug, user_id):
+        raise HTTPException(status_code=404, detail="条目不存在")
+    _invalidate_engine(slug)
+    return StatusResponse(message="已删除")
+
+
+@router.get("/exes/{slug}/state")
+def get_exe_state(slug: str, user_id: int = Depends(require_auth)):
+    """ta 当前的心情与近况。"""
+    from core.relationship import get_state
+
+    slug = _check_exe_access(slug, user_id)
+    return get_state(slug, user_id) or {"mood": None, "recent_context": None}
+
+
+@router.put("/exes/{slug}/state", response_model=StatusResponse)
+def update_exe_state(
+    slug: str, req: ExeStateRequest, user_id: int = Depends(require_auth)
+):
+    from core.relationship import set_state
+
+    slug = _check_exe_access(slug, user_id)
+    set_state(slug, owner=user_id, mood=req.mood, recent_context=req.recent_context)
+    # 状态进了 prompt 的稳定区，改完必须让缓存里的引擎失效
+    _invalidate_engine(slug)
+    return StatusResponse(message="已更新")

@@ -112,9 +112,7 @@ class ChatEngine:
                 :RECENT_SESSIONS
             ]
             if summary_files:
-                self.session_summaries = [
-                    f.read_text(encoding="utf-8") for f in summary_files
-                ]
+                self.session_summaries = [self._apply_decay(f) for f in summary_files]
             else:
                 # 兼容旧归档（无摘要文件时直接读原始对话）
                 raw_files = sorted(sessions_dir.glob("session_*.md"), reverse=True)[
@@ -164,6 +162,33 @@ class ChatEngine:
 
         logger.info("已连接 %s 的数字镜像 (model=%s)", self.slug, self.model)
 
+    def _apply_decay(self, summary_file) -> str:
+        """按记忆衰减状态处理摘要（FR-068）。
+
+        过了保留期的记忆不删掉，而是标成「模糊」并截短——真人对久远小事
+        的记忆就是这样：还记得有这么回事，细节说不清了。全都记得反而不像。
+        """
+        text = summary_file.read_text(encoding="utf-8")
+        try:
+            from core.memory_decay import MEMORY_INDEX_FILE, MemoryIndex
+
+            index = MemoryIndex(self.ex_dir / MEMORY_INDEX_FILE)
+            entry = index.entries.get(summary_file.name)
+            if entry is None:
+                return text
+            from datetime import datetime as _dt
+
+            from core.memory_scorer import should_keep_memory
+
+            created = _dt.fromisoformat(entry["created_at"])
+            age_days = (_dt.now() - created).days
+            if not should_keep_memory(float(entry["importance"]), age_days):
+                head = text.strip()[:80]
+                return f"（这段记忆已经有些模糊）{head}…"
+        except Exception as e:  # noqa: BLE001
+            logger.debug("记忆衰减处理跳过: %s", e)
+        return text
+
     def _build_system_prompt(self, rag_results: Optional[list[dict]] = None) -> str:
         sticker_list = ", ".join(
             f"{sid}({s['label']})" for sid, s in IMAGE_STICKERS.items()
@@ -206,6 +231,17 @@ class ChatEngine:
                     p.append(f"### 第 {i} 次\n{summary}\n")
             if self.corrections.strip():
                 p.append(f"\n---\n## 用户纠正记录（优先级最高）\n{self.corrections}\n")
+            # 时间线与跨会话状态：低频变化，放稳定区跟着前缀缓存走。
+            # 状态更新时会触发引擎失效，所以不会一直用旧的。
+            from core.relationship import state_prompt, timeline_prompt
+
+            timeline = timeline_prompt(self.slug, self.owner)
+            if timeline:
+                p.append(timeline)
+            state = state_prompt(self.slug, self.owner)
+            if state:
+                p.append(state)
+
             from core.persona_style import style_instructions
 
             p.append(style_instructions(self.style_profile))
@@ -259,7 +295,9 @@ class ChatEngine:
 
         try:
             results = self.vector_store.search_target_only(
-                query=user_input, embedder=self.embedder, top_k=DEFAULT_TOP_K
+                query=self._expand_query(user_input),
+                embedder=self.embedder,
+                top_k=DEFAULT_TOP_K,
             )
             # 成功 — 重置失败计数
             if self._rag_failures > 0:
@@ -348,6 +386,26 @@ class ChatEngine:
             )
         kept.reverse()
         return kept
+
+    @staticmethod
+    def _expand_query(user_input: str) -> str:
+        """情感同义词扩展（FR-069）。
+
+        KEYWORD_EXPANSIONS 定义了 18 组情感场景的近义表达，但此前从未被
+        使用过。「想你」和「想念」在向量空间里未必足够近，把同义表达拼进
+        查询能提高召回——检索的是 ta 说过的话，不是问答。
+
+        只在命中时扩展，且限制数量：无差别拼接会把查询语义冲淡。
+        """
+        matched: list[str] = []
+        for keyword, synonyms in KEYWORD_EXPANSIONS.items():
+            if keyword in user_input:
+                matched.extend(synonyms)
+            if len(matched) >= 6:
+                break
+        if not matched:
+            return user_input
+        return f"{user_input} {' '.join(matched[:6])}"
 
     @staticmethod
     def _extract_sticker_tags(text: str) -> tuple[str, list[str]]:

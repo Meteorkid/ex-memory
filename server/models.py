@@ -168,3 +168,14 @@ class SubscribeRequest(BaseModel):
 class ActivateSubscriptionRequest(BaseModel):
     payment_ref: str = Field(..., min_length=4, max_length=128)
     days: int = Field(default=30, ge=1, le=3650)
+
+
+class TimelineEventRequest(BaseModel):
+    event: str = Field(..., min_length=1, max_length=500)
+    happened_at: Optional[str] = Field(default=None, max_length=32)
+    emotion: Optional[str] = Field(default=None, max_length=32)
+
+
+class ExeStateRequest(BaseModel):
+    mood: Optional[str] = Field(default=None, max_length=100)
+    recent_context: Optional[str] = Field(default=None, max_length=500)
