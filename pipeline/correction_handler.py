@@ -55,7 +55,6 @@ def handle_correction(
         return "（未配置 LLM API Key，无法自动处理纠正。请手动编辑 corrections.md。）"
 
     client = get_llm_client()
-    ex_dir = resolve_ex_dir(slug, owner)
 
     # 读取 correction_handler prompt
     prompt_template = (PROMPTS_DIR / "correction_handler.md").read_text(
@@ -84,26 +83,14 @@ def handle_correction(
     )
     correction_content = response.choices[0].message.content or ""
 
-    # 写入 corrections.md（持续追加，用户纠正记录是人物画像准确性的核心数据）
-    corrections_path = ex_dir / "corrections.md"
+    # 结构化写入（FR-070 / D-19）。原实现是无上限追加的流水账，
+    # 全量注入 prompt 会一直涨——而它标着「优先级最高」，被上下文预算挤掉的
+    # 反而是最该保留的东西。
+    from core.corrections import add as add_correction
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    existing = ""
-    if corrections_path.exists():
-        existing = corrections_path.read_text(encoding="utf-8")
-        count = len(re.findall(r"### Correction #", existing))
-    else:
-        existing = "# 纠正记录\n\n"
-        count = 0
-
-    new_correction = f"""
-### Correction #{count + 1} — {timestamp}
-
-{correction_content}
-
----
-"""
-    atomic_write(corrections_path, existing + new_correction)
+    entry = add_correction(slug, correction_content, owner)
+    count = entry.get("count", 1) - 1
 
     # 同时追加到 memory.md 的 Correction 记录节
     _append_to_memory(slug, count + 1, timestamp, user_msg, owner)

@@ -122,9 +122,14 @@ class ChatEngine:
                     f.read_text(encoding="utf-8") for f in raw_files
                 ]
 
-        corrections_path = self.ex_dir / "corrections.md"
-        if corrections_path.exists():
-            self.corrections = corrections_path.read_text(encoding="utf-8")
+        # 结构化纠正：有上限、同主题合并计数，不会无限增长（FR-070）
+        try:
+            from core.corrections import prompt_section
+
+            self.corrections = prompt_section(self.slug, self.owner)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("纠正记录加载失败: %s", e)
+            self.corrections = ""
 
         # 关系阶段：Web 写 "stage"，CLI 写 "relationship_stage"，两个键都认。
         # 未知值回退默认阶段，注入 prompt 时才不会 KeyError
@@ -230,7 +235,7 @@ class ChatEngine:
                 for i, summary in enumerate(sums, 1):
                     p.append(f"### 第 {i} 次\n{summary}\n")
             if self.corrections.strip():
-                p.append(f"\n---\n## 用户纠正记录（优先级最高）\n{self.corrections}\n")
+                p.append(self.corrections)
             # 时间线与跨会话状态：低频变化，放稳定区跟着前缀缓存走。
             # 状态更新时会触发引擎失效，所以不会一直用旧的。
             from core.relationship import state_prompt, timeline_prompt
