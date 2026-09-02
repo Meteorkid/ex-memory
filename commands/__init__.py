@@ -30,4 +30,5 @@ from commands import (  # noqa: E402,F401
     vector_rebuild,
     migrate_layout,
     grant_admin,
+    backup_platform,
 )

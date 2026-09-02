@@ -69,6 +69,12 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 对象存储（FR-034 / NFR-033）。当前用于备份与恢复，不是运行时文件访问。
+# BLOB_BUCKET 为空时用本地目录 data/blobs，仅适合单机。
+BLOB_BUCKET = os.getenv("BLOB_BUCKET", "")
+BLOB_ENDPOINT = os.getenv("BLOB_ENDPOINT", "")
+BLOB_PREFIX = os.getenv("BLOB_PREFIX", "")
+
 # 向量库后端（FR-033）：chroma（默认，本地目录）或 pgvector。
 # 多副本必须用 pgvector——Chroma 的 persist 目录在各副本自己的盘上，共享不了。
 VECTOR_BACKEND = os.getenv("VECTOR_BACKEND", "chroma")
