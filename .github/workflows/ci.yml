@@ -43,6 +43,18 @@ jobs:
         run: |
           pytest --cov --cov-report=term --cov-report=html --cov-fail-under=70
 
+      # NFR-034：删除完整性是合规底线，单独作为门禁跑一遍。
+      # 数据平面迁到 Postgres / 对象存储 / pgvector 之后，若删除路径没同步
+      # 改造，这里会立刻变红——这正是它存在的意义。
+      - name: Deletion completeness gate
+        run: |
+          pytest tests/test_account_rights.py::TestDeletionCompleteness -v
+
+      # 安全闸门顺序改动风险极高，同样单独把关
+      - name: Safety gate ordering
+        run: |
+          pytest tests/test_crisis_route.py tests/test_moderation.py -q
+
       - name: Upload coverage report
         if: matrix.python-version == '3.12' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
@@ -76,6 +88,13 @@ jobs:
 
       - name: Mypy type check
         run: mypy
+
+      # NFR-072：依赖漏洞扫描，高危阻断
+      - name: Dependency vulnerability scan
+        run: |
+          pip install pip-audit
+          pip-audit --requirement requirements.txt --strict || \
+            (echo "::error::依赖存在已知漏洞，请升级后再合并" && exit 1)
 
       - name: Ruff format check
         run: ruff format --check .
