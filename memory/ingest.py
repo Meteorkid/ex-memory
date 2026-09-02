@@ -25,6 +25,7 @@ def ingest_wechat_file(
     target_name: str,
     vector_store,
     embedder,
+    owner=None,
 ) -> tuple[list[dict], int]:
     """解析微信聊天记录并入库。
 
@@ -47,6 +48,11 @@ def ingest_wechat_file(
     if not messages:
         return [], 0
 
+    # 归档脱敏后的消息：没有可重放的输入，换模型/调分块/迁移向量库都会卡死
+    from core.corpus_store import append_messages
+
+    append_messages(slug, messages, source="wechat", owner=owner)
+
     chunker = Chunker()
     chunks = chunker.chunk_messages(messages, source="wechat", chat_id=f"wechat_{slug}")
     logger.info("切片完成: %d 个 chunks", len(chunks))
@@ -64,6 +70,7 @@ def ingest_qq_file(
     target_name: str,
     vector_store,
     embedder,
+    owner=None,
 ) -> tuple[list[dict], int]:
     """解析 QQ 聊天记录并入库。
 
@@ -85,6 +92,10 @@ def ingest_qq_file(
 
     if not messages:
         return [], 0
+
+    from core.corpus_store import append_messages
+
+    append_messages(slug, messages, source="qq", owner=owner)
 
     chunker = Chunker()
     chunks = chunker.chunk_messages(messages, source="qq", chat_id=f"qq_{slug}")

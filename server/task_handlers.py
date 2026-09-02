@@ -56,19 +56,19 @@ def handle_import(
             from memory.ingest import ingest_qq_file
 
             messages, chunks = ingest_qq_file(
-                str(path), slug, target_name, vector_store, embedder
+                str(path), slug, target_name, vector_store, embedder, owner=owner
             )
         elif suffix == ".txt" and detect_format(str(path)) == "plaintext":
             from memory.ingest import ingest_qq_file
 
             messages, chunks = ingest_qq_file(
-                str(path), slug, target_name, vector_store, embedder
+                str(path), slug, target_name, vector_store, embedder, owner=owner
             )
         else:
             from memory.ingest import ingest_wechat_file
 
             messages, chunks = ingest_wechat_file(
-                str(path), slug, target_name, vector_store, embedder
+                str(path), slug, target_name, vector_store, embedder, owner=owner
             )
 
         progress.update(95, "入库完成")
