@@ -29,3 +29,9 @@ htmlcov/
 
 # 软著申请材料（含个人信息，不进仓库）
 软著申请材料/
+
+# 前端 lint 依赖（不引入构建步骤，只装 eslint）
+node_modules/
+package-lock.json
+sbom.json
+coverage.xml

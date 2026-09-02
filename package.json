@@ -1,0 +1,11 @@
+{
+  "name": "ex-memory-web",
+  "private": true,
+  "description": "前端只做静态资源，不引入构建步骤——加构建会打断现有交付节奏。这里只装 lint。",
+  "scripts": {
+    "lint": "eslint web/static/*.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}

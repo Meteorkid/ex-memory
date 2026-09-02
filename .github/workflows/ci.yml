@@ -41,7 +41,13 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov --cov-report=term --cov-report=html --cov-fail-under=70
+          pytest --cov --cov-report=term --cov-report=html --cov-report=xml --cov-fail-under=70
+
+      # NFR-075：全局单一门槛掩盖结构性空洞——审计时发现三条关键路径零覆盖
+      # 而全局数字看着很健康。核心域（认证、隔离、计费、安全闸门）单独设线。
+      - name: Coverage tiers
+        run: |
+          python scripts/check_coverage_tiers.py
 
       # NFR-034：删除完整性是合规底线，单独作为门禁跑一遍。
       # 数据平面迁到 Postgres / 对象存储 / pgvector 之后，若删除路径没同步
@@ -54,6 +60,13 @@ jobs:
       - name: Safety gate ordering
         run: |
           pytest tests/test_crisis_route.py tests/test_moderation.py -q
+
+      # FR-060：拟真度指标进门禁。全部是纯统计、无 LLM 调用，
+      # 所以可以每次跑且结果可复现。
+      - name: Fidelity metrics gate
+        run: |
+          pytest tests/test_fingerprint.py tests/test_breach.py \
+                 tests/test_persona_style.py -q
 
       - name: Upload coverage report
         if: matrix.python-version == '3.12' && github.event_name == 'push'
@@ -71,6 +84,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -95,6 +112,26 @@ jobs:
           pip install pip-audit
           pip-audit --requirement requirements.txt --strict || \
             (echo "::error::依赖存在已知漏洞，请升级后再合并" && exit 1)
+
+      # NFR-070：前端此前零静态检查，后端有 ruff+mypy，前端什么都没有
+      - name: ESLint
+        run: |
+          npm install --no-audit --no-fund
+          npm run lint
+
+      # NFR-073：发布物要能追溯依赖
+      - name: Generate SBOM
+        run: |
+          pip install cyclonedx-bom
+          cyclonedx-py requirements requirements.txt -o sbom.json || \
+            cyclonedx-py -r -i requirements.txt -o sbom.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
 
       - name: Ruff format check
         run: ruff format --check .
