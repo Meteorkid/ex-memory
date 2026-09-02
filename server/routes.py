@@ -894,6 +894,11 @@ async def chat(
             _run_session_archive, slug, engine.vector_store, engine.embedder, user_id
         )
 
+        from core.persona_style import split_reply
+
+        segments = split_reply(reply, getattr(engine, "style_profile", None))
+        reply = "\n".join(segments)
+
         settle(
             account_id,
             usage,
@@ -1009,6 +1014,39 @@ async def chat_stream(
                 elif item.get("type") == "usage":
                     stream_usage = item
                 yield f"data: {json.dumps(item)}\n\n"
+
+            # 分条边界：模型用 || 标记自然断句处，前端据此分气泡（FR-062）。
+            # 这里只下发边界信息，不重发文本——文本已经流式送过了。
+            from core.persona_style import (
+                SPLIT_MARKER,
+                reply_delay_seconds,
+                split_reply,
+            )
+
+            if SPLIT_MARKER in full_reply:
+                segments = split_reply(
+                    full_reply, getattr(engine, "style_profile", None)
+                )
+                yield (
+                    "data: "
+                    + json.dumps(
+                        {
+                            "type": "segments",
+                            "segments": [
+                                {
+                                    "text": seg,
+                                    "delay": reply_delay_seconds(
+                                        i, seg, getattr(engine, "style_profile", None)
+                                    ),
+                                }
+                                for i, seg in enumerate(segments)
+                            ],
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n\n"
+                )
+                full_reply = "\n".join(segments)
 
             # 收尾：对完整回复做一次主通道检查。此时文本已下发，只能事后
             # 撤回并且不落库——这是流式与「违规内容一个字都不到前端」之间

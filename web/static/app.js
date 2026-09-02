@@ -342,7 +342,9 @@ async function parseChatStream(res, msgsEl) {
             if (d === '[DONE]') continue;
             try {
                 const item = JSON.parse(d);
-                if (item.type === 'crisis' || item.type === 'blocked') {
+                if (item.type === 'segments') {
+                    await renderSegments(msgsEl, replyRow, item.segments);
+                } else if (item.type === 'crisis' || item.type === 'blocked') {
                     replyRow.remove();
                     msgsEl.appendChild(noticeMsg(item));
                 } else if (item.error) {
@@ -2475,6 +2477,26 @@ $('create-file').addEventListener('change', () => {
 });
 
 // ═══════════════════════════════════════
+// 分条回复（FR-062 / FR-063）
+// ═══════════════════════════════════════
+
+// 真实微信里人是连发多条短消息的：「在吗」「刚看到」「今天好累」。
+// 一整段完整的话反而最不像微信。服务端把断句位置和每条的延迟一起下发，
+// 这里按节奏逐条冒出来——永远秒回是最出戏的一点。
+async function renderSegments(msgsEl, streamedRow, segments) {
+    if (!segments || !segments.length) return;
+    // 流式已经把整段送过来了，先撤掉那个气泡再按条重放
+    streamedRow.remove();
+    for (const seg of segments) {
+        const delayMs = Math.min((seg.delay || 0.5) * 1000, 12000);
+        await new Promise(r => setTimeout(r, delayMs));
+        const row = chatBubble('assistant', seg.text);
+        msgsEl.appendChild(row);
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+}
+
+// ═══════════════════════════════════════
 // 异步任务轮询
 // ═══════════════════════════════════════
 
@@ -2997,7 +3019,8 @@ async function sendVoiceMessage(duration, sttText) {
                 if (d === '[DONE]') continue;
                 try {
                     const item = JSON.parse(d);
-                    if (item.type === 'crisis' || item.type === 'blocked') { replyRow.remove(); msgsEl.appendChild(noticeMsg(item)); }
+                    if (item.type === 'segments') { await renderSegments(msgsEl, replyRow, item.segments); }
+                    else if (item.type === 'crisis' || item.type === 'blocked') { replyRow.remove(); msgsEl.appendChild(noticeMsg(item)); }
                     else if (item.error) { assistantDiv.textContent = item.error; replyRow.className = 'msg-row sys'; }
                     else if (item.type === 'text' && item.content) { assistantDiv.textContent += item.content; }
                     else if (item.type === 'sticker' && item.id) { msgsEl.appendChild(stickerMsg(item.id)); }

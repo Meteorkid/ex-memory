@@ -90,6 +90,9 @@ class ChatEngine:
         self.session_summaries: list[str] = []
         self.corrections = ""
         self.relationship_stage = "dating"  # 默认热恋期
+        # 表达风格画像：从真实语料统计而来，没有语料时为 None（不猜）
+        self.style_profile = None
+        self.last_seen_at = None
         # 实际服务本次请求的供应商，供成本归集与观测
         self.last_provider = ""
 
@@ -141,6 +144,24 @@ class ChatEngine:
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("加载 meta.json 失败: %s", e)
 
+        # 上次对话时间：相对时间感知靠它，「好久没聊了」需要知道间隔
+        try:
+            from core.conversation_store import load_jsonl_messages
+
+            history = load_jsonl_messages(self.slug, self.owner)
+            if history:
+                self.last_seen_at = history[-1].get("created_at")
+        except Exception as e:  # noqa: BLE001
+            logger.debug("读取上次对话时间失败: %s", e)
+
+        # 风格画像从语料归档统计，属稳定内容，随引擎缓存一起复用
+        try:
+            from core.persona_style import profile_from_corpus
+
+            self.style_profile = profile_from_corpus(self.slug, self.owner)
+        except Exception as e:  # noqa: BLE001 — 风格只是锦上添花，不该拖垮加载
+            logger.warning("风格画像加载失败: %s", e)
+
         logger.info("已连接 %s 的数字镜像 (model=%s)", self.slug, self.model)
 
     def _build_system_prompt(self, rag_results: Optional[list[dict]] = None) -> str:
@@ -185,6 +206,9 @@ class ChatEngine:
                     p.append(f"### 第 {i} 次\n{summary}\n")
             if self.corrections.strip():
                 p.append(f"\n---\n## 用户纠正记录（优先级最高）\n{self.corrections}\n")
+            from core.persona_style import style_instructions
+
+            p.append(style_instructions(self.style_profile))
             p.append(
                 f"\n---\n## 可用图片表情包\n你可以在回复中使用图片表情包来表达情绪。"
                 f"在回复文本末尾加上 [sticker:贴纸ID] 标记即可。\n可用贴纸：{sticker_list}\n"
@@ -193,6 +217,12 @@ class ChatEngine:
 
             # ↓ 以下每轮/每分钟变化，必须排在全部稳定内容之后
             p.append(time_context)
+            if self.last_seen_at:
+                from core.persona_style import relative_time_hint
+
+                hint = relative_time_hint(self.last_seen_at)
+                if hint:
+                    p.append(f"距上次对话：{hint}\n")
             if rag_results:
                 filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
                 if filtered:
