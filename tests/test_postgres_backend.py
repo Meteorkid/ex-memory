@@ -38,7 +38,9 @@ def pg(monkeypatch):
     with psycopg.connect(PG_URL, autocommit=True) as conn:
         conn.execute(f"CREATE SCHEMA {schema}")
 
-    url = f"{PG_URL}?options=-csearch_path%3D{schema}"
+    # search_path 带上 public：vector 扩展装在 public，
+    # 不带的话建表时找不到 vector 类型
+    url = f"{PG_URL}?options=-csearch_path%3D{schema},public"
     monkeypatch.setattr("config.DATABASE_URL", url)
     db.reset_pool()
 
@@ -229,3 +231,120 @@ class TestComplianceTablesOnPg:
             task = tasks.get_task(task_id)
         assert task["status"] == "succeeded", task.get("error")
         tasks._handlers.pop("pg_task", None)
+
+
+class TestPgVectorStore:
+    """pgvector 后端与 ChromaDB 版同签名，调用方不用区分（FR-033）。
+
+    换掉 ChromaDB 的理由不是性能，是本地盘：Chroma 的 persist 目录在每个
+    副本各自的磁盘上，多副本下共享不了。
+    """
+
+    @pytest.fixture
+    def store(self, pg, monkeypatch):
+        monkeypatch.setattr("config.VECTOR_BACKEND", "pgvector")
+        from memory.pgvector_store import PgVectorStore
+
+        return PgVectorStore(persist_dir="", collection_name="ex_test_memories")
+
+    @staticmethod
+    def _embedder(dim=1024):
+        from unittest.mock import MagicMock
+
+        emb = MagicMock()
+
+        def _vec(seed):
+            v = [0.0] * dim
+            v[seed % dim] = 1.0
+            return v
+
+        emb.embed.side_effect = lambda docs: [_vec(i) for i in range(len(docs))]
+        emb.embed_one.side_effect = lambda q: _vec(0)
+        return emb
+
+    def _chunks(self, n=3, speaker="target"):
+        return [
+            {
+                "id": f"c{i}",
+                "text_for_embedding": f"文本{i}",
+                "display_text": f"原话{i}",
+                "metadata": {"dominant_speaker": speaker, "source": "wechat"},
+            }
+            for i in range(n)
+        ]
+
+    def test_ingest_and_count(self, store):
+        store.ingest(self._chunks(3), self._embedder())
+        assert store.count() == 3
+
+    def test_ingest_is_idempotent_on_same_id(self, store):
+        store.ingest(self._chunks(2), self._embedder())
+        store.ingest(self._chunks(2), self._embedder())
+        assert store.count() == 2, "重复入库应覆盖而非重复插入"
+
+    def test_search_returns_display_text_and_score(self, store):
+        store.ingest(self._chunks(3), self._embedder())
+        results = store.search("查询", self._embedder(), top_k=2)
+        assert len(results) == 2
+        assert results[0]["display_text"].startswith("原话")
+        # score 口径与 ChromaDB 版一致：1 - 余弦距离
+        assert 0.0 <= results[0]["score"] <= 1.0
+
+    def test_search_target_only_filters_by_speaker(self, store):
+        store.ingest(self._chunks(2, speaker="target"), self._embedder())
+        others = self._chunks(2, speaker="user")
+        for i, c in enumerate(others):
+            c["id"] = f"o{i}"
+        store.ingest(others, self._embedder())
+
+        results = store.search_target_only("查询", self._embedder(), top_k=10)
+        assert len(results) == 2
+        assert all(r["metadata"]["dominant_speaker"] == "target" for r in results)
+
+    def test_collections_are_isolated(self, pg, monkeypatch):
+        """不同镜像的向量不能互相检索到。"""
+        monkeypatch.setattr("config.VECTOR_BACKEND", "pgvector")
+        from memory.pgvector_store import PgVectorStore
+
+        a = PgVectorStore(persist_dir="", collection_name="ex_a")
+        b = PgVectorStore(persist_dir="", collection_name="ex_b")
+        a.ingest(self._chunks(2), self._embedder())
+        assert a.count() == 2
+        assert b.count() == 0
+        assert b.search("查询", self._embedder()) == []
+
+    def test_delete_collection_removes_only_own_rows(self, pg, monkeypatch):
+        monkeypatch.setattr("config.VECTOR_BACKEND", "pgvector")
+        from memory.pgvector_store import PgVectorStore
+
+        a = PgVectorStore(persist_dir="", collection_name="ex_a")
+        b = PgVectorStore(persist_dir="", collection_name="ex_b")
+        a.ingest(self._chunks(2), self._embedder())
+        other = self._chunks(1)
+        other[0]["id"] = "keep"
+        b.ingest(other, self._embedder())
+
+        a.delete_collection()
+        assert a.count() == 0
+        assert b.count() == 1
+
+    def test_session_summary_is_stored(self, store):
+        store.add_session_summary("这次聊了很久", "slug1", self._embedder())
+        assert store.count() == 1
+        results = store.search("查询", self._embedder(), top_k=1)
+        assert results[0]["metadata"]["source"] == "session_summary"
+
+    def test_factory_picks_pgvector_when_configured(self, pg, monkeypatch):
+        monkeypatch.setattr("config.VECTOR_BACKEND", "pgvector")
+        from core.factory import build_vector_store
+        from memory.pgvector_store import PgVectorStore
+
+        assert isinstance(build_vector_store("anything"), PgVectorStore)
+
+    def test_factory_defaults_to_chroma(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("config.VECTOR_BACKEND", "chroma")
+        monkeypatch.setattr("config.EXES_DIR", tmp_path / "exes")
+        from core.factory import build_vector_store
+        from memory.vector_store import VectorStore
+
+        assert isinstance(build_vector_store("anything"), VectorStore)

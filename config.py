@@ -69,6 +69,12 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 向量库后端（FR-033）：chroma（默认，本地目录）或 pgvector。
+# 多副本必须用 pgvector——Chroma 的 persist 目录在各副本自己的盘上，共享不了。
+VECTOR_BACKEND = os.getenv("VECTOR_BACKEND", "chroma")
+if VECTOR_BACKEND not in ("chroma", "pgvector"):
+    raise ValueError("VECTOR_BACKEND 只能是 chroma 或 pgvector")
+
 # 数据库（FR-030）。为空时用 SQLite——单副本部署够用。
 # 多副本必须配 Postgres：多个写入方共享一个 SQLite 文件会锁冲突甚至损坏。
 DATABASE_URL = os.getenv("DATABASE_URL", "")
