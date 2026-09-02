@@ -67,7 +67,7 @@ class TestIdempotency:
         from pathlib import Path
 
         expected = max(
-            int(f.stem.split("_")[0]) for f in Path("migrations").glob("*.sql")
+            int(f.stem.split("_")[0]) for f in Path("migrations/sqlite").glob("*.sql")
         )
         conn = sqlite3.connect(str(fresh_db))
         try:
@@ -97,7 +97,9 @@ class TestIncrementalUpgrade:
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
         for name in ("001_init.sql", "002_external_identities.sql"):
-            conn.executescript((Path("migrations") / name).read_text(encoding="utf-8"))
+            conn.executescript(
+                (Path("migrations/sqlite") / name).read_text(encoding="utf-8")
+            )
         conn.execute("INSERT OR REPLACE INTO schema_version (version) VALUES (2)")
         conn.execute(
             "INSERT INTO users (username, password_hash, salt) VALUES ('存量用户', 'h', 's')"

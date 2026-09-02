@@ -20,5 +20,5 @@ module = "memory.vector_store"
 disable_error_code = ["arg-type"]
 
 [[tool.mypy.overrides]]
-module = ["chromadb.*", "gradio.*", "prompt_toolkit.*", "matplotlib.*", "redis.*", "psycopg.*", "boto3.*", "botocore.*", "opentelemetry.*", "prometheus_client.*"]
+module = ["chromadb.*", "gradio.*", "prompt_toolkit.*", "matplotlib.*", "redis.*", "psycopg.*", "psycopg_pool.*", "boto3.*", "botocore.*", "opentelemetry.*", "prometheus_client.*"]
 ignore_missing_imports = true

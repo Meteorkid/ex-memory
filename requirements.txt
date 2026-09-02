@@ -11,7 +11,8 @@ zstandard~=0.25.0
 
 # M1 平台化依赖
 redis~=8.1          # 共享状态（限流/验证码/失效广播）
-psycopg[binary]~=3.3  # PostgreSQL 驱动
+psycopg[binary]~=3.3
+psycopg-pool~=3.2  # PostgreSQL 驱动
 boto3~=1.43         # S3 兼容对象存储
 prometheus-client~=0.23
 opentelemetry-sdk~=1.43

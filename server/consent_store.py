@@ -113,7 +113,7 @@ def create_subject_request(
     from server.auth import _get_conn
 
     with _get_conn() as conn:
-        cursor = conn.execute(
+        request_id = conn.insert_returning_id(
             """
             INSERT INTO subject_requests (
                 claim_type, contact, target_slug, target_hint, detail, identity_evidence
@@ -129,7 +129,7 @@ def create_subject_request(
             ),
         )
         conn.commit()
-        return int(cursor.lastrowid)
+        return int(request_id)
 
 
 def list_subject_requests(status: str = "received", limit: int = 100) -> list[dict]:

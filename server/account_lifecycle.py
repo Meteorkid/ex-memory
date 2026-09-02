@@ -272,15 +272,16 @@ def verify_deletion(user_id: int) -> list[str]:
             ("external_identities", "user_id"),
         ):
             row = conn.execute(
-                f"SELECT COUNT(*) FROM {table} WHERE {column} = ?", (user_id,)
+                f"SELECT COUNT(*) AS n FROM {table} WHERE {column} = ?",
+                (user_id,),
             ).fetchone()
-            if row[0]:
-                residues.append(f"{table} 残留 {row[0]} 行")
+            if row["n"]:
+                residues.append(f"{table} 残留 {row['n']} 行")
         row = conn.execute(
-            "SELECT COUNT(*) FROM safety_events WHERE user_id = ?", (user_id,)
+            "SELECT COUNT(*) AS n FROM safety_events WHERE user_id = ?", (user_id,)
         ).fetchone()
-        if row[0]:
-            residues.append(f"safety_events 仍关联该账号 {row[0]} 行")
+        if row["n"]:
+            residues.append(f"safety_events 仍关联该账号 {row['n']} 行")
 
     import server.routes as routes
 

@@ -57,7 +57,7 @@ def record_safety_event(
 
     try:
         with _get_conn() as conn:
-            cursor = conn.execute(
+            event_id = conn.insert_returning_id(
                 """
                 INSERT INTO safety_events (
                     user_id, slug, event_type, severity, confidence,
@@ -77,7 +77,7 @@ def record_safety_event(
                 ),
             )
             conn.commit()
-            return int(cursor.lastrowid)
+            return int(event_id)
     except Exception as e:  # noqa: BLE001 — 审计失败不得中断危机响应
         logger.error("安全事件落库失败 type=%s user=%s: %s", event_type, user_id, e)
         return None

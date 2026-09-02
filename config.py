@@ -69,6 +69,11 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
     "yes",
 )
 
+# 数据库（FR-030）。为空时用 SQLite——单副本部署够用。
+# 多副本必须配 Postgres：多个写入方共享一个 SQLite 文件会锁冲突甚至损坏。
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "10"))
+
 # 可观测性（NFR-031 / NFR-032）。
 # METRICS_TOKEN 未配置时 /metrics 直接不启用：指标会泄漏运营信息
 # （用量、错误率、供应商），不能默认公开。

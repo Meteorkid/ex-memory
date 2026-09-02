@@ -4,12 +4,13 @@ import hashlib
 import hmac
 import os
 import secrets
-import sqlite3
 import time
 import logging
 from contextlib import contextmanager
 from typing import Optional
 from pathlib import Path
+
+from core.db import integrity_errors
 
 logger = logging.getLogger("ex-memory")
 
@@ -29,14 +30,16 @@ TOKEN_EXPIRY_SECONDS = ACCESS_TOKEN_EXPIRY_SECONDS
 
 @contextmanager
 def _get_conn():
-    """数据库连接上下文管理器，确保连接总是被关闭。"""
-    DB_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    try:
+    """数据库连接上下文管理器。
+
+    实际方言由 core.db 按 DATABASE_URL 决定：配了就走 Postgres 连接池，
+    没配就是 SQLite 单文件。业务代码一律按 SQLite 方言写 SQL，翻译在
+    core.db 里做——7 个模块都从这里取连接，改一处即可全体切换。
+    """
+    from core.db import connect
+
+    with connect(DB_PATH) as conn:
         yield conn
-    finally:
-        conn.close()
 
 
 def init_db():
@@ -49,13 +52,17 @@ def _get_current_version(conn) -> int:
     conn.execute(
         "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
     )
-    row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-    return row[0] if row[0] is not None else 0
+    # 具名取值：psycopg 用 dict_row，位置访问在两种方言下不通用
+    row = conn.execute("SELECT MAX(version) AS version FROM schema_version").fetchone()
+    current = row["version"] if row else None
+    return int(current) if current is not None else 0
 
 
 def _run_migrations():
     """按序执行 migrations/ 目录下的 SQL 文件。"""
-    migrations_dir = Path(__file__).resolve().parent.parent / "migrations"
+    from core.db import migration_dir
+
+    migrations_dir = migration_dir()
     if not migrations_dir.exists():
         # 兜底：直接建表
         _bootstrap_tables()
@@ -78,10 +85,10 @@ def _run_migrations():
             sql = sql_file.read_text(encoding="utf-8")
             conn.executescript(sql)
 
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
-                (version,),
-            )
+            # 先删后插：INSERT OR REPLACE 是 SQLite 专有的，
+            # 两步写法在两种方言下语义一致
+            conn.execute("DELETE FROM schema_version WHERE version = ?", (version,))
+            conn.execute("INSERT INTO schema_version (version) VALUES (?)", (version,))
             conn.commit()
 
 
@@ -149,14 +156,12 @@ def get_or_create_external_user_id(provider: str, external_user_id: str) -> int:
         ).hexdigest()[:24]
         username = f"external_{identity_hash}"
         password_hash, salt = _hash_password(secrets.token_urlsafe(32))
-        cursor = conn.execute(
-            """
-            INSERT INTO users (username, password_hash, salt)
-            VALUES (?, ?, ?)
-            """,
-            (username, password_hash, salt),
+        user_id = int(
+            conn.insert_returning_id(
+                "INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?)",
+                (username, password_hash, salt),
+            )
         )
-        user_id = int(cursor.lastrowid)
         conn.execute(
             """
             INSERT INTO external_identities (provider, external_user_id, user_id)
@@ -191,7 +196,7 @@ def register_user(username: str, password: str) -> Optional[str]:
             )
             conn.commit()
             return None
-        except sqlite3.IntegrityError:
+        except integrity_errors():
             return "用户名已存在"
 
 
