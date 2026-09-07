@@ -15,7 +15,6 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger("ex-memory")
@@ -26,10 +25,10 @@ MAX_ENTRIES = 40
 MAX_IN_PROMPT = 20
 
 
-def _path(slug: str, owner: Optional[int] = None) -> Path:
-    import config
+def _store(slug: str, owner: Optional[int] = None):
+    from core.mirror_store import mirror_store
 
-    return config.resolve_ex_dir(slug, owner) / CORRECTIONS_FILE
+    return mirror_store(slug, owner)
 
 
 def _now() -> str:
@@ -48,11 +47,11 @@ def _normalize(text: str) -> str:
 
 
 def load(slug: str, owner: Optional[int] = None) -> list[dict]:
-    path = _path(slug, owner)
-    if not path.exists():
+    store = _store(slug, owner)
+    if not store.exists(CORRECTIONS_FILE):
         return _migrate_legacy(slug, owner)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = store.read_json(CORRECTIONS_FILE)
         return data if isinstance(data, list) else []
     except (OSError, json.JSONDecodeError) as e:
         logger.warning("纠正记录读取失败 slug=%s: %s", slug, e)
@@ -65,13 +64,11 @@ def _migrate_legacy(slug: str, owner: Optional[int] = None) -> list[dict]:
     存量镜像不该因为改了存储格式就丢掉已有的纠正——那是人物画像准确性的
     核心数据。
     """
-    import config
-
-    legacy = config.resolve_ex_dir(slug, owner) / LEGACY_FILE
-    if not legacy.exists():
+    store = _store(slug, owner)
+    if not store.exists(LEGACY_FILE):
         return []
     try:
-        text = legacy.read_text(encoding="utf-8")
+        text = store.read_text(LEGACY_FILE)
     except OSError:
         return []
 
@@ -104,11 +101,7 @@ def _migrate_legacy(slug: str, owner: Optional[int] = None) -> list[dict]:
 
 
 def save(slug: str, entries: list[dict], owner: Optional[int] = None) -> None:
-    from core.file_utils import atomic_write_json
-
-    path = _path(slug, owner)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(path, entries)
+    _store(slug, owner).write_json(CORRECTIONS_FILE, entries)
 
 
 def add(slug: str, content: str, owner: Optional[int] = None) -> dict:

@@ -28,6 +28,12 @@ def corpus_path(slug: str, owner: Optional[int] = None) -> Path:
     return config.resolve_ex_dir(slug, owner) / CORPUS_FILENAME
 
 
+def _store(slug: str, owner: Optional[int] = None):
+    from core.mirror_store import mirror_store
+
+    return mirror_store(slug, owner)
+
+
 def append_messages(
     slug: str, messages: list[dict], source: str, owner: Optional[int] = None
 ) -> int:
@@ -37,32 +43,25 @@ def append_messages(
     """
     if not messages:
         return 0
-    path = corpus_path(slug, owner)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    written = 0
-    with open(path, "a", encoding="utf-8") as f:
-        for message in messages:
-            record = {**message, "_source": source}
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            written += 1
+    records = [{**message, "_source": source} for message in messages]
+    written = _store(slug, owner).append_jsonl(CORPUS_FILENAME, records)
     logger.info("语料归档写入 %d 条 slug=%s source=%s", written, slug, source)
     return written
 
 
 def iter_messages(slug: str, owner: Optional[int] = None) -> Iterator[dict]:
     """按写入顺序重放归档消息。损坏行跳过并告警。"""
-    path = corpus_path(slug, owner)
-    if not path.exists():
+    store = _store(slug, owner)
+    if not store.exists(CORPUS_FILENAME):
         return
-    with open(path, "r", encoding="utf-8") as f:
-        for line_no, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-            except json.JSONDecodeError:
-                logger.warning("语料归档第 %d 行损坏，已跳过 slug=%s", line_no, slug)
+    for line_no, line in enumerate(store.read_text(CORPUS_FILENAME).splitlines(), 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            yield json.loads(line)
+        except json.JSONDecodeError:
+            logger.warning("语料归档第 %d 行损坏，已跳过 slug=%s", line_no, slug)
 
 
 def load_messages(slug: str, owner: Optional[int] = None) -> list[dict]:
@@ -74,4 +73,4 @@ def count_messages(slug: str, owner: Optional[int] = None) -> int:
 
 
 def has_corpus(slug: str, owner: Optional[int] = None) -> bool:
-    return corpus_path(slug, owner).exists()
+    return _store(slug, owner).exists(CORPUS_FILENAME)

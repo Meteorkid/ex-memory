@@ -1,6 +1,5 @@
 """钱包、红包、转账数据管理。"""
 
-import json
 import random
 import uuid
 import logging
@@ -9,7 +8,6 @@ from pathlib import Path
 from typing import Optional, Any
 
 from config import resolve_ex_dir
-from core.file_utils import atomic_write_json, locked_update_json
 
 logger = logging.getLogger("ex-memory")
 
@@ -66,6 +64,11 @@ RED_PACKET_TRIGGERS: dict[str, dict[str, Any]] = {
 
 # ── 钱包管理 ──
 
+def _store(slug: str, owner: Optional[int] = None):
+    from core.mirror_store import mirror_store
+
+    return mirror_store(slug, owner)
+
 
 def get_wallet_path(slug: str, owner: Optional[int] = None) -> Path:
     return resolve_ex_dir(slug, owner) / "wallet.json"
@@ -73,14 +76,14 @@ def get_wallet_path(slug: str, owner: Optional[int] = None) -> Path:
 
 def load_wallet(slug: str, owner: Optional[int] = None) -> dict:
     """加载钱包数据，不存在则初始化。"""
-    p = get_wallet_path(slug, owner)
-    if p.exists():
-        return json.loads(p.read_text(encoding="utf-8"))
+    store = _store(slug, owner)
+    if store.exists("wallet.json"):
+        return store.read_json("wallet.json")
     return {"balance": 0.0, "transactions": []}
 
 
 def save_wallet(slug: str, wallet: dict, owner: Optional[int] = None) -> None:
-    atomic_write_json(get_wallet_path(slug, owner), wallet)
+    _store(slug, owner).write_json("wallet.json", wallet)
 
 
 def add_transaction(
@@ -110,8 +113,8 @@ def add_transaction(
         )
         return dict(wallet)
 
-    return locked_update_json(
-        get_wallet_path(slug, owner),
+    return _store(slug, owner).locked_update_json(
+        "wallet.json",
         lambda: {"balance": 0.0, "transactions": []},
         update,
     )
@@ -125,16 +128,16 @@ def get_redpackets_path(slug: str, owner: Optional[int] = None) -> Path:
 
 
 def load_redpackets(slug: str, owner: Optional[int] = None) -> list[dict]:
-    p = get_redpackets_path(slug, owner)
-    if p.exists():
-        return json.loads(p.read_text(encoding="utf-8"))
+    store = _store(slug, owner)
+    if store.exists("red_packets.json"):
+        return store.read_json("red_packets.json")
     return []
 
 
 def save_redpackets(
     slug: str, packets: list[dict], owner: Optional[int] = None
 ) -> None:
-    atomic_write_json(get_redpackets_path(slug, owner), packets)
+    _store(slug, owner).write_json("red_packets.json", packets)
 
 
 def create_redpacket(
@@ -170,7 +173,7 @@ def create_redpacket(
         packets.append(rp)
         return dict(rp)
 
-    return locked_update_json(get_redpackets_path(slug, owner), list, update)
+    return _store(slug, owner).locked_update_json("red_packets.json", list, update)
 
 
 def open_redpacket(
@@ -188,7 +191,7 @@ def open_redpacket(
             return dict(rp)
         return None
 
-    rp = locked_update_json(get_redpackets_path(slug, owner), list, update)
+    rp = _store(slug, owner).locked_update_json("red_packets.json", list, update)
     if rp is not None:
         add_transaction(
             slug,
@@ -223,16 +226,16 @@ def get_transfers_path(slug: str, owner: Optional[int] = None) -> Path:
 
 
 def load_transfers(slug: str, owner: Optional[int] = None) -> list[dict]:
-    p = get_transfers_path(slug, owner)
-    if p.exists():
-        return json.loads(p.read_text(encoding="utf-8"))
+    store = _store(slug, owner)
+    if store.exists("transfers.json"):
+        return store.read_json("transfers.json")
     return []
 
 
 def save_transfers(
     slug: str, transfers: list[dict], owner: Optional[int] = None
 ) -> None:
-    atomic_write_json(get_transfers_path(slug, owner), transfers)
+    _store(slug, owner).write_json("transfers.json", transfers)
 
 
 def create_transfer(
@@ -257,7 +260,7 @@ def create_transfer(
         transfers.append(tx)
         return dict(tx)
 
-    return locked_update_json(get_transfers_path(slug, owner), list, update)
+    return _store(slug, owner).locked_update_json("transfers.json", list, update)
 
 
 def confirm_transfer(
@@ -278,7 +281,7 @@ def confirm_transfer(
             return dict(tx)
         return None
 
-    tx = locked_update_json(get_transfers_path(slug, owner), list, update)
+    tx = _store(slug, owner).locked_update_json("transfers.json", list, update)
     if tx is None:
         return None
     if action == "receive":

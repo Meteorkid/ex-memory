@@ -1,6 +1,5 @@
 """情感记忆模块：提取和存储重要情感记忆点。"""
 
-import json
 import logging
 from typing import Optional
 
@@ -116,25 +115,19 @@ def extract_emotional_memories(messages: list[dict]) -> dict:
 
 def save_emotional_memories(slug: str, memories: dict, owner: Optional[int] = None):
     """保存情感记忆到文件。"""
-    from config import resolve_ex_dir
+    from core.mirror_store import mirror_store
 
-    ex_dir = resolve_ex_dir(slug, owner)
-    memory_file = ex_dir / "emotional_memories.json"
-
-    with open(memory_file, "w", encoding="utf-8") as f:
-        json.dump(memories, f, ensure_ascii=False, indent=2)
+    mirror_store(slug, owner).write_json("emotional_memories.json", memories)
 
     logger.info("情感记忆已保存: %s", slug)
 
 
 def load_emotional_memories(slug: str, owner: Optional[int] = None) -> dict:
     """加载情感记忆。"""
-    from config import resolve_ex_dir
+    from core.mirror_store import mirror_store
 
-    ex_dir = resolve_ex_dir(slug, owner)
-    memory_file = ex_dir / "emotional_memories.json"
-
-    if not memory_file.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("emotional_memories.json"):
         return {
             "important_dates": [],
             "shared_experiences": [],
@@ -142,8 +135,7 @@ def load_emotional_memories(slug: str, owner: Optional[int] = None) -> dict:
             "pet_names": [],
         }
 
-    with open(memory_file, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return store.read_json("emotional_memories.json")
 
 
 def get_memory_context(slug: str, current_topic: str = "") -> str:

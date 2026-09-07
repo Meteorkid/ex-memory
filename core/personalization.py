@@ -1,6 +1,5 @@
 """个性化模块：学习用户习惯，提供个性化体验。"""
 
-import json
 import logging
 from collections import Counter
 from datetime import datetime
@@ -181,26 +180,19 @@ def calculate_relationship_temperature(slug: str, messages: list[dict]) -> dict:
 
 def save_user_profile(slug: str, profile: dict, owner=None):
     """保存用户画像。"""
-    from config import resolve_ex_dir
+    from core.mirror_store import mirror_store
 
-    ex_dir = resolve_ex_dir(slug, owner)
-    profile_file = ex_dir / "user_profile.json"
-
-    with open(profile_file, "w", encoding="utf-8") as f:
-        json.dump(profile, f, ensure_ascii=False, indent=2)
+    mirror_store(slug, owner).write_json("user_profile.json", profile)
 
     logger.info("用户画像已保存: %s", slug)
 
 
 def load_user_profile(slug: str, owner=None) -> dict:
     """加载用户画像。"""
-    from config import resolve_ex_dir
+    from core.mirror_store import mirror_store
 
-    ex_dir = resolve_ex_dir(slug, owner)
-    profile_file = ex_dir / "user_profile.json"
-
-    if not profile_file.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("user_profile.json"):
         return {}
 
-    with open(profile_file, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return store.read_json("user_profile.json")

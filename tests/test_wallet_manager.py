@@ -4,14 +4,14 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 
-def test_open_redpacket_is_single_settlement(tmp_path, monkeypatch):
+def test_open_redpacket_is_single_settlement():
     from core.wallet_manager import open_redpacket
 
-    ex_dir = tmp_path / "exes" / "owned"
+    # 依赖 conftest 的 isolate_exes_dir：EXES_DIR 指向临时目录，flat 布局 exes/owned
+    import config
+
+    ex_dir = config.EXES_DIR / "owned"
     ex_dir.mkdir(parents=True)
-    monkeypatch.setattr(
-        "core.wallet_manager.resolve_ex_dir", lambda s, owner=None: ex_dir
-    )
 
     packet = {
         "id": "rp_1",

@@ -8,23 +8,21 @@
 通过 config.resolve_ex_dir 优先命中嵌套目录、回退扁平目录兼容存量镜像。
 """
 
-import json
 import logging
 from typing import Optional
 
-from config import resolve_ex_dir
-from core.file_utils import atomic_write_json
+from core.mirror_store import mirror_store
 
 logger = logging.getLogger("ex-memory")
 
 
 def load_meta(slug: str, owner: Optional[int] = None) -> Optional[dict]:
     """读取镜像 meta.json。owner 为空时只查扁平目录（存量 / 无人格上下文）。"""
-    meta_path = resolve_ex_dir(slug, owner) / "meta.json"
-    if not meta_path.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("meta.json"):
         return None
     try:
-        return json.loads(meta_path.read_text(encoding="utf-8"))
+        return store.read_json("meta.json")
     except Exception:
         return None
 
@@ -39,13 +37,12 @@ def get_owner_user_id(slug: str, owner: Optional[int] = None) -> Optional[int]:
 
 
 def set_owner_user_id(slug: str, user_id: int) -> None:
-    ex_dir = resolve_ex_dir(slug, user_id)
-    meta_path = ex_dir / "meta.json"
-    if not meta_path.exists():
+    store = mirror_store(slug, user_id)
+    if not store.exists("meta.json"):
         raise FileNotFoundError(f"镜像 [{slug}] 不存在")
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta = store.read_json("meta.json")
     meta["owner_user_id"] = user_id
-    atomic_write_json(meta_path, meta)
+    store.write_json("meta.json", meta)
 
 
 def _single_user_mode() -> bool:
@@ -65,8 +62,7 @@ def user_owns_exe(slug: str, user_id: int) -> bool:
 
 def assert_exe_access(slug: str, user_id: int) -> None:
     """校验当前用户可访问该镜像。Raises PermissionError。"""
-    ex_dir = resolve_ex_dir(slug, user_id)
-    if not ex_dir.exists():
+    if not mirror_store(slug, user_id).base_dir.exists():
         raise FileNotFoundError(f"镜像 [{slug}] 不存在")
 
     if _single_user_mode():
