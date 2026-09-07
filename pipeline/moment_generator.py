@@ -1,12 +1,11 @@
 """朋友圈生成器：基于 persona.md 生成朋友圈内容，含评论和点赞。"""
 
-import json
 import logging
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from config import get_llm_config, get_llm_client, resolve_ex_dir
-from core.file_utils import atomic_write_json
+from config import get_llm_config, get_llm_client
+from core.mirror_store import mirror_store
 
 logger = logging.getLogger("ex-memory")
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
@@ -29,16 +28,15 @@ def generate_moment(slug: str, owner=None) -> str:
         FileNotFoundError: 缺少 persona.md
         RuntimeError: 未配置 LLM
     """
-    ex_dir = resolve_ex_dir(slug, owner)
-    persona_path = ex_dir / "persona.md"
-    if not persona_path.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("persona.md"):
         raise FileNotFoundError("缺少 persona.md")
 
     cfg = get_llm_config()
     if not cfg["api_key"]:
         raise RuntimeError("未配置 LLM API Key")
 
-    persona_content = persona_path.read_text(encoding="utf-8")
+    persona_content = store.read_text("persona.md")
     moment_prompt = (PROMPTS_DIR / "moment.md").read_text(encoding="utf-8")
 
     client = get_llm_client()
@@ -85,12 +83,7 @@ def generate_moment(slug: str, owner=None) -> str:
             }
         )
 
-    moments_path = ex_dir / "moments.json"
-    moments = (
-        json.loads(moments_path.read_text(encoding="utf-8"))
-        if moments_path.exists()
-        else []
-    )
+    moments = store.read_json("moments.json") if store.exists("moments.json") else []
     moments.append(
         {
             "id": f"m{len(moments) + 1}",
@@ -100,6 +93,6 @@ def generate_moment(slug: str, owner=None) -> str:
             "comments": comments,
         }
     )
-    atomic_write_json(moments_path, moments)
+    store.write_json("moments.json", moments)
     logger.info("朋友圈已生成: %s", slug)
     return content

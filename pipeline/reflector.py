@@ -5,8 +5,8 @@
 
 import logging
 from pathlib import Path
-from config import get_llm_config, get_llm_client, resolve_ex_dir
-from core.file_utils import atomic_write
+from config import get_llm_config, get_llm_client
+from core.mirror_store import mirror_store
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 logger = logging.getLogger("ex-memory")
@@ -30,13 +30,12 @@ def run_reflection(slug: str, owner=None) -> str:
     if not cfg["api_key"]:
         raise RuntimeError("未配置 LLM API Key")
 
-    ex_dir = resolve_ex_dir(slug, owner)
-    memory_path = ex_dir / "memory.md"
-    if not memory_path.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("memory.md"):
         raise FileNotFoundError(f"镜像 [{slug}] 缺少 memory.md，请先完成创建流程")
 
     reflect_prompt = (PROMPTS_DIR / "reflect.md").read_text(encoding="utf-8")
-    memory_content = memory_path.read_text(encoding="utf-8")
+    memory_content = store.read_text("memory.md")
 
     client = get_llm_client()
     response = client.chat.completions.create(
@@ -51,6 +50,6 @@ def run_reflection(slug: str, owner=None) -> str:
         temperature=0.7,
     )
     reflection = response.choices[0].message.content
-    atomic_write(ex_dir / "reflections.md", reflection)
+    store.write_text("reflections.md", reflection)
     logger.info("反思完成: %s", slug)
     return reflection

@@ -10,13 +10,11 @@ from prompt_toolkit import prompt as pt_prompt
 from config import (
     get_ex_dir,
     ensure_ex_dirs,
-    resolve_ex_dir,
-    ensure_ex_dirs_owned,
     get_embedding_config,
     get_llm_config,
     get_collection_name,
 )
-from core.file_utils import atomic_write, atomic_write_json
+from core.mirror_store import mirror_store
 from core.version_manager import backup as version_backup
 from memory.embedder import Embedder
 from memory.vector_store import VectorStore
@@ -31,18 +29,15 @@ logger = logging.getLogger("ex-memory")
 PIPELINE_STEPS = ["import", "distill_memory", "distill_persona", "skill"]
 
 
-def _save_failed_state(ex_dir: Path, step: str, error: Exception):
+def _save_failed_state(slug: str, step: str, error: Exception, owner=None):
     """保存失败状态到 meta.json。"""
-    meta_path = ex_dir / "meta.json"
-    if meta_path.exists():
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    else:
-        meta = {}
+    store = mirror_store(slug, owner)
+    meta = store.read_json("meta.json") if store.exists("meta.json") else {}
     meta["pipeline_state"] = "failed"
     meta["failed_step"] = step
     meta["error"] = str(error)[:500]
     meta["updated_at"] = datetime.now().isoformat()
-    atomic_write_json(meta_path, meta)
+    store.write_json("meta.json", meta)
 
 
 def run_create_flow(slug: Optional[str] = None):
@@ -113,6 +108,7 @@ def run_create_flow(slug: Optional[str] = None):
 
         # 创建目录
         ex_dir = ensure_ex_dirs(slug)
+        store = mirror_store(slug)
 
         # 写入初始 meta.json
         meta = {
@@ -127,7 +123,7 @@ def run_create_flow(slug: Optional[str] = None):
             },
             "pipeline_state": "intake_done",
         }
-        atomic_write_json(ex_dir / "meta.json", meta)
+        store.write_json("meta.json", meta)
 
         # 事前备份
         try:
@@ -140,6 +136,8 @@ def run_create_flow(slug: Optional[str] = None):
     # 上面两个分支都已确定 slug；显式收敛类型，避免下游反复出现 Optional
     if slug is None:
         raise RuntimeError("内部错误：镜像 slug 未能确定")
+
+    store = mirror_store(slug)
 
     failed_step = existing_meta.get("failed_step") if existing_meta else None
     steps = ["import", "distill_memory", "distill_persona", "skill"]
@@ -154,7 +152,7 @@ def run_create_flow(slug: Optional[str] = None):
     embedder = Embedder(
         api_key=emb_cfg["api_key"], base_url=emb_cfg["base_url"], model=emb_cfg["model"]
     )
-    chroma_dir = str(ex_dir / "chroma_db")
+    chroma_dir = str(store.path("chroma_db"))
     collection_name = get_collection_name(slug)
     vector_store = VectorStore(persist_dir=chroma_dir, collection_name=collection_name)
     chunker = Chunker()
@@ -178,7 +176,7 @@ def run_create_flow(slug: Optional[str] = None):
                 print("跳过数据导入。")
         except Exception as e:
             logger.error("数据导入失败: %s", e, exc_info=True)
-            _save_failed_state(ex_dir, "import", e)
+            _save_failed_state(slug, "import", e)
             print(f"数据导入失败: {e}")
             print("请修复问题后重新运行 /create 并输入代号继续。")
             return
@@ -206,11 +204,11 @@ def run_create_flow(slug: Optional[str] = None):
         print("正在生成 Relationship Memory...")
         try:
             memory_content = build_memory(slug, materials_summary)
-            atomic_write(ex_dir / "memory.md", memory_content)
+            store.write_text("memory.md", memory_content)
             print("  memory.md 已生成")
         except Exception as e:
             logger.error("生成 memory.md 失败: %s", e, exc_info=True)
-            _save_failed_state(ex_dir, "distill_memory", e)
+            _save_failed_state(slug, "distill_memory", e)
             print(f"生成 memory.md 失败: {e}")
             print("可稍后重新运行 /create 并输入代号继续。")
             return
@@ -221,11 +219,11 @@ def run_create_flow(slug: Optional[str] = None):
             persona_content = build_persona(
                 slug, materials_summary, vector_store, embedder
             )
-            atomic_write(ex_dir / "persona.md", persona_content)
+            store.write_text("persona.md", persona_content)
             print("  persona.md 已生成")
         except Exception as e:
             logger.error("生成 persona.md 失败: %s", e, exc_info=True)
-            _save_failed_state(ex_dir, "distill_persona", e)
+            _save_failed_state(slug, "distill_persona", e)
             print(f"生成 persona.md 失败: {e}")
             print("可稍后重新运行 /create 并输入代号继续。")
             return
@@ -237,17 +235,17 @@ def run_create_flow(slug: Optional[str] = None):
             write_skill(slug)
         except Exception as e:
             logger.error("生成 SKILL.md 失败: %s", e, exc_info=True)
-            _save_failed_state(ex_dir, "skill", e)
+            _save_failed_state(slug, "skill", e)
             print(f"生成 SKILL.md 失败: {e}")
             return
 
     # 更新 meta.json
-    meta = json.loads((ex_dir / "meta.json").read_text(encoding="utf-8"))
+    meta = store.read_json("meta.json")
     meta["pipeline_state"] = "completed"
     meta.pop("failed_step", None)
     meta.pop("error", None)
     meta["updated_at"] = datetime.now().isoformat()
-    atomic_write_json(ex_dir / "meta.json", meta)
+    store.write_json("meta.json", meta)
 
     # 展示摘要
     print("\n=== 创建完成！===")
@@ -328,18 +326,13 @@ def run_create_flow_api(
     """
 
     try:
-        ex_dir = (
-            resolve_ex_dir(slug, owner_user_id)
-            if resume
-            else ensure_ex_dirs_owned(slug, owner_user_id)
-        )
+        store = mirror_store(slug, owner_user_id)
 
         # 恢复模式：读取已有 meta
         if resume:
-            meta_path = ex_dir / "meta.json"
-            if not meta_path.exists():
+            if not store.exists("meta.json"):
                 return {"error": "未找到创建记录，无法恢复"}
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta = store.read_json("meta.json")
             if meta.get("pipeline_state") != "failed":
                 return {"error": "该镜像未处于失败状态，无需恢复"}
             failed_step = meta.get("failed_step", "")
@@ -370,7 +363,7 @@ def run_create_flow_api(
             }
             if owner_user_id is not None:
                 meta["owner_user_id"] = owner_user_id
-            atomic_write_json(ex_dir / "meta.json", meta)
+            store.write_json("meta.json", meta)
 
             # 事前备份
             try:
@@ -398,7 +391,7 @@ def run_create_flow_api(
                 model=emb_cfg["model"],
             )
             vector_store = VectorStore(
-                persist_dir=str(ex_dir / "chroma_db"),
+                persist_dir=str(store.path("chroma_db")),
                 collection_name=get_collection_name(slug),
             )
 
@@ -410,9 +403,9 @@ def run_create_flow_api(
         if start_idx <= 1:
             try:
                 memory_content = build_memory(slug, materials_summary)
-                atomic_write(ex_dir / "memory.md", memory_content)
+                store.write_text("memory.md", memory_content)
             except Exception as e:
-                _save_failed_state(ex_dir, "distill_memory", e)
+                _save_failed_state(slug, "distill_memory", e, owner=owner_user_id)
                 return {"error": f"生成 memory.md 失败: {e}"}
 
         if start_idx <= 2:
@@ -420,25 +413,25 @@ def run_create_flow_api(
                 persona_content = build_persona(
                     slug, materials_summary, vector_store, embedder
                 )
-                atomic_write(ex_dir / "persona.md", persona_content)
+                store.write_text("persona.md", persona_content)
             except Exception as e:
-                _save_failed_state(ex_dir, "distill_persona", e)
+                _save_failed_state(slug, "distill_persona", e, owner=owner_user_id)
                 return {"error": f"生成 persona.md 失败: {e}"}
 
         if start_idx <= 3:
             try:
                 write_skill(slug, owner=owner_user_id)
             except Exception as e:
-                _save_failed_state(ex_dir, "skill", e)
+                _save_failed_state(slug, "skill", e, owner=owner_user_id)
                 return {"error": f"生成 SKILL.md 失败: {e}"}
 
         # 读取最新 meta 并更新
-        meta = json.loads((ex_dir / "meta.json").read_text(encoding="utf-8"))
+        meta = store.read_json("meta.json")
         meta["pipeline_state"] = "completed"
         meta.pop("failed_step", None)
         meta.pop("error", None)
         meta["updated_at"] = datetime.now().isoformat()
-        atomic_write_json(ex_dir / "meta.json", meta)
+        store.write_json("meta.json", meta)
 
         logger.info("API 创建完成: %s", slug)
         return {"slug": slug, "name": name, "state": "completed"}

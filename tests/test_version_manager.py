@@ -25,7 +25,10 @@ def temp_ex_dir():
 
 class TestVersionManager:
     def test_backup_creates_version(self, temp_ex_dir):
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             version_name = backup("test_user")
             version_path = temp_ex_dir / "versions" / version_name
             assert version_path.exists()
@@ -33,14 +36,20 @@ class TestVersionManager:
             assert (version_path / "memory.md").read_text() == "# Memory\n版本一"
 
     def test_backup_creates_meta(self, temp_ex_dir):
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             version_name = backup("test_user", "v1_custom")
             assert version_name == "v1_custom"
             meta_path = temp_ex_dir / "versions" / "v1_custom" / "version_meta.json"
             assert meta_path.exists()
 
     def test_rollback_restores_files(self, temp_ex_dir):
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             # 先备份
             version_name = backup("test_user")
             # 修改原文件
@@ -50,25 +59,37 @@ class TestVersionManager:
             assert (temp_ex_dir / "memory.md").read_text() == "# Memory\n版本一"
 
     def test_rollback_nonexistent_version(self, temp_ex_dir):
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             with pytest.raises(FileNotFoundError, match="版本不存在"):
                 rollback("test_user", "v_nonexistent")
 
     def test_list_versions(self, temp_ex_dir):
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             backup("test_user", "v1")
             backup("test_user", "v2")
             versions = list_versions("test_user")
             assert len(versions) == 2
 
     def test_list_versions_empty(self, temp_ex_dir):
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             versions = list_versions("test_user")
             assert versions == []
 
     def test_backup_nonexistent_ex(self, temp_ex_dir):
-        with patch(
-            "core.version_manager.resolve_ex_dir", return_value=Path("/nonexistent")
+        with (
+            patch(
+                "core.version_manager.resolve_ex_dir", return_value=Path("/nonexistent")
+            ),
+            patch("config.resolve_ex_dir", return_value=Path("/nonexistent")),
         ):
             with pytest.raises(FileNotFoundError, match="镜像不存在"):
                 backup("ghost")
@@ -78,7 +99,10 @@ class TestVersionManager:
         chroma_dir = temp_ex_dir / "chroma_db"
         chroma_dir.mkdir()
         (chroma_dir / "test.db").write_text("fake-db-content")
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             version_name = backup("test_user")
             version_chroma = temp_ex_dir / "versions" / version_name / "chroma_db"
             assert version_chroma.exists()
@@ -89,7 +113,10 @@ class TestVersionManager:
         chroma_dir = temp_ex_dir / "chroma_db"
         chroma_dir.mkdir()
         (chroma_dir / "test.db").write_text("fake")
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             version_name = backup("test_user", include_chroma=False)
             version_chroma = temp_ex_dir / "versions" / version_name / "chroma_db"
             assert not version_chroma.exists()
@@ -99,7 +126,10 @@ class TestVersionManager:
         chroma_dir = temp_ex_dir / "chroma_db"
         chroma_dir.mkdir()
         (chroma_dir / "test.db").write_text("v1-db")
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             # 备份 v1
             version_name = backup("test_user")
             # 修改向量库
@@ -112,7 +142,10 @@ class TestVersionManager:
         """空 chroma_db 不备份（没有内容的目录不拷贝）。"""
         chroma_dir = temp_ex_dir / "chroma_db"
         chroma_dir.mkdir()  # 空目录
-        with patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir):
+        with (
+            patch("core.version_manager.resolve_ex_dir", return_value=temp_ex_dir),
+            patch("config.resolve_ex_dir", return_value=temp_ex_dir),
+        ):
             version_name = backup("test_user")
             version_chroma = temp_ex_dir / "versions" / version_name / "chroma_db"
             assert not version_chroma.exists()

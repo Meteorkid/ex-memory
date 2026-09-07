@@ -3,8 +3,8 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from config import get_llm_config, get_llm_client, resolve_ex_dir
-from core.file_utils import atomic_write
+from config import get_llm_config, get_llm_client
+from core.mirror_store import mirror_store
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -110,13 +110,12 @@ def _append_to_memory(
     slug: str, correction_num: int, timestamp: str, user_msg: str, owner=None
 ):
     """将纠正摘要追加到 memory.md 的 Correction 记录节。"""
-    ex_dir = resolve_ex_dir(slug, owner)
-    memory_path = ex_dir / "memory.md"
+    store = mirror_store(slug, owner)
 
-    if not memory_path.exists():
+    if not store.exists("memory.md"):
         return
 
-    content = memory_path.read_text(encoding="utf-8")
+    content = store.read_text("memory.md")
 
     if "## Correction 记录" not in content:
         content += "\n\n## Correction 记录\n"
@@ -127,17 +126,16 @@ def _append_to_memory(
 - 详见 corrections.md
 """
     content += correction_entry
-    atomic_write(memory_path, content)
+    store.write_text("memory.md", content)
 
 
 def _patch_persona(slug: str, correction_content: str, owner=None):
     """将纠正中的人格特征更新到 persona.md。"""
-    ex_dir = resolve_ex_dir(slug, owner)
-    persona_path = ex_dir / "persona.md"
-    if not persona_path.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("persona.md"):
         return
 
-    content = persona_path.read_text(encoding="utf-8")
+    content = store.read_text("persona.md")
 
     # 在 persona.md 末尾添加纠正记录节
     if "## 用户纠正补充" not in content:
@@ -147,7 +145,7 @@ def _patch_persona(slug: str, correction_content: str, owner=None):
     entry = f"\n### {timestamp}\n{correction_content}\n"
     content += entry
 
-    atomic_write(persona_path, content)
+    store.write_text("persona.md", content)
 
 
 def _format_history(messages: list[dict]) -> str:

@@ -26,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 
 from config import PROJECT_DIR, resolve_ex_dir, DISABLE_REGISTRATION
 from core.validation import validate_slug, validate_user_input, sanitize_chat_history
+from core.mirror_store import mirror_store
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
 import config
@@ -120,18 +121,15 @@ cache = SimpleCache(default_ttl=30)  # 30秒 TTL
 
 def _load_meta(slug: str, owner: Optional[int] = None) -> dict:
     """读取镜像 meta.json，不存在则抛 404。"""
-    meta_file = resolve_ex_dir(slug, owner) / "meta.json"
-    if not meta_file.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("meta.json"):
         raise HTTPException(status_code=404, detail="镜像不存在")
-    return json.loads(meta_file.read_text(encoding="utf-8"))
+    return store.read_json("meta.json")
 
 
 def _save_meta(slug: str, meta: dict, owner: Optional[int] = None) -> None:
     """写入镜像 meta.json。"""
-    meta_file = resolve_ex_dir(slug, owner) / "meta.json"
-    meta_file.write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    mirror_store(slug, owner).write_json("meta.json", meta)
 
 
 logger = logging.getLogger("ex-memory")
@@ -453,9 +451,8 @@ def list_exes(user_id: int = Depends(require_auth)):
     """列出当前用户可访问的镜像。"""
     exes = []
     for d in iter_accessible_exes(user_id):
-        meta_path = d / "meta.json"
         try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta = mirror_store(d.name, user_id).read_json("meta.json")
             exes.append(
                 ExeInfo(
                     slug=d.name,
@@ -1155,11 +1152,10 @@ def reflect_exe(slug: str, user_id: int = Depends(require_auth)):
 def list_moments(slug: str, user_id: int = Depends(require_auth)):
     """获取朋友圈时间线。"""
     slug = _check_exe_access(slug, user_id)
-    ex_dir = resolve_ex_dir(slug, user_id)
-    moments_path = ex_dir / "moments.json"
-    if not moments_path.exists():
+    store = mirror_store(slug, user_id)
+    if not store.exists("moments.json"):
         return {"moments": []}
-    moments = json.loads(moments_path.read_text(encoding="utf-8"))
+    moments = store.read_json("moments.json")
     return {"moments": moments}
 
 
@@ -1397,9 +1393,8 @@ def list_groups(user_id: int = Depends(require_auth)):
     groups: dict[str, list] = {}
     # 必须按归属过滤：镜像 slug/name 是前任昵称，泄露给其他用户属于越权信息暴露
     for exe_dir in iter_accessible_exes(user_id):
-        meta_file = exe_dir / "meta.json"
         try:
-            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            meta = mirror_store(exe_dir.name, user_id).read_json("meta.json")
             group = meta.get("group", "默认")
             if group not in groups:
                 groups[group] = []

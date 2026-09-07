@@ -1,8 +1,7 @@
 """合并 memory.md + persona.md → SKILL.md。"""
 
-import json
 import logging
-from config import resolve_ex_dir
+from core.mirror_store import mirror_store
 
 logger = logging.getLogger("ex-memory")
 
@@ -13,17 +12,12 @@ def combine(slug: str, owner=None) -> str:
     Returns:
         SKILL.md 的完整内容
     """
-    ex_dir = resolve_ex_dir(slug, owner)
+    store = mirror_store(slug, owner)
 
-    meta_path = ex_dir / "meta.json"
-    memory_path = ex_dir / "memory.md"
-    persona_path = ex_dir / "persona.md"
+    if not store.exists("meta.json"):
+        raise FileNotFoundError(f"meta.json 不存在: {store.path('meta.json')}")
 
-    if not meta_path.exists():
-        raise FileNotFoundError(f"meta.json 不存在: {meta_path}")
-
-    with open(meta_path, "r", encoding="utf-8") as f:
-        meta = json.load(f)
+    meta = store.read_json("meta.json")
 
     name = meta.get("name", slug)
     profile = meta.get("profile", {})
@@ -37,10 +31,10 @@ def combine(slug: str, owner=None) -> str:
     description = f"{name}，{'，'.join(desc_parts)}" if desc_parts else name
 
     memory_content = (
-        memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
+        store.read_text("memory.md") if store.exists("memory.md") else ""
     )
     persona_content = (
-        persona_path.read_text(encoding="utf-8") if persona_path.exists() else ""
+        store.read_text("persona.md") if store.exists("persona.md") else ""
     )
 
     skill_md = f"""# {name}
@@ -81,9 +75,8 @@ def combine(slug: str, owner=None) -> str:
 
 def write_skill(slug: str, owner=None):
     """生成并写入 SKILL.md。"""
-    ex_dir = resolve_ex_dir(slug, owner)
     content = combine(slug, owner)
-    skill_path = ex_dir / "SKILL.md"
-    skill_path.write_text(content, encoding="utf-8")
-    logger.info("已生成 %s", skill_path)
+    store = mirror_store(slug, owner)
+    store.write_text("SKILL.md", content)
+    logger.info("已生成 %s", store.path("SKILL.md"))
     return content

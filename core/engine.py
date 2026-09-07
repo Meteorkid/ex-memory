@@ -9,7 +9,6 @@ from typing import Optional
 
 from config import (
     get_llm_config,
-    resolve_ex_dir,
     RECENT_SESSIONS,
     DEFAULT_TOP_K,
     RAG_THRESHOLD,
@@ -79,7 +78,9 @@ class ChatEngine:
 
         self.slug = slug
         self.owner = owner
-        self.ex_dir = resolve_ex_dir(slug, owner)
+        from core.mirror_store import mirror_store
+
+        self.store = mirror_store(slug, owner)
         self.vector_store = vector_store
         self.embedder = embedder
         self._rag_failures = 0
@@ -100,27 +101,24 @@ class ChatEngine:
 
     def _load(self):
         """加载 SKILL.md、session 摘要、corrections。"""
-        skill_path = self.ex_dir / "SKILL.md"
-        if not skill_path.exists():
-            raise FileNotFoundError(f"缺少镜像文件: {skill_path}")
-        self.skill_content = skill_path.read_text(encoding="utf-8")
+        if not self.store.exists("SKILL.md"):
+            raise FileNotFoundError(f"缺少镜像文件: {self.store.path('SKILL.md')}")
+        self.skill_content = self.store.read_text("SKILL.md")
 
-        sessions_dir = self.ex_dir / "sessions"
-        if sessions_dir.exists():
-            # 优先使用 LLM 语义摘要（短小精准），没有则回退到原始归档
-            summary_files = sorted(sessions_dir.glob("*_summary.md"), reverse=True)[
-                :RECENT_SESSIONS
+        # 优先使用 LLM 语义摘要（短小精准），没有则回退到原始归档
+        summary_rels = sorted(
+            self.store.list("sessions", "*_summary.md"), reverse=True
+        )[:RECENT_SESSIONS]
+        if summary_rels:
+            self.session_summaries = [self._apply_decay(rel) for rel in summary_rels]
+        else:
+            # 兼容旧归档（无摘要文件时直接读原始对话）
+            raw_rels = sorted(
+                self.store.list("sessions", "session_*.md"), reverse=True
+            )[:RECENT_SESSIONS]
+            self.session_summaries = [
+                self.store.read_text(rel) for rel in raw_rels
             ]
-            if summary_files:
-                self.session_summaries = [self._apply_decay(f) for f in summary_files]
-            else:
-                # 兼容旧归档（无摘要文件时直接读原始对话）
-                raw_files = sorted(sessions_dir.glob("session_*.md"), reverse=True)[
-                    :RECENT_SESSIONS
-                ]
-                self.session_summaries = [
-                    f.read_text(encoding="utf-8") for f in raw_files
-                ]
 
         # 结构化纠正：有上限、同主题合并计数，不会无限增长（FR-070）
         try:
@@ -133,10 +131,9 @@ class ChatEngine:
 
         # 关系阶段：Web 写 "stage"，CLI 写 "relationship_stage"，两个键都认。
         # 未知值回退默认阶段，注入 prompt 时才不会 KeyError
-        meta_path = self.ex_dir / "meta.json"
-        if meta_path.exists():
+        if self.store.exists("meta.json"):
             try:
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                meta = self.store.read_json("meta.json")
                 stage = meta.get("stage") or meta.get("relationship_stage")
                 if stage in STAGE_INSTRUCTIONS:
                     self.relationship_stage = stage
@@ -167,18 +164,19 @@ class ChatEngine:
 
         logger.info("已连接 %s 的数字镜像 (model=%s)", self.slug, self.model)
 
-    def _apply_decay(self, summary_file) -> str:
+    def _apply_decay(self, rel: str) -> str:
         """按记忆衰减状态处理摘要（FR-068）。
 
         过了保留期的记忆不删掉，而是标成「模糊」并截短——真人对久远小事
         的记忆就是这样：还记得有这么回事，细节说不清了。全都记得反而不像。
         """
-        text = summary_file.read_text(encoding="utf-8")
+        text = self.store.read_text(rel)
         try:
             from core.memory_decay import MEMORY_INDEX_FILE, MemoryIndex
 
-            index = MemoryIndex(self.ex_dir / MEMORY_INDEX_FILE)
-            entry = index.entries.get(summary_file.name)
+            index = MemoryIndex(self.store.path(MEMORY_INDEX_FILE))
+            name = rel.rsplit("/", 1)[-1]
+            entry = index.entries.get(name)
             if entry is None:
                 return text
             from datetime import datetime as _dt

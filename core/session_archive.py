@@ -4,14 +4,13 @@
 函数签名不依赖 CLI 的 Session 对象。
 """
 
-import fcntl
 import json
 import logging
 from datetime import datetime
 from typing import Optional
 
-from config import resolve_ex_dir, ARCHIVE_THRESHOLD, PROJECT_DIR
-from core.file_utils import atomic_write, locked_update_json, _lock
+from config import ARCHIVE_THRESHOLD, PROJECT_DIR
+from core.mirror_store import mirror_store
 
 logger = logging.getLogger("ex-memory")
 
@@ -35,7 +34,7 @@ def maybe_archive(
     Returns:
         是否触发了归档
     """
-    state_path = resolve_ex_dir(slug, owner) / "sessions" / _STATE_FILENAME
+    store = mirror_store(slug, owner)
 
     def _claim(state: dict) -> Optional[dict]:
         from core.conversation_store import load_jsonl_messages
@@ -55,7 +54,9 @@ def maybe_archive(
         return {"start": archived, "end": total, "turns": turns}
 
     try:
-        claim = locked_update_json(state_path, dict, _claim)
+        claim = store.locked_update_json(
+            f"sessions/{_STATE_FILENAME}", dict, _claim
+        )
     except (OSError, ValueError, TimeoutError, json.JSONDecodeError) as e:
         logger.warning("会话归档认领失败 slug=%s: %s", slug, e)
         return False
@@ -105,23 +106,23 @@ def archive_session(
     if not messages:
         return None
 
-    sessions_dir = resolve_ex_dir(slug, owner) / "sessions"
-    sessions_dir.mkdir(parents=True, exist_ok=True)
+    store = mirror_store(slug, owner)
+    store.mkdir("sessions")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_file = sessions_dir / f"session_{timestamp}.md"
+    session_file_rel = f"sessions/session_{timestamp}.md"
+    session_file_name = session_file_rel.rsplit("/", 1)[-1]
 
     lines = [f"# 对话记录 — {timestamp}\n"]
     for msg in messages:
         role = "用户" if msg["role"] == "user" else slug
         lines.append(f"**{role}**: {msg['content']}\n")
 
-    atomic_write(session_file, "\n".join(lines))
-    logger.info("对话已归档: %s", session_file.name)
+    store.write_text(session_file_rel, "\n".join(lines))
+    logger.info("对话已归档: %s", session_file_name)
 
     summary = _generate_summary(
         slug,
-        sessions_dir,
         timestamp,
         messages,
         vector_store,
@@ -129,12 +130,11 @@ def archive_session(
         engine,
         owner,
     )
-    return {"session_file": session_file.name, "summary": summary}
+    return {"session_file": session_file_name, "summary": summary}
 
 
 def _generate_summary(
     slug: str,
-    sessions_dir,
     timestamp: str,
     messages: list[dict],
     vector_store,
@@ -145,6 +145,7 @@ def _generate_summary(
     """调用 LLM 生成会话语义摘要，用于下次启动时快速恢复上下文。"""
     from config import get_llm_config, get_llm_client
 
+    store = mirror_store(slug, owner)
     cfg = get_llm_config()
     if not cfg["api_key"]:
         return None
@@ -175,9 +176,10 @@ def _generate_summary(
         )
         summary = response.choices[0].message.content
 
-        summary_file = sessions_dir / f"session_{timestamp}_summary.md"
-        summary_file.write_text(summary, encoding="utf-8")
-        logger.info("会话摘要已生成: %s", summary_file.name)
+        summary_file_rel = f"sessions/session_{timestamp}_summary.md"
+        summary_file_name = summary_file_rel.rsplit("/", 1)[-1]
+        store.write_text(summary_file_rel, summary)
+        logger.info("会话摘要已生成: %s", summary_file_name)
 
         # 登记进记忆索引并跑一次衰减（FR-068）。
         # 衰减不是删除——久远的低重要度记忆会变模糊，那比全都记得更像人。
@@ -188,10 +190,10 @@ def _generate_summary(
                 run_decay_cycle,
             )
 
-            index = MemoryIndex(sessions_dir.parent / MEMORY_INDEX_FILE)
-            index.add(summary_file.name, summary, source="session")
+            index = MemoryIndex(store.path(MEMORY_INDEX_FILE))
+            index.add(summary_file_name, summary, source="session")
             index.save()
-            run_decay_cycle(sessions_dir.parent)
+            run_decay_cycle(store.path(""))
         except Exception as e:  # noqa: BLE001 — 记忆衰减是锦上添花，不该拖垮归档
             logger.warning("记忆索引登记失败: %s", e)
 
@@ -229,20 +231,25 @@ def update_skill_memory(
     slug: str, new_summary: str, owner: Optional[int] = None
 ) -> None:
     """将新摘要追加到 SKILL.md 的 PART A 末尾（带文件锁的读-改-写）。"""
-    skill_path = resolve_ex_dir(slug, owner) / "SKILL.md"
-    if not skill_path.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists("SKILL.md"):
         return
 
-    lock_path = skill_path.with_name(skill_path.name + ".lock")
+    marker = "---\n\n## PART B"
+
     try:
-        with open(lock_path, "a+", encoding="utf-8") as lock_file:
-            _lock(lock_file, fcntl.LOCK_EX)
-            content = skill_path.read_text(encoding="utf-8")
-            marker = "---\n\n## PART B"
-            if marker in content:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-                addition = f"\n\n### 对话摘要 ({timestamp})\n{new_summary}\n"
-                atomic_write(skill_path, content.replace(marker, addition + marker))
-                logger.info("SKILL.md 已同步最新摘要")
+        store.locked_update_text(
+            "SKILL.md", lambda content: _insert_summary(content, marker, new_summary)
+        )
+        logger.info("SKILL.md 已同步最新摘要")
     except OSError as e:
         logger.debug("更新 SKILL.md 摘要失败（非关键）: %s", e)
+
+
+def _insert_summary(content: str, marker: str, new_summary: str) -> str:
+    """在 PART B 标记前插入摘要段；无标记时不改动。"""
+    if marker not in content:
+        return content
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    addition = f"\n\n### 对话摘要 ({timestamp})\n{new_summary}\n"
+    return content.replace(marker, addition + marker)

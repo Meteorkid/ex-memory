@@ -58,29 +58,31 @@ def _rebuild_from_corpus(slug: str, owner=None) -> str:
 
 def _fresh_store(slug: str, owner=None):
     """清空旧 collection 后返回全新的 store 与 embedder。"""
-    from config import get_collection_name, get_embedding_config, resolve_ex_dir
+    from config import get_collection_name, get_embedding_config
     from memory.embedder import Embedder
     from memory.vector_store import VectorStore
+    from core.mirror_store import mirror_store
 
     emb_cfg = get_embedding_config()
     if not emb_cfg["api_key"]:
         raise RuntimeError("未配置 Embedding API Key，无法重建向量库")
 
-    ex_dir = resolve_ex_dir(slug, owner)
+    # chroma_db 是目录树硬点，经 MirrorStore.path() 定位
+    chroma_dir = str(mirror_store(slug, owner).path("chroma_db"))
     embedder = Embedder(
         api_key=emb_cfg["api_key"],
         base_url=emb_cfg["base_url"],
         model=emb_cfg["model"],
     )
     store = VectorStore(
-        persist_dir=str(ex_dir / "chroma_db"),
+        persist_dir=chroma_dir,
         collection_name=get_collection_name(slug),
     )
     # 先清空：旧参数切片与新参数切片混存会污染检索
     store.delete_collection()
     return (
         VectorStore(
-            persist_dir=str(ex_dir / "chroma_db"),
+            persist_dir=chroma_dir,
             collection_name=get_collection_name(slug),
         ),
         embedder,

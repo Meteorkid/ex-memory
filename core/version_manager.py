@@ -5,6 +5,16 @@ import json
 from datetime import datetime
 from config import resolve_ex_dir
 from core.path_safety import safe_version_name, resolve_under
+from core.mirror_store import mirror_store
+
+# 关键文本文件清单（chroma_db 是目录树，走 path() 出口单独处理）
+_TEXT_FILES = [
+    "SKILL.md",
+    "memory.md",
+    "persona.md",
+    "corrections.md",
+    "meta.json",
+]
 
 
 def backup(
@@ -21,38 +31,30 @@ def backup(
     Returns:
         版本名称
     """
-    ex_dir = resolve_ex_dir(slug, owner)
-    if not ex_dir.exists():
+    store = mirror_store(slug, owner)
+    if not store.exists(""):
         raise FileNotFoundError(f"镜像不存在: {slug}")
 
-    versions_dir = ex_dir / "versions"
-    versions_dir.mkdir(parents=True, exist_ok=True)
+    store.mkdir("versions")
 
     if not version_name:
         version_name = datetime.now().strftime("v%Y%m%d_%H%M%S")
     else:
         version_name = safe_version_name(version_name)
 
-    version_path = resolve_under(versions_dir, version_name)
-    version_path.mkdir(parents=True, exist_ok=True)
+    version_rel = f"versions/{version_name}"
+    store.mkdir(version_rel)
 
     # 备份关键文件
-    for filename in [
-        "SKILL.md",
-        "memory.md",
-        "persona.md",
-        "corrections.md",
-        "meta.json",
-    ]:
-        src = ex_dir / filename
-        if src.exists():
-            shutil.copy2(src, version_path / filename)
+    for filename in _TEXT_FILES:
+        if store.exists(filename):
+            store.write_bytes(f"{version_rel}/{filename}", store.read_bytes(filename))
 
-    # 备份向量库
+    # 备份向量库（目录树硬点，经 path() 出口处理）
     if include_chroma:
-        chroma_src = ex_dir / "chroma_db"
+        chroma_src = store.path("chroma_db")
         if chroma_src.exists() and any(chroma_src.iterdir()):
-            shutil.copytree(chroma_src, version_path / "chroma_db", dirs_exist_ok=True)
+            shutil.copytree(chroma_src, store.path(version_rel) / "chroma_db", dirs_exist_ok=True)
 
     # 写入版本元信息
     version_meta = {
@@ -60,9 +62,7 @@ def backup(
         "created_at": datetime.now().isoformat(),
         "slug": slug,
     }
-    (version_path / "version_meta.json").write_text(
-        json.dumps(version_meta, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    store.write_json(f"{version_rel}/version_meta.json", version_meta)
 
     return version_name
 
@@ -72,8 +72,8 @@ def rollback(slug: str, version_name: str, owner=None):
 
     回滚前自动创建安全备份，防止回滚出错后无法恢复。
     """
-    ex_dir = resolve_ex_dir(slug, owner)
-    versions_dir = ex_dir / "versions"
+    store = mirror_store(slug, owner)
+    versions_dir = store.path("versions")
     try:
         version_name = safe_version_name(version_name)
         version_path = resolve_under(versions_dir, version_name)
@@ -90,22 +90,16 @@ def rollback(slug: str, version_name: str, owner=None):
     except Exception:
         pass  # 备份失败不阻塞回滚
 
-    # 恢复关键文件
-    for filename in [
-        "SKILL.md",
-        "memory.md",
-        "persona.md",
-        "corrections.md",
-        "meta.json",
-    ]:
-        src = version_path / filename
-        if src.exists():
-            shutil.copy2(src, ex_dir / filename)
+    # 恢复关键文件（文本文件经 store 收敛，向量库走 path() 出口）
+    for filename in _TEXT_FILES:
+        src_rel = f"versions/{version_name}/{filename}"
+        if store.exists(src_rel):
+            store.write_bytes(filename, store.read_bytes(src_rel))
 
     # 恢复向量库
     chroma_src = version_path / "chroma_db"
     if chroma_src.exists():
-        current_chroma = ex_dir / "chroma_db"
+        current_chroma = store.path("chroma_db")
         if current_chroma.exists():
             shutil.rmtree(current_chroma)
         shutil.copytree(chroma_src, current_chroma)

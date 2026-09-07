@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from config import get_collection_name, get_embedding_config, resolve_ex_dir
+from config import get_collection_name, get_embedding_config
 
 
 def create_engine_and_store(slug: str, owner: Optional[int] = None):
@@ -59,7 +59,10 @@ def build_vector_store(slug: str, owner=None):
 
     from memory.vector_store import VectorStore
 
-    ex_dir = resolve_ex_dir(slug, owner)
+    # chroma_db 是目录树，属于 path() 硬点；将来切对象存储时改用后端专用落位
+    from core.mirror_store import mirror_store
+
     return VectorStore(
-        persist_dir=str(ex_dir / "chroma_db"), collection_name=collection
+        persist_dir=str(mirror_store(slug, owner).path("chroma_db")),
+        collection_name=collection,
     )
