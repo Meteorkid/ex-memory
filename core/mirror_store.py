@@ -48,6 +48,13 @@ class MirrorBackend(Protocol):
     def read_json(self, rel: str) -> Any: ...
     def write_json(self, rel: str, data: Any) -> None: ...
     def append_jsonl(self, rel: str, records: list[dict]) -> int: ...
+    def locked_update_text(
+        self,
+        rel: str,
+        updater: Callable[[str], str],
+        encoding: str = "utf-8",
+        default_text: str = "",
+    ) -> str: ...
     def locked_update_json(
         self, rel: str, default: Any, updater: Callable[[Any], Any]
     ) -> Any: ...
@@ -141,6 +148,25 @@ class LocalMirrorBackend:
                 f.flush()
         return len(records)
 
+    def locked_update_text(
+        self,
+        rel: str,
+        updater: Callable[[str], str],
+        encoding: str = "utf-8",
+        default_text: str = "",
+    ) -> str:
+        """在同一把 .lock 内完成文本读-改-写，无变化时不写盘（避免无谓 churn）。"""
+        p = self._path(rel)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = p.with_name(p.name + ".lock")
+        with open(lock_path, "a+", encoding="utf-8") as lock_file:
+            self._lock(lock_file, fcntl.LOCK_EX)
+            current = p.read_text(encoding=encoding) if p.exists() else default_text
+            new_text = updater(current)
+            if new_text != current:
+                file_utils.atomic_write(p, new_text, encoding=encoding)
+        return new_text
+
     def locked_update_json(
         self, rel: str, default: Any, updater: Callable[[Any], Any]
     ) -> Any:
@@ -207,6 +233,15 @@ class MirrorStore:
 
     def append_jsonl(self, rel: str, records: list[dict]) -> int:
         return self._backend.append_jsonl(rel, records)
+
+    def locked_update_text(
+        self,
+        rel: str,
+        updater: Callable[[str], str],
+        encoding: str = "utf-8",
+        default_text: str = "",
+    ) -> str:
+        return self._backend.locked_update_text(rel, updater, encoding, default_text)
 
     def locked_update_json(
         self, rel: str, default: Any, updater: Callable[[Any], Any]

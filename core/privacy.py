@@ -1,6 +1,5 @@
 """隐私安全：敏感信息检测、数据脱敏、过期清理。"""
 
-import fcntl
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -73,44 +72,38 @@ def clean_expired_conversations(
     """
     import json
 
-    import config
-    from core.file_utils import atomic_write, _lock
+    from core.mirror_store import mirror_store
 
-    conv_dir = config.resolve_ex_dir(slug, owner) / "conversations"
-    if not conv_dir.exists():
-        return 0
-
+    store = mirror_store(slug, owner)
+    rels = store.list("conversations", "*.jsonl")
     cutoff = datetime.now() - timedelta(days=retention_days)
     removed = 0
 
-    for path in sorted(conv_dir.glob("*.jsonl")):
-        lock_path = path.with_name(path.name + ".lock")
-        with open(lock_path, "a+", encoding="utf-8") as lock_file:
-            _lock(lock_file, fcntl.LOCK_EX)
-            kept_lines: list[str] = []
-            file_removed = 0
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    stripped = line.strip()
-                    if not stripped:
-                        continue
-                    try:
-                        record = json.loads(stripped)
-                        created_at = datetime.fromisoformat(record["created_at"])
-                    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
-                        # 无法判断时间的行保守保留
-                        kept_lines.append(stripped)
-                        continue
-                    if created_at < cutoff:
-                        file_removed += 1
-                    else:
-                        kept_lines.append(stripped)
-            if file_removed:
-                atomic_write(
-                    path,
-                    "\n".join(kept_lines) + "\n" if kept_lines else "",
-                )
-                removed += file_removed
+    def _filter(text: str) -> str:
+        kept_lines: list[str] = []
+        file_removed = 0
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                record = json.loads(stripped)
+                created_at = datetime.fromisoformat(record["created_at"])
+            except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+                # 无法判断时间的行保守保留
+                kept_lines.append(stripped)
+                continue
+            if created_at < cutoff:
+                file_removed += 1
+            else:
+                kept_lines.append(stripped)
+        return "\n".join(kept_lines) + ("\n" if kept_lines else "")
+
+    for rel in rels:
+        before = len(store.read_text(rel).splitlines())
+        store.locked_update_text(rel, _filter)
+        after = len(store.read_text(rel).splitlines())
+        removed += max(0, before - after)
 
     return removed
 

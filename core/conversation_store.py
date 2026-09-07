@@ -1,18 +1,17 @@
 """服务端对话归档：Web/API 聊天 JSONL 持久化。"""
 
-import fcntl
 import json
-import time
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
-
-import config
 
 from core.privacy import mask_sensitive
 
-LOCK_TIMEOUT = 5
+
+def _store(slug: str, owner: Optional[int] = None):
+    from core.mirror_store import mirror_store
+
+    return mirror_store(slug, owner)
 
 
 def append_turn(
@@ -28,7 +27,6 @@ def append_turn(
     手机号/身份证/银行卡/邮箱在落库前脱敏——这四类对语气还原没有价值，
     敏感信息不以明文入库。
     """
-    path = _conversation_path(slug, user_id)
     turn_id = uuid.uuid4().hex
     created_at = datetime.now().isoformat()
     records = [
@@ -52,55 +50,22 @@ def append_turn(
             "stickers": stickers or [],
         },
     ]
-    _append_jsonl(path, records)
+    _store(slug, user_id).append_jsonl("conversations/conversation.jsonl", records)
 
 
 def load_jsonl_messages(slug: str, owner: Optional[int] = None) -> list[dict]:
     """读取 Web/API 对话归档。损坏行会被跳过。"""
-    directory = config.resolve_ex_dir(slug, owner) / "conversations"
-    if not directory.exists():
-        return []
-
+    store = _store(slug, owner)
     messages = []
-    for path in sorted(directory.glob("*.jsonl")):
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    item = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if item.get("role") in ("user", "assistant") and item.get("content"):
-                    messages.append(item)
+    for rel in store.list("conversations", "*.jsonl"):
+        for line in store.read_text(rel).splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if item.get("role") in ("user", "assistant") and item.get("content"):
+                messages.append(item)
     return messages
-
-
-def _conversation_path(slug: str, owner: Optional[int] = None) -> Path:
-    path = config.resolve_ex_dir(slug, owner) / "conversations" / "conversation.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _append_jsonl(path: Path, records: list[dict]) -> None:
-    lock_path = path.with_name(path.name + ".lock")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "a+", encoding="utf-8") as lock_file:
-        _lock(lock_file, fcntl.LOCK_EX)
-        with open(path, "a", encoding="utf-8") as f:
-            for record in records:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            f.flush()
-
-
-def _lock(f, mode: int):
-    deadline = time.monotonic() + LOCK_TIMEOUT
-    while True:
-        try:
-            fcntl.flock(f.fileno(), mode | fcntl.LOCK_NB)
-            return
-        except BlockingIOError:
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"无法获取文件锁: {f.name}")
-            time.sleep(0.05)
