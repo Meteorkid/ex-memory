@@ -159,14 +159,25 @@ def _quiet_now(config: dict, now: datetime) -> bool:
 
 
 def _sent_today(user_id: int, slug: str, now: datetime) -> int:
+    """统计本地自然日内已排队的条数。
+
+    created_at 两种方言都按 UTC 落库，而 now 是本地时间。早先直接拿本地日期去
+    LIKE UTC 时间戳，在 UTC+8 下每天本地 00:00–08:00 会一条都查不到，日限额被
+    整段绕过。默认免打扰窗口（23–8）恰好盖住了这段，但免打扰是用户可配的，
+    健康保护不能靠另一个可关掉的开关兜底。所以把本地自然日的边界换算成 UTC
+    再按区间统计——顺带也走得上 created_at 索引。
+    """
     from server.auth import _get_conn
 
-    today = now.strftime("%Y-%m-%d")
+    start_local = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    fmt = "%Y-%m-%d %H:%M:%S"
+    start_utc = start_local.astimezone(timezone.utc).strftime(fmt)
+    end_utc = (start_local + timedelta(days=1)).astimezone(timezone.utc).strftime(fmt)
     with _get_conn() as conn:
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM proactive_messages"
-            " WHERE user_id = ? AND slug = ? AND created_at LIKE ?",
-            (user_id, slug, f"{today}%"),
+            " WHERE user_id = ? AND slug = ? AND created_at >= ? AND created_at < ?",
+            (user_id, slug, start_utc, end_utc),
         ).fetchone()
     return int(row["n"])
 

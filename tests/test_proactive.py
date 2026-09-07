@@ -6,7 +6,7 @@
 
 import hashlib
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -66,9 +66,12 @@ def _enable(slug, owner, **kw):
     return set_config(slug, owner=owner, enabled=True, **kw)
 
 
-MORNING = datetime(2026, 9, 2, 9, 0)
-NIGHT = datetime(2026, 9, 2, 22, 0)
-QUIET = datetime(2026, 9, 2, 3, 0)
+# 锚在「今天」而不是写死日期：日限额是按自然日统计的，入库时间用的是真实时钟，
+# 写死一个过去的日期会让限额测试只在那一天成立。
+_TODAY = date.today()
+MORNING = datetime.combine(_TODAY, time(9, 0))
+NIGHT = datetime.combine(_TODAY, time(22, 0))
+QUIET = datetime.combine(_TODAY, time(3, 0))
 
 
 class TestDefaultOff:
@@ -108,7 +111,10 @@ class TestTriggers:
 
     def test_no_trigger_at_random_hours(self, env):
         _enable("s", 1)
-        assert decide_trigger("s", 1, owner=1, now=datetime(2026, 9, 2, 15, 0)) is None
+        assert (
+            decide_trigger("s", 1, owner=1, now=datetime.combine(_TODAY, time(15, 0)))
+            is None
+        )
 
     def test_malformed_last_seen_is_tolerated(self, env):
         _enable("s", 1)
@@ -125,8 +131,14 @@ class TestQuietHours:
 
     def test_quiet_window_spanning_midnight(self, env):
         _enable("s", 1, quiet_start=23, quiet_end=8)
-        assert decide_trigger("s", 1, owner=1, now=datetime(2026, 9, 2, 23, 30)) is None
-        assert decide_trigger("s", 1, owner=1, now=datetime(2026, 9, 2, 7, 0)) is None
+        assert (
+            decide_trigger("s", 1, owner=1, now=datetime.combine(_TODAY, time(23, 30)))
+            is None
+        )
+        assert (
+            decide_trigger("s", 1, owner=1, now=datetime.combine(_TODAY, time(7, 0)))
+            is None
+        )
 
     def test_non_spanning_quiet_window(self, env):
         _enable("s", 1, quiet_start=8, quiet_end=10)
@@ -138,6 +150,30 @@ class TestDailyCap:
         _enable("s", 1, max_per_day=1)
         queue_message("s", 1, TRIGGER_MORNING, "早", owner=1)
         assert decide_trigger("s", 1, owner=1, now=MORNING) is None
+
+    def test_cap_holds_across_utc_day_boundary(self, env):
+        """本地日期与 UTC 日期不同的那一段，日限额同样要生效。
+
+        created_at 按 UTC 落库，早先的实现拿本地日期去 LIKE。西半球部署时，
+        本地晚上的推送窗口（21–23 点）落在 UTC 的第二天，于是每晚的消息一条
+        都统计不到，日限额整段失效——对一个默认就要防沉溺的功能，这是最不能
+        漏的一处。用带固定偏移的 aware 时间构造，不依赖跑测试的机器在哪个时区。
+        """
+        from server.auth import _get_conn
+
+        est = timezone(timedelta(hours=-5))
+        local_now = datetime(2026, 9, 7, 22, 30, tzinfo=est)  # UTC 已是 09-08 03:30
+        _enable("s", 1, max_per_day=1)
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO proactive_messages"
+                " (exe_key, user_id, slug, trigger, content, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                ("1/s", 1, "s", TRIGGER_NIGHT, "睡了吗", "2026-09-08 03:00:00"),
+            )
+            conn.commit()
+
+        assert decide_trigger("s", 1, owner=1, now=local_now) is None
 
     def test_zero_cap_disables_effectively(self, env):
         _enable("s", 1, max_per_day=0)
