@@ -224,6 +224,9 @@ class TestWebPathIntegration:
             "/api/auth/login", json={"username": "web", "password": "pass1234"}
         ).json()["token"]
         headers = {"Authorization": f"Bearer {token}"}
+        from server.auth import validate_token
+
+        token_uid = validate_token(token)
 
         engine = MagicMock()
 
@@ -232,6 +235,14 @@ class TestWebPathIntegration:
             yield {"type": "usage", "prompt_tokens": 1, "completion_tokens": 1}
 
         engine.chat_stream.side_effect = fake_stream
+
+        # 按量计费下，初始体验余额只够 10 轮（¥0.20 / ¥0.02 每轮），
+        # 而归档需要满 ARCHIVE_THRESHOLD 轮。先充值补齐，否则中途会被余额闸门拦下。
+        from core.billing import ensure_account, topup
+        from config import TURN_PRICE_MICROS
+
+        account_id = ensure_account(token_uid)
+        topup(account_id, ARCHIVE_THRESHOLD * int(TURN_PRICE_MICROS))
 
         cfg_p, client_p = _mock_llm("记忆层摘要：我们聊了很多")
         with cfg_p, client_p, patch("server.routes._get_engine", return_value=engine):

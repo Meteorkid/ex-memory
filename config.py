@@ -77,6 +77,14 @@ REQUIRE_AGE_CONFIRMATION = os.getenv("REQUIRE_AGE_CONFIRMATION", "true").lower()
 _pricing_raw = os.getenv("LLM_PRICING", "")
 LLM_PRICING = json.loads(_pricing_raw) if _pricing_raw else {}
 
+# ── 按量计费（对话轮次 × 单价，见 FR-055 / M2）──
+# 每轮固定单价（micros，1 元 = 1_000_000）：用户侧应收按「轮 × 单价」记账，
+# 与 usage_records.cost_micros（供应商成本）分离，成本口径不受定价影响。
+TURN_PRICE_MICROS = int(os.getenv("TURN_PRICE_MICROS", "20000"))  # ¥0.02 / 轮
+# 新账号初始体验余额（micros），¥0.20 ≈ 10 轮 @¥0.02。避免免费档因余额为 0
+# 导致一条消息都发不出。要更慷慨可在环境变量提高。
+INITIAL_BALANCE_MICROS = int(os.getenv("INITIAL_BALANCE_MICROS", "200000"))  # ¥0.20 ≈ 10 轮
+
 # 对象存储（FR-034 / NFR-033）。当前用于备份与恢复，不是运行时文件访问。
 # BLOB_BUCKET 为空时用本地目录 data/blobs，仅适合单机。
 BLOB_BUCKET = os.getenv("BLOB_BUCKET", "")

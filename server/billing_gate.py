@@ -25,7 +25,13 @@ def reserve(user_id: int) -> tuple[Optional[int], str]:
     连话都说不了。account_id 为 None 时后续 settle/release 自动跳过。
     这条路径会打错误日志——收不上钱是要有人知道的。
     """
-    from core.billing import ALLOW, QuotaExceeded, ensure_account, reserve_turn
+    from core.billing import (
+        ALLOW,
+        BalanceInsufficient,
+        QuotaExceeded,
+        ensure_account,
+        reserve_turn,
+    )
 
     try:
         account_id = ensure_account(user_id)
@@ -35,6 +41,13 @@ def reserve(user_id: int) -> tuple[Optional[int], str]:
 
     try:
         outcome = reserve_turn(account_id)
+    except BalanceInsufficient as e:
+        raise QuotaBlocked(
+            {
+                "type": "insufficient_balance",
+                "message": str(e),
+            }
+        ) from e
     except QuotaExceeded as e:
         raise QuotaBlocked(
             {

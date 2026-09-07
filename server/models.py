@@ -170,6 +170,16 @@ class ActivateSubscriptionRequest(BaseModel):
     days: int = Field(default=30, ge=1, le=3650)
 
 
+class TopupRequest(BaseModel):
+    amount_micros: int = Field(..., gt=0, le=100_000_000_000)
+
+
+class PaymentCallbackRequest(BaseModel):
+    payment_ref: str = Field(..., min_length=4, max_length=160)
+    provider: str = Field(default="", max_length=32)
+    channel_trade_no: str = Field(default="", max_length=128)
+
+
 class TimelineEventRequest(BaseModel):
     event: str = Field(..., min_length=1, max_length=500)
     happened_at: Optional[str] = Field(default=None, max_length=32)

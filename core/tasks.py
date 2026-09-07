@@ -243,3 +243,22 @@ def shutdown(wait: bool = False) -> None:
 
 def reset_for_tests() -> None:
     shutdown(wait=True)
+
+
+@register("billing_reconcile")
+def _reconcile_billing(progress, external_orders: list, include_subscriptions: bool = False) -> dict:
+    """充值侧对账任务（NFR-006）。外部下单/入账后由调度触发。
+
+    payload.external_orders 形如 [{"payment_ref" ..., "amount_micros" ...}]，
+    require_topup 等渠道账单解析后投喂。返回充值对账报告；如需同时核对订阅侧，
+    置 include_subscriptions=True。
+    """
+    from core.topup import reconcile_topup
+
+    report = reconcile_topup(external_orders or [])
+    if include_subscriptions:
+        from core.payments import reconcile
+
+        report["subscriptions"] = reconcile(external_orders or [])
+    progress.update(100, "充值对账完成")
+    return report

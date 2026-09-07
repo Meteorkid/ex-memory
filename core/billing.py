@@ -61,6 +61,19 @@ class QuotaExceeded(Exception):
     """配额耗尽且套餐策略为拒绝。"""
 
 
+class BalanceInsufficient(Exception):
+    """余额不足，无法支付一轮对话。按量计费下用于拦截（对应旧配额制 QuotaExceeded）。"""
+
+    def __init__(self, account_id: int, balance_micros: int, turn_price_micros: int):
+        super().__init__(
+            f"余额不足（{balance_micros / 1_000_000:.2f} 元），本轮单价 "
+            f"{turn_price_micros / 1_000_000:.2f} 元，请先充值。"
+        )
+        self.account_id = account_id
+        self.balance_micros = balance_micros
+        self.turn_price_micros = turn_price_micros
+
+
 def current_period() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m")
 
@@ -123,7 +136,165 @@ def set_plan(account_id: int, plan: str) -> None:
         conn.commit()
 
 
+# ── 余额账本（按量计费）──
+
+
+def _turn_price() -> int:
+    from config import TURN_PRICE_MICROS
+
+    return int(TURN_PRICE_MICROS)
+
+
+def _ensure_balance_row(conn, account_id: int) -> None:
+    """惰性建余额行。新账号首次建行时写入初始体验余额，避免一分钱没有。"""
+    from config import INITIAL_BALANCE_MICROS
+
+    row = conn.execute(
+        "SELECT balance_micros FROM account_balances WHERE account_id = ?",
+        (account_id,),
+    ).fetchone()
+    if row is not None:
+        return
+    conn.execute(
+        "INSERT INTO account_balances (account_id, balance_micros, updated_at)"
+        " VALUES (?, ?, ?)",
+        (account_id, int(INITIAL_BALANCE_MICROS), _now()),
+    )
+
+
+def _add_ledger(
+    conn,
+    account_id: int,
+    kind: str,
+    amount_micros: int,
+    *,
+    turn_price: Optional[int] = None,
+    ref_type: str = "",
+    ref_id: str = "",
+    memo: str = "",
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO ledger (account_id, kind, amount_micros, turn_price_micros,
+                            ref_type, ref_id, memo)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (account_id, kind, amount_micros, turn_price, ref_type, ref_id, memo),
+    )
+
+
+def balance_status(account_id: int) -> dict:
+    """余额视图：余额、单价、可支撑轮数。用户侧余额查询走这里。"""
+    from server.auth import _get_conn
+
+    with _get_conn() as conn:
+        _ensure_balance_row(conn, account_id)
+        row = conn.execute(
+            "SELECT balance_micros FROM account_balances WHERE account_id = ?",
+            (account_id,),
+        ).fetchone()
+        conn.commit()
+    balance = int(row["balance_micros"])
+    price = _turn_price()
+    return {
+        "account_id": account_id,
+        "balance_micros": balance,
+        "turn_price_micros": price,
+        "affordable_turns": balance // price if price else 0,
+    }
+
+
+def credit(
+    conn,
+    account_id: int,
+    amount_micros: int,
+    *,
+    kind: str,
+    turn_price: Optional[int] = None,
+    ref_type: str = "",
+    ref_id: str = "",
+    memo: str = "",
+) -> int:
+    """事务内入账：加余额并落一条 ledger 流水，返回入账后余额。
+
+    与 `topup()` 的区别：不自己开事务，把余额与流水写入放进**调用方的事务**，
+    用于充值回调这类「订单状态 + 余额 + 流水」必须原子一起提交的场景。
+    由调用方负责 commit。
+    """
+    _ensure_balance_row(conn, account_id)
+    conn.execute(
+        "UPDATE account_balances SET balance_micros = balance_micros + ?,"
+        " updated_at = ? WHERE account_id = ?",
+        (amount_micros, _now(), account_id),
+    )
+    _add_ledger(
+        conn,
+        account_id,
+        kind,
+        amount_micros,
+        turn_price=turn_price,
+        ref_type=ref_type,
+        ref_id=ref_id,
+        memo=memo,
+    )
+    row = conn.execute(
+        "SELECT balance_micros FROM account_balances WHERE account_id = ?",
+        (account_id,),
+    ).fetchone()
+    return int(row["balance_micros"])
+
+
+def topup(
+    account_id: int,
+    amount_micros: int,
+    *,
+    provider: str = "manual",
+    payment_ref: str = "",
+    ref_id: str = "",
+) -> int:
+    """充值入账：金额加进余额并落一条 topup 流水。返回入账后余额。
+
+    管理员手工充值（无渠道订单）走这里的完整事务。幂等交给上层
+    （topup_orders.payment_ref 唯一约束），本函数只做「入账」这一动作。
+    """
+    from server.auth import _get_conn
+
+    if amount_micros <= 0:
+        raise ValueError("充值金额必须为正")
+    with _get_conn() as conn:
+        _ensure_balance_row(conn, account_id)
+        conn.execute(
+            "UPDATE account_balances SET balance_micros = balance_micros + ?,"
+            " updated_at = ? WHERE account_id = ?",
+            (amount_micros, _now(), account_id),
+        )
+        _add_ledger(
+            conn,
+            account_id,
+            "topup",
+            amount_micros,
+            ref_type="topup_order" if ref_id else provider,
+            ref_id=ref_id or payment_ref,
+            memo=f"provider={provider}",
+        )
+        row = conn.execute(
+            "SELECT balance_micros FROM account_balances WHERE account_id = ?",
+            (account_id,),
+        ).fetchone()
+        conn.commit()
+    return int(row["balance_micros"])
+
+
 # ── 配额 ──
+
+
+def _turn_limit(conn, account_id: int) -> int:
+    """同一事务连接内读取套餐月轮次（仅作统计，放行由余额决定）。"""
+    row = conn.execute(
+        "SELECT plan FROM accounts WHERE id = ?", (account_id,)
+    ).fetchone()
+    name = row["plan"] if row else PLAN_FREE
+    return PLANS.get(name, PLANS[PLAN_FREE]).monthly_turns
 
 
 def _ensure_quota_row(conn, account_id: int, period: str, limit: int) -> dict:
@@ -168,37 +339,41 @@ def quota_status(account_id: int) -> dict:
 
 
 def reserve_turn(account_id: int) -> str:
-    """预扣一轮额度。返回 ALLOW / DEGRADE，或抛 QuotaExceeded。
+    """预扣一轮费用。返回 ALLOW，余额不足以支付本轮时抛 BalanceInsufficient。
 
-    预扣发生在调 LLM 之前：并发请求各自先占住名额，避免同时判断「还有余额」
-    然后一起超发。
+    按量计费：放行与否由**余额**是否 ≥ 本轮单价决定，用原子 UPDATE 预扣，
+    并发下也不会超扣。配额表的 turns_reserved 仅作轮次统计（历史维度），
+    不再作为放行门槛。
     """
     from server.auth import _get_conn
 
-    plan = get_plan(account_id)
+    price = _turn_price()
     period = current_period()
     with _get_conn() as conn:
-        row = _ensure_quota_row(conn, account_id, period, plan.monthly_turns)
-        used = int(row["turns_reserved"]) + int(row["turns_settled"])
-        limit = int(row["turns_limit"])
+        _ensure_balance_row(conn, account_id)
+        cur = conn.execute(
+            "UPDATE account_balances SET balance_micros = balance_micros - ?,"
+            " updated_at = ? WHERE account_id = ? AND balance_micros >= ?",
+            (price, _now(), account_id, price),
+        )
+        if cur.rowcount == 0:
+            row = conn.execute(
+                "SELECT balance_micros FROM account_balances WHERE account_id = ?",
+                (account_id,),
+            ).fetchone()
+            balance = int(row["balance_micros"]) if row else 0
+            conn.commit()
+            raise BalanceInsufficient(account_id, balance, price)
 
-        if used >= limit:
-            if plan.overage == "reject":
-                conn.commit()
-                raise QuotaExceeded(
-                    f"本月对话额度已用完（{limit} 轮）。升级套餐或等下个周期重置。"
-                )
-            outcome = DEGRADE
-        else:
-            outcome = ALLOW
-
+        # 轮次统计：保留 turns_reserved 计数，放行不依赖 quota.limit
+        _ensure_quota_row(conn, account_id, period, _turn_limit(conn, account_id))
         conn.execute(
             "UPDATE quotas SET turns_reserved = turns_reserved + 1, updated_at = ?"
             " WHERE account_id = ? AND period = ?",
             (_now(), account_id, period),
         )
         conn.commit()
-    return outcome
+    return ALLOW
 
 
 def settle_turn(
@@ -251,14 +426,26 @@ def settle_turn(
                 cost,
             ),
         )
+        # 用户侧应收：每轮固定单价（与 cost 即供应商成本分离）。
+        # 余额已在 reserve_turn 预扣，此处只落不可变流水，供对账核对应收总额。
+        price = _turn_price()
+        _add_ledger(
+            conn,
+            account_id,
+            "consume",
+            -price,
+            turn_price=price,
+            ref_type="turn",
+            ref_id=str(account_id),
+        )
         conn.commit()
     return cost
 
 
 def release_reservation(account_id: int) -> None:
-    """调用失败时释放预扣。
+    """调用失败时释放预扣：撤销配额计数，并把 reserve 预扣的余额加回。
 
-    没有这一步就是「扣了额度没生成」——用户为一次失败的请求付了钱。
+    没有这一步就是「扣了钱没生成」——用户为一次失败的请求付了费。
     """
     from server.auth import _get_conn
 
@@ -268,6 +455,11 @@ def release_reservation(account_id: int) -> None:
             " THEN turns_reserved - 1 ELSE 0 END, updated_at = ?"
             " WHERE account_id = ? AND period = ?",
             (_now(), account_id, current_period()),
+        )
+        conn.execute(
+            "UPDATE account_balances SET balance_micros = balance_micros + ?,"
+            " updated_at = ? WHERE account_id = ?",
+            (_turn_price(), _now(), account_id),
         )
         conn.commit()
 

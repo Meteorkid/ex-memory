@@ -104,22 +104,28 @@ class TestTwoPhaseDeduction:
         release_reservation(account_id)
         assert quota_status(account_id)["turns_used"] == 0
 
-    def test_concurrent_reservations_do_not_oversell(self, client, request):
-        """并发下各自先占名额，不能同时判断「还有余额」然后一起超发。"""
-        from core.billing import PLANS, QuotaExceeded, ensure_account, reserve_turn
+    def test_reservations_do_not_oversell_balance(self, client, request):
+        """并发下不能超扣：余额只够 N 轮时最多放行 N 轮，第 N+1 轮抛余额不足。"""
+        from core.billing import (
+            BalanceInsufficient,
+            balance_status,
+            ensure_account,
+            reserve_turn,
+        )
 
         _headers, user_id = _account(client, request)
         account_id = ensure_account(user_id)
-        limit = PLANS["free"].monthly_turns
+        affordable = balance_status(account_id)["affordable_turns"]
 
         granted = 0
-        for _ in range(limit + 5):
+        for _ in range(affordable + 5):
             try:
                 reserve_turn(account_id)
                 granted += 1
-            except QuotaExceeded:
+            except BalanceInsufficient:
                 break
-        assert granted == limit
+        assert granted == affordable
+        assert balance_status(account_id)["balance_micros"] == 0
 
     def test_release_never_goes_negative(self, client, request):
         from core.billing import ensure_account, quota_status, release_reservation
@@ -131,27 +137,223 @@ class TestTwoPhaseDeduction:
         assert quota_status(account_id)["turns_used"] == 0
 
 
-class TestOveragePolicy:
-    def test_free_plan_rejects_when_exhausted(self, client, request):
-        from core.billing import PLANS, QuotaExceeded, ensure_account, reserve_turn
+class TestBalancePolicy:
+    """按量计费：放行只由余额决定，套餐不影响（无月度额度上限，也无降级模型）。"""
+
+    def test_insufficient_balance_blocks_reserve(self, client, request):
+        from core.billing import (
+            ALLOW,
+            BalanceInsufficient,
+            balance_status,
+            ensure_account,
+            reserve_turn,
+            topup,
+        )
+        from config import INITIAL_BALANCE_MICROS
 
         _headers, user_id = _account(client, request)
         account_id = ensure_account(user_id)
-        for _ in range(PLANS["free"].monthly_turns):
+        # 掏空初始余额
+        affordable = balance_status(account_id)["affordable_turns"]
+        for _ in range(affordable):
             reserve_turn(account_id)
-        with pytest.raises(QuotaExceeded):
+        with pytest.raises(BalanceInsufficient):
             reserve_turn(account_id)
+        # 充值后恢复可继续
+        topup(account_id, INITIAL_BALANCE_MICROS)
+        assert reserve_turn(account_id) == ALLOW
 
-    def test_paid_plan_degrades_instead_of_rejecting(self, client, request):
-        from core.billing import DEGRADE, PLANS, ensure_account, reserve_turn, set_plan
+    def test_topup_credits_balance_and_ledger(self, client, request):
+        from core.billing import balance_status, ensure_account, topup
 
         _headers, user_id = _account(client, request)
         account_id = ensure_account(user_id)
-        set_plan(account_id, "standard")
-        for _ in range(PLANS["standard"].monthly_turns):
-            reserve_turn(account_id)
-        # 付费用户超额降级而不是被拦住
-        assert reserve_turn(account_id) == DEGRADE
+        before = balance_status(account_id)["balance_micros"]
+        new_bal = topup(account_id, 100_000, ref_id="order-1")
+        assert new_bal == before + 100_000
+
+        from server.auth import _get_conn
+
+        with _get_conn() as conn:
+            row = conn.execute(
+                "SELECT kind, amount_micros, ref_id FROM ledger"
+                " WHERE account_id = ? ORDER BY id DESC LIMIT 1",
+                (account_id,),
+            ).fetchone()
+        assert row["kind"] == "topup" and int(row["amount_micros"]) == 100_000
+        assert row["ref_id"] == "order-1"
+
+    def test_settle_writes_consume_ledger(self, client, request):
+        from core.billing import ensure_account, settle_turn
+        from config import TURN_PRICE_MICROS
+        from server.auth import _get_conn
+
+        _headers, user_id = _account(client, request)
+        account_id = ensure_account(user_id)
+        settle_turn(account_id, prompt_tokens=100, completion_tokens=10)
+
+        with _get_conn() as conn:
+            row = conn.execute(
+                "SELECT kind, amount_micros, turn_price_micros FROM ledger"
+                " WHERE account_id = ? AND kind = 'consume' ORDER BY id DESC LIMIT 1",
+                (account_id,),
+            ).fetchone()
+        assert int(row["amount_micros"]) == -int(TURN_PRICE_MICROS)
+        assert int(row["turn_price_micros"]) == int(TURN_PRICE_MICROS)
+
+
+class TestTopupOrder:
+    """充值订单 + 回调入账（core.topup）：下单、幂等入账、并发防重复、404/订单状态保护。"""
+
+    def test_create_order_then_callback_credits(self, client, request):
+        from core.billing import balance_status, ensure_account
+        from core.topup import confirm_topup_payment, create_topup_order
+
+        _headers, user_id = _account(client, request)
+        account_id = ensure_account(user_id)
+        before = balance_status(account_id)["balance_micros"]
+
+        order = create_topup_order(account_id, 500_000)
+        assert order["status"] == "pending" and order["amount_micros"] == 500_000
+
+        result = confirm_topup_payment(order["order_id"], channel_trade_no="wx-1")
+        assert result["status"] == "paid" and result["ok"] is True
+        assert balance_status(account_id)["balance_micros"] == before + 500_000
+
+    def test_callback_idempotent_no_double_credit(self, client, request):
+        from core.billing import balance_status, ensure_account
+        from core.topup import confirm_topup_payment, create_topup_order
+
+        _headers, user_id = _account(client, request)
+        account_id = ensure_account(user_id)
+        before = balance_status(account_id)["balance_micros"]
+
+        order = create_topup_order(account_id, 200_000)
+        paid = confirm_topup_payment(order["order_id"])
+        assert paid["status"] == "paid"
+        again = confirm_topup_payment(order["order_id"])
+        assert again["status"] == "already_paid" and again["ok"] is True
+        assert balance_status(account_id)["balance_micros"] == before + 200_000
+
+    def test_callback_unknown_order(self, client, request):
+        from core.topup import confirm_topup_payment
+
+        result = confirm_topup_payment("nope-nope-nope-nope")
+        assert result["status"] == "not_found" and result["ok"] is False
+
+    def test_topup_http_endpoints(self, client, request):
+        """POST /account/topup 建单 + POST /payment/callback 入账 走完整闭环。"""
+        headers, user_id = _account(client, request)
+
+        resp = client.post(
+            "/api/account/topup", headers=headers, json={"amount_micros": 300_000}
+        )
+        assert resp.status_code == 200
+        order = resp.json()
+        assert order["status"] == "pending"
+
+        cb = client.post(
+            "/api/payment/callback",
+            json={"payment_ref": order["order_id"], "channel_trade_no": "wx-web"},
+        )
+        assert cb.status_code == 200
+        # 重复回调不报错且不再加钱
+        cb2 = client.post(
+            "/api/payment/callback", json={"payment_ref": order["order_id"]}
+        )
+        assert cb2.status_code == 200
+
+        bal = client.get(
+            "/api/account/balance", headers=headers
+        ).json()
+        assert bal["balance_micros"] >= 300_000
+
+    def test_callback_unknown_http_404(self, client, request):
+        resp = client.post(
+            "/api/payment/callback", json={"payment_ref": "no-such-order-ref"}
+        )
+        assert resp.status_code == 404
+
+
+class TestTopupRefund:
+    """充值退款 + 充值侧对账（NFR-006）：幂等退款、余额扣回、三类差异。"""
+
+    def test_refund_credits_back_balance_once(self, client, request):
+        from core.billing import balance_status, ensure_account
+        from core.topup import (
+            confirm_topup_payment,
+            create_topup_order,
+            refund_topup,
+        )
+
+        _headers, user_id = _account(client, request)
+        account_id = ensure_account(user_id)
+        before = balance_status(account_id)["balance_micros"]
+
+        order = create_topup_order(account_id, 400_000)
+        confirm_topup_payment(order["order_id"])
+        assert balance_status(account_id)["balance_micros"] == before + 400_000
+
+        refund = refund_topup(order["order_id"])
+        assert refund["status"] == "refunded" and refund["ok"] is True
+        assert balance_status(account_id)["balance_micros"] == before
+
+        # 幂等：重复退款不重复扣
+        again = refund_topup(order["order_id"])
+        assert again["status"] == "already_refunded" and again["ok"] is True
+        assert balance_status(account_id)["balance_micros"] == before
+
+    def test_refund_rejects_unpaid_order(self, client, request):
+        from core.billing import ensure_account
+        from core.topup import create_topup_order, refund_topup
+
+        _headers, user_id = _account(client, request)
+        order = create_topup_order(ensure_account(user_id), 100_000)
+        result = refund_topup(order["order_id"])
+        assert result["status"] == "pending" and result["ok"] is False
+
+    def test_reconcile_three_kinds_of_discrepancy(self, client, request):
+        from core.billing import ensure_account
+        from core.topup import (
+            confirm_topup_payment,
+            create_topup_order,
+            reconcile_topup,
+        )
+
+        _headers, user_id = _account(client, request)
+        account_id = ensure_account(user_id)
+
+        a = create_topup_order(account_id, 100_000)
+        confirm_topup_payment(a["order_id"])  # 内部+渠道都有的正常单
+        b = create_topup_order(account_id, 200_000)
+        confirm_topup_payment(b["order_id"])
+
+        report = reconcile_topup(
+            [
+                {"payment_ref": a["order_id"], "amount_micros": 100_000},
+                {"payment_ref": "channel-only-ref", "amount_micros": 50_000},
+            ]
+        )
+        # b 只在内部 → missing_externally；channel-only-ref 只在渠道 → missing_internally
+        assert b["order_id"] in report["missing_externally"]
+        assert "channel-only-ref" in report["missing_internally"]
+
+    def test_reconcile_amount_mismatch(self, client, request):
+        from core.billing import ensure_account
+        from core.topup import (
+            confirm_topup_payment,
+            create_topup_order,
+            reconcile_topup,
+        )
+
+        _headers, user_id = _account(client, request)
+        order = create_topup_order(ensure_account(user_id), 300_000)
+        confirm_topup_payment(order["order_id"])
+
+        report = reconcile_topup(
+            [{"payment_ref": order["order_id"], "amount_micros": 999}]
+        )
+        assert order["order_id"] in report["amount_mismatch"]
 
 
 class TestCostAccounting:
@@ -201,19 +403,19 @@ class TestCostAccounting:
 
 
 class TestChatIntegration:
-    def test_quota_exceeded_blocks_chat_before_engine(self, client, request):
-        from core.billing import PLANS, ensure_account, reserve_turn
+    def test_insufficient_balance_blocks_chat_before_engine(self, client, request):
+        from core.billing import balance_status, ensure_account, reserve_turn
 
         headers, user_id = _account(client, request)
         account_id = ensure_account(user_id)
-        for _ in range(PLANS["free"].monthly_turns):
+        for _ in range(balance_status(account_id)["affordable_turns"]):
             reserve_turn(account_id)
 
         with patch("server.routes._get_engine") as get_engine:
             resp = client.post(
                 "/api/chat", json={"slug": "demo", "message": "在吗"}, headers=headers
             )
-        assert resp.json()["notice"]["type"] == "quota_exceeded"
+        assert resp.json()["notice"]["type"] == "insufficient_balance"
         get_engine.assert_not_called()
 
     def test_successful_chat_settles_usage(self, client, request):

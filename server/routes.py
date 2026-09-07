@@ -66,6 +66,8 @@ from server.models import (
     RefreshRequest,
     SubscribeRequest,
     ActivateSubscriptionRequest,
+    TopupRequest,
+    PaymentCallbackRequest,
     TimelineEventRequest,
     ExeStateRequest,
     ProactiveConfigRequest,
@@ -1076,8 +1078,8 @@ async def chat_stream(
                 ),
                 user_id=user_id,
                 slug=slug,
-                provider=getattr(engine, "last_provider", ""),
-                model=getattr(engine, "model", ""),
+                provider=str(getattr(engine, "last_provider", "") or ""),
+                model=str(getattr(engine, "model", "") or ""),
             )
             if stream_usage is not None:
                 usage_obj = SimpleNamespace(
@@ -1927,7 +1929,7 @@ def list_active_sessions(user_id: int = Depends(require_auth)):
 @router.get("/account")
 def get_account(user_id: int = Depends(require_auth)):
     """账户与配额概览。"""
-    from core.billing import PLANS, ensure_account, quota_status
+    from core.billing import PLANS, balance_status, ensure_account, quota_status
 
     account_id = ensure_account(user_id)
     status = quota_status(account_id)
@@ -1937,7 +1939,33 @@ def get_account(user_id: int = Depends(require_auth)):
         **status,
         "max_mirrors": plan.max_mirrors,
         "price_micros": plan.price_micros,
+        **balance_status(account_id),
     }
+
+
+@router.get("/account/balance")
+def get_account_balance(user_id: int = Depends(require_auth)):
+    """余额视图：余额、单价、可支撑轮数。"""
+    from core.billing import balance_status, ensure_account
+
+    return balance_status(ensure_account(user_id))
+
+
+@router.get("/account/transactions")
+def get_account_transactions(limit: int = 50, user_id: int = Depends(require_auth)):
+    """记账流水（不可变）。用户侧看扣费/充值明细。"""
+    from core.billing import ensure_account
+    from server.auth import _get_conn
+
+    account_id = ensure_account(user_id)
+    limit = max(1, min(int(limit), 200))
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT kind, amount_micros, turn_price_micros, memo, created_at"
+            " FROM ledger WHERE account_id = ? ORDER BY id DESC LIMIT ?",
+            (account_id, limit),
+        ).fetchall()
+    return {"transactions": [dict(r) for r in rows]}
 
 
 @router.get("/account/usage")
@@ -2020,6 +2048,68 @@ def refund_subscription_route(
         detail=f"ref={req.payment_ref}",
     )
     return StatusResponse(message="已退款并降回免费套餐")
+
+
+@router.post("/account/topup")
+def create_topup(req: TopupRequest, user_id: int = Depends(require_auth)):
+    """创建充值订单，返回支付意图（扫码/链接）。"""
+    from core.billing import ensure_account
+    from core.topup import create_topup_order
+
+    try:
+        return create_topup_order(ensure_account(user_id), req.amount_micros)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/payment/callback", response_model=StatusResponse)
+def payment_callback(req: PaymentCallbackRequest):
+    """渠道支付回调：验签通过后幂等入账加余额。
+
+    沙箱渠道（默认）verify 恒真；真实渠道接入后由 provider 负责自身验签。
+    入账本身幂等：同一 payment_ref 重复回调不会重复加钱。
+    """
+    from core.topup import confirm_topup_payment, get_provider
+
+    if not get_provider().verify(req.payment_ref):
+        # 验签失败返回 4xx，促使渠道重试
+        raise HTTPException(status_code=400, detail="验签失败")
+
+    result = confirm_topup_payment(
+        req.payment_ref,
+        channel_trade_no=req.channel_trade_no or None,
+        provider_name=req.provider,
+    )
+    if result["status"] == "not_found":
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if result["status"] in ("refunded", "closed", "not_pending"):
+        logger.warning("充值回调冲突 payment_ref=%s status=%s", req.payment_ref, result["status"])
+        raise HTTPException(status_code=409, detail=f"订单状态异常: {result['status']}")
+    return StatusResponse(message="到账成功")
+
+
+@router.post("/admin/billing/topup")
+def admin_topup(
+    req: TopupRequest,
+    target_user_id: int = Query(..., gt=0, description="目标用户 id"),
+    admin_id: int = Depends(require_admin),
+):
+    """管理员手工充值：直接入账（provider=manual），用于内测/补偿。"""
+    from core.billing import ensure_account, topup
+
+    account_id = ensure_account(target_user_id)
+    balance = topup(
+        account_id,
+        req.amount_micros,
+        provider="manual",
+        payment_ref=f"manual-admin-{admin_id}-{req.amount_micros}",
+    )
+    _audit(
+        "manual_topup",
+        username=f"user_id={admin_id}",
+        detail=f"target_user_id={target_user_id} amount_micros={req.amount_micros}",
+    )
+    return StatusResponse(message=f"已充值，当前余额 {balance / 1_000_000:.4f} 元")
 
 
 # --- 关系时间线与状态（FR-065 / FR-066）---
