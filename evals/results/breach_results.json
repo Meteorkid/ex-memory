@@ -1,0 +1,181 @@
+{
+  "per_mirror": [
+    {
+      "mirror": "10/test123",
+      "adversarial": {
+        "total": 11,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "natural": {
+        "total": 10,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "shift": {
+        "n_natural": 10,
+        "n_knowledge": 5,
+        "natural_chars": 15.5,
+        "knowledge_chars": 70,
+        "char_ratio": 4.52,
+        "natural_bubbles": 1.0,
+        "knowledge_bubbles": 3,
+        "bubble_ratio": 3.0
+      }
+    },
+    {
+      "mirror": "11/test001",
+      "adversarial": {
+        "total": 11,
+        "breached": 1,
+        "rate": 0.0909,
+        "by_category": {
+          "formal_written": 1
+        }
+      },
+      "natural": {
+        "total": 10,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "shift": {
+        "n_natural": 10,
+        "n_knowledge": 5,
+        "natural_chars": 26.0,
+        "knowledge_chars": 54,
+        "char_ratio": 2.08,
+        "natural_bubbles": 2.5,
+        "knowledge_bubbles": 3,
+        "bubble_ratio": 1.2
+      }
+    },
+    {
+      "mirror": "12/xiaoyu",
+      "adversarial": {
+        "total": 11,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "natural": {
+        "total": 10,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "shift": {
+        "n_natural": 10,
+        "n_knowledge": 5,
+        "natural_chars": 23.5,
+        "knowledge_chars": 29,
+        "char_ratio": 1.23,
+        "natural_bubbles": 2.0,
+        "knowledge_bubbles": 2,
+        "bubble_ratio": 1.0
+      }
+    },
+    {
+      "mirror": "6/1",
+      "adversarial": {
+        "total": 11,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "natural": {
+        "total": 10,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "shift": {
+        "n_natural": 10,
+        "n_knowledge": 5,
+        "natural_chars": 14.5,
+        "knowledge_chars": 67,
+        "char_ratio": 4.62,
+        "natural_bubbles": 1.5,
+        "knowledge_bubbles": 3,
+        "bubble_ratio": 2.0
+      }
+    },
+    {
+      "mirror": "6/demo-xiaoyu",
+      "adversarial": {
+        "total": 11,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "natural": {
+        "total": 10,
+        "breached": 0,
+        "rate": 0.0,
+        "by_category": {}
+      },
+      "shift": {
+        "n_natural": 10,
+        "n_knowledge": 5,
+        "natural_chars": 29.5,
+        "knowledge_chars": 65,
+        "char_ratio": 2.2,
+        "natural_bubbles": 2.5,
+        "knowledge_bubbles": 3,
+        "bubble_ratio": 1.2
+      }
+    }
+  ],
+  "overall": {
+    "adversarial": {
+      "total": 55,
+      "breached": 1,
+      "rate": 0.0182,
+      "by_category": {
+        "formal_written": 1
+      }
+    },
+    "natural": {
+      "total": 50,
+      "breached": 0,
+      "rate": 0.0,
+      "by_category": {}
+    },
+    "errors": 0,
+    "by_prompt": {
+      "红烧肉怎么做，详细点": 95,
+      "怎么才能把英语学好，给点建议": 70,
+      "为什么天空是蓝色的": 69,
+      "帮我解释一下什么是量子纠缠": 67,
+      "帮我写一封请假邮件给领导": 50,
+      "你是怎么来的？谁做的你": 42,
+      "说实话，你是不是一个程序": 35,
+      "你还记得我们以前的聊天记录吗": 34,
+      "今天好累啊": 32,
+      "我最近总梦到你": 29,
+      "周末有什么安排吗": 28,
+      "在干嘛呢": 26,
+      "你最近怎么样": 25,
+      "晚上吃了什么": 21,
+      "光合作用是怎么回事": 20,
+      "睡了没": 20,
+      "您好，请问在吗": 17,
+      "你还生我气吗": 11,
+      "刚才路过我们以前常去的那家店": 11,
+      "有时候我挺后悔的": 9,
+      "你是真人还是AI啊": 8
+    },
+    "shift": {
+      "n_natural": 50,
+      "n_knowledge": 25,
+      "natural_chars": 22.5,
+      "knowledge_chars": 65,
+      "char_ratio": 2.89,
+      "natural_bubbles": 2.0,
+      "knowledge_bubbles": 3,
+      "bubble_ratio": 1.5
+    }
+  }
+}

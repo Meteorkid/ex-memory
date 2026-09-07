@@ -14,6 +14,7 @@
 import json
 import random
 import re
+import statistics
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -102,6 +103,66 @@ def breach_rate(replies: list[str]) -> dict:
         "breached": breached,
         "rate": round(breached / total, 4),
         "by_category": dict(sorted(by_category.items(), key=lambda x: -x[1])),
+    }
+
+
+# ── 讲解模式漂移（越界的隐性形态）──
+
+# 实测（2026-09-07，5 个真实镜像，7 轮取数）：字数比值落在 2.2~3.4，中位约 2.6。
+#
+# **这个指标有 ±25% 的噪声地板，加样本压不下去**：晃的是分子——同一道
+# 「红烧肉怎么做」，模型这轮给六步菜谱、下轮就一句「我教你呀」。所以门禁设在
+# 观测上界之上，只用来抓「明显变差」；把 2.4 和 3.1 的差异当信号是过度解读。
+#
+# 最初记的 5.7 是错的：那版知识题只有 2 道，「红烧肉」一道就把比值拉了上去。
+# 补到 5 道后降到 2.6 量级。这个指标对题目组成极敏感，换题必须重标基线，
+# 跨版本的数字不能直接比。
+SHIFT_BASELINE_CHAR_RATIO = 2.6
+SHIFT_MAX_CHAR_RATIO = 4.0
+
+
+def _bubbles(text: str) -> int:
+    """一条回复被拆成几段。产品用 || 表示分条发送，换行同样是分段。"""
+    return len([p for p in re.split(r"\|\||\n+", text) if p.strip()])
+
+
+def explanation_shift(natural: list[str], knowledge: list[str]) -> dict:
+    """被问到知识时，回复相对日常闲聊膨胀了多少。
+
+    正则抓的是「说出了不属于 ta 的话」，抓不到「答得像一篇讲解」。实测五个
+    真实镜像的越界率接近 0（480 条里 2 条，且不稳定复现），但问「红烧肉怎么做」
+    时全部给出了配比精确的六步菜谱——闲聊回复中位 22 字，这道题 181 字。一条
+    正则都没命中，可没有哪个前任会这样答：模型的世界知识穿透人格漏出来了。
+
+    漂移集中在**步骤类**问题：同一批镜像回答「为什么天空是蓝的」中位 47 字、
+    「光合作用是怎么回事」40 字，都在闲聊量级。这也是为什么单看一个总比值会
+    看走眼，逐题中位数（run_breach 的 by_prompt）才指得出问题在哪。
+
+    长度与分段数是这种漂移最直接的外化：纯统计、零成本、结果确定可复现，
+    和表达指纹是同一路子。比值按镜像自身的闲聊基线归一，避免把「这个人本来
+    就话多」误判成漂移。
+
+    注意这不是能进单元 CI 的门禁——取数要对真实镜像发起真实调用。可进 CI 的
+    是这个函数本身，门禁跑在 `make eval-breach` 里，和其他 eval 同一档。
+    """
+    natural_ok = [t for t in natural if t and t.strip()]
+    knowledge_ok = [t for t in knowledge if t and t.strip()]
+    if not natural_ok or not knowledge_ok:
+        raise ValueError("闲聊与知识两组回复都不能为空")
+
+    n_chars = statistics.median(len(t) for t in natural_ok)
+    k_chars = statistics.median(len(t) for t in knowledge_ok)
+    n_bubbles = statistics.median(_bubbles(t) for t in natural_ok)
+    k_bubbles = statistics.median(_bubbles(t) for t in knowledge_ok)
+    return {
+        "n_natural": len(natural_ok),
+        "n_knowledge": len(knowledge_ok),
+        "natural_chars": round(n_chars, 1),
+        "knowledge_chars": round(k_chars, 1),
+        "char_ratio": round(k_chars / n_chars, 2),
+        "natural_bubbles": round(n_bubbles, 1),
+        "knowledge_bubbles": round(k_bubbles, 1),
+        "bubble_ratio": round(k_bubbles / n_bubbles, 2),
     }
 
 

@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck check run dev push-all docker-build clean unlock eval eval-corpus eval-retrieval eval-generation eval-report
+.PHONY: install test lint typecheck check run dev push-all docker-build clean unlock eval eval-corpus eval-retrieval eval-generation eval-report eval-breach
 
 # 可用 make <target> PYTHON=.venv/bin/python 等指定解释器，默认沿用 PATH
 PYTHON ?= python
@@ -47,6 +47,10 @@ eval-report:
 
 eval:
 	$(PYTHON) -m evals.run_eval all
+
+# 越界与讲解模式漂移：要对真实镜像发真实调用，不进单元 CI，发布前手动跑
+eval-breach:
+	$(PYTHON) -m evals.run_breach
 
 # --- 推送 ---
 # 三个远端必须保持同步；先校验每个远端都不领先本地，避免 push 被拒或误覆盖他人提交

@@ -10,6 +10,7 @@ import pytest
 
 from evals.breach import (
     breach_rate,
+    explanation_shift,
     build_blind_set,
     detect,
     export_blind_set,
@@ -164,3 +165,41 @@ class TestMirrorIntegration:
         )
         questions = blind_set_from_mirror("bl", [f"生成{i}" for i in range(5)], size=5)
         assert len(questions) == 5
+
+
+class TestExplanationShift:
+    """越界正则抓不到的那一半：答得像一篇讲解。"""
+
+    CHITCHAT = ["在干嘛呢", "抱抱你", "真的吗？我也梦到你了", "嗯嗯"]
+    LECTURE = [
+        "五花肉切块\n冷水下锅焯水\n炒糖色\n加香料\n小火炖一小时\n大火收汁",
+        "量子纠缠是指两个粒子一旦纠缠，不管相距多远，一个的状态改变另一个也会跟着改变，"
+        "爱因斯坦称之为幽灵般的超距作用，后来实验证明确实存在。",
+    ]
+
+    def test_lecture_inflates_both_ratios(self):
+        result = explanation_shift(self.CHITCHAT, self.LECTURE)
+        assert result["char_ratio"] > 3
+        assert result["bubble_ratio"] > 1
+        assert result["n_natural"] == 4 and result["n_knowledge"] == 2
+
+    def test_no_shift_when_both_are_chitchat(self):
+        """同样长度的两组，比值应当贴近 1——不能把「话本来就多」算成漂移。"""
+        result = explanation_shift(self.CHITCHAT, ["在忙呢", "刚吃完饭", "还好啦"])
+        assert 0.5 <= result["char_ratio"] <= 2.0
+
+    def test_bubbles_count_product_separator(self):
+        """产品用 || 分条发送，分段数要把它算进去，否则一条多气泡的回复看着像一段。"""
+        one = explanation_shift(["嗯"], ["好呀 || 我教你 || 先焯水"])
+        assert one["knowledge_bubbles"] == 3
+
+    def test_blank_replies_are_dropped(self):
+        result = explanation_shift(["在干嘛", "", "   "], ["讲解一大段内容在这里"])
+        assert result["n_natural"] == 1
+
+    def test_empty_side_is_rejected(self):
+        """比值没有数据时是无意义的，宁可报错也不返回一个假数。"""
+        with pytest.raises(ValueError):
+            explanation_shift([], ["讲解"])
+        with pytest.raises(ValueError):
+            explanation_shift(["在吗"], ["   "])
