@@ -83,6 +83,12 @@ BLOB_BUCKET = os.getenv("BLOB_BUCKET", "")
 BLOB_ENDPOINT = os.getenv("BLOB_ENDPOINT", "")
 BLOB_PREFIX = os.getenv("BLOB_PREFIX", "")
 
+# 镜像运行时存储后端（FR-034 前置）。local 为当前文件系统实现，行为零变化；
+# 逐文件迁对象存储时将为 s3，配合 MirrorStore 的 S3 后端。当前仅支持 local。
+MIRROR_STORAGE = os.getenv("MIRROR_STORAGE", "local")
+if MIRROR_STORAGE not in ("local",):
+    raise ValueError("MIRROR_STORAGE 当前仅支持 local")
+
 # 向量库后端（FR-033）：chroma（默认，本地目录）或 pgvector。
 # 多副本必须用 pgvector——Chroma 的 persist 目录在各副本自己的盘上，共享不了。
 VECTOR_BACKEND = os.getenv("VECTOR_BACKEND", "chroma")
