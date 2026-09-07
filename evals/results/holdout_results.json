@@ -1,0 +1,37 @@
+{
+ "known": {
+  "recall@1": 0.07971014492753623,
+  "recall@3": 0.16304347826086957,
+  "recall@5": 0.2246376811594203,
+  "recall@10": 0.29347826086956524,
+  "precision@5": 0.05507246376811595,
+  "hit@5": 0.2463768115942029,
+  "mrr": 0.15526224982746722,
+  "ndcg@10": 0.16684914132090392
+ },
+ "heldout": {
+  "recall@1": 0.0,
+  "recall@3": 0.0,
+  "recall@5": 0.0,
+  "recall@10": 0.0,
+  "precision@5": 0.0,
+  "hit@5": 0.0,
+  "mrr": 0.0,
+  "ndcg@10": 0.0
+ },
+ "meta": {
+  "config": "turns5_overlap1",
+  "corpus_size": 316,
+  "known_corpus_size": 310,
+  "n_removed": 6,
+  "n_known": 138,
+  "n_heldout": 9,
+  "heldout_facts": [
+   "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好",
+   "有老胃病，包里常备胃药",
+   "第一次约会去海边看日落，她踩进水坑鞋全湿了"
+  ],
+  "embedder": "MockEmbedder",
+  "mock": true
+ }
+}

@@ -3,6 +3,7 @@
 用法：
     python -m evals.run_eval retrieval [--mock] [--limit N]
     python -m evals.run_eval generation [--limit N] [--threshold 0.3]
+    python -m evals.run_eval holdout [--mock] [--facts N] [--seed N] [--fact F,...]
     python -m evals.run_eval report
     python -m evals.run_eval all [--limit N]
 
@@ -20,6 +21,8 @@ from evals.report import RESULTS_DIR, RETRIEVAL_RESULTS, GENERATION_RESULTS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("ex-memory.evals")
+
+HOLDOUT_RESULTS = RESULTS_DIR / "holdout_results.json"
 
 
 def _make_embedder(mock: bool):
@@ -97,6 +100,35 @@ def cmd_generation(args):
         )
 
 
+def cmd_holdout(args):
+    from evals.holdout import holdout_facts, run_holdout_eval
+
+    corpus = load_corpus()
+    golden = load_golden(corpus=corpus)
+    embedder = _make_embedder(args.mock)
+
+    if args.fact:
+        heldout = set(args.fact)
+    else:
+        heldout = holdout_facts(golden, n=args.facts, seed=args.seed)
+    logger.info("留出事实簇：%s", "、".join(sorted(heldout)))
+
+    results = run_holdout_eval(corpus, golden, embedder, heldout_facts=heldout)
+    if args.mock:
+        results["meta"]["mock"] = True
+    _save(HOLDOUT_RESULTS, results)
+    k = results["meta"]["n_known"]
+    h = results["meta"]["n_heldout"]
+    print(
+        f"known({k}):   recall@10={results['known']['recall@10']:.3f} "
+        f"mrr={results['known']['mrr']:.3f}"
+    )
+    print(
+        f"heldout({h}): recall@10={results['heldout']['recall@10']:.3f} "
+        f"mrr={results['heldout']['mrr']:.3f}"
+    )
+
+
 def cmd_report(_args):
     from evals.report import generate_report
 
@@ -120,6 +152,19 @@ def main():
     )
     p_gen.add_argument("--threshold", type=float, default=0.3, help="RAG 相似度阈值")
     p_gen.set_defaults(func=cmd_generation)
+
+    p_hold = sub.add_parser(
+        "holdout", help="事实簇级留出：测未见知识的检索泛化"
+    )
+    p_hold.add_argument("--mock", action="store_true", help="离线伪向量冒烟")
+    p_hold.add_argument("--facts", type=int, default=3, help="留出事实簇数量")
+    p_hold.add_argument("--seed", type=int, default=7, help="抽样随机种子")
+    p_hold.add_argument(
+        "--fact",
+        action="append",
+        help="显式指定留出事实簇（可多次），覆盖自动抽样",
+    )
+    p_hold.set_defaults(func=cmd_holdout)
 
     p_rep = sub.add_parser("report", help="从已有结果生成图表与报告")
     p_rep.set_defaults(func=cmd_report)
