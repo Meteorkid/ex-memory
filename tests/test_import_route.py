@@ -207,3 +207,86 @@ def test_import_does_not_block_event_loop(env):
             assert elapsed < 0.7, (
                 f"回归：导入阻塞了事件循环，/health 延迟 {elapsed:.2f}s"
             )
+
+
+def _weflow_bytes(n_pairs: int = 12) -> bytes:
+    """WeFlow 风格聊天记录。isSend=0 是 ta 发的，1 是我发的。"""
+    rows = []
+    for i in range(n_pairs):
+        rows.append(
+            {
+                "sender": "ta",
+                "content": f"今天去了那家店，还是老样子，第{i}次了",
+                "isSend": 0,
+                "formattedTime": f"2026-01-01 10:{i:02d}:00",
+            }
+        )
+        rows.append(
+            {
+                "sender": "me",
+                "content": f"是吗，我也想去，第{i}次说了",
+                "isSend": 1,
+                "formattedTime": f"2026-01-01 10:{i:02d}:30",
+            }
+        )
+    return json.dumps(rows, ensure_ascii=False).encode("utf-8")
+
+
+def test_import_actually_lands_in_vector_store(env):
+    """真实端到端：不 mock VectorStore、不 mock ingest，只把 Embedder 换成
+    离线确定性实现。
+
+    既有的 test_import_success 把两者都 mock 掉了，证明的是路由接线，证明不了
+    数据真的落库。而现网 6 个镜像的向量库全是空的——正是这个断言缺位的那一类
+    问题：链路每一段都「有实现」，端到端却没人验证过。
+
+    同时断言语料归档非空：没有可重放的输入，换 embedding 模型、调分块参数、
+    迁移向量库都做不了，向量库一旦空掉就再也重建不回来。
+    """
+    from evals.ab_runner import MockEmbedder
+    from server.app import create_app
+
+    class _OfflineEmbedder(MockEmbedder):
+        """吃掉真 Embedder 的构造参数，向量算法沿用离线确定性实现。"""
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+    _make_exe(env, "vec")
+    client = TestClient(create_app())
+    headers = _login(client)
+    _grant_third_party_consent(client, headers)
+
+    with (
+        patch("config.get_embedding_config", return_value=_EMB_CFG),
+        patch("memory.embedder.Embedder", _OfflineEmbedder),
+    ):
+        resp = client.post(
+            "/api/exes/vec/import",
+            files={"file": ("chat.json", _weflow_bytes(), "application/json")},
+            data={"target_name": "ta"},
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        task = _await_task(resp.json()["task_id"])
+
+    assert task["status"] == "succeeded", task.get("error")
+    result = json.loads(task["result"])
+    assert result["messages"] > 0
+    assert result["chunks"] > 0
+
+    import config
+    from memory.vector_store import VectorStore
+
+    ex_dir = config.resolve_ex_dir("vec", 1)
+    store = VectorStore(
+        persist_dir=str(ex_dir / "chroma_db"),
+        collection_name=config.get_collection_name("vec"),
+    )
+    assert store.count() == result["chunks"], "入库条数应与返回的切片数一致"
+
+    from core.corpus_store import load_messages
+
+    archived = load_messages("vec", 1)
+    assert archived, "语料归档为空，向量库将无法重建"
+    assert any(m.get("is_target") for m in archived), "归档里必须有 ta 说的话"
