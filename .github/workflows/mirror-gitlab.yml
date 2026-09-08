@@ -1,0 +1,48 @@
+name: Mirror to GitLab
+
+# 本机网络对 gitlab.com 的 SSH/HTTPS 均不稳定，改由 GitHub 侧代推。
+# 前置条件：仓库 Settings → Secrets and variables → Actions 添加 GITLAB_TOKEN
+# （GitLab Personal Access Token，勾选 write_repository 权限）。
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 串行执行，避免并发推送互相打架
+concurrency:
+  group: mirror-gitlab
+  cancel-in-progress: false
+
+env:
+  GITLAB_REPO: gitlab.com/Meteor-kid/ex-memory.git
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 镜像需要完整历史与标签，浅克隆推送会被拒
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Push to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GITLAB_TOKEN}" ]; then
+            echo "::error::未配置 GITLAB_TOKEN secret，无法推送到 GitLab"
+            exit 1
+          fi
+          # 凭证只存在于内存变量，不写入 .git/config，避免泄漏到 artifact
+          remote="https://oauth2:${GITLAB_TOKEN}@${GITLAB_REPO}"
+          # 不加 --force：GitLab 若有本地没有的提交，宁可失败也不覆盖
+          git push "${remote}" HEAD:refs/heads/main
+          git push "${remote}" --tags
+          echo "已同步到 GitLab: $(git rev-parse --short HEAD)"
