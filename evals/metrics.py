@@ -129,16 +129,31 @@ def aggregate_gold_consistency(per_answer_claims: list[list[dict]]) -> dict:
     每条论断的 gold 取值：
         support    - 与黄金事实一致
         contradict - 与黄金事实矛盾
-        absent     - 黄金事实中不存在（编造的具体细节，按严格口径计为幻觉）
+        absent     - 黄金事实中不存在
+
+    **contradict 与 absent 必须分开看，把两者合成一个幻觉率会看不见真问题。**
+    实测 135 条论断里 contradict 只有 3 条（记错了窗帘颜色、记错了蛋糕口味），
+    absent 有 10 条，而那 10 条长这样：「对不起啦」「再辣我可扛不住」「不然
+    十二点就困了」——是道歉、是主观感受、是把一件真事说得更像话。合并统计时
+    严格口径给出 17.5%，其中真正的事实错误只占 3.5%。
+
+    这个区分对本产品尤其要紧：一个只肯说可核验事实的前任，听起来像数据库。
+    absent 不该压到 0，压到 0 就是把人味优化掉了；该压到 0 的是 contradict。
 
     Returns:
-        hallucination_rate: 含至少一条 contradict/absent 论断的回答占比
+        hallucination_rate: 含至少一条 contradict/absent 论断的回答占比（严格口径，
+            保留是为了与历史数据可比）
+        contradiction_rate: 含至少一条 contradict 论断的回答占比——真正的事实错误
+        unsupported_rate: 只含 absent、无 contradict 的回答占比——未被黄金事实
+            覆盖的发挥，本产品预期非零
         claim_accuracy: 全部论断中 support 的占比
         n_scored / n_no_claim: 同 aggregate_generation
     """
     n_scored = 0
     n_no_claim = 0
     hallucinated = 0
+    contradicted = 0
+    unsupported_only = 0
     total_claims = 0
     supported_claims = 0
     for claims in per_answer_claims:
@@ -148,10 +163,18 @@ def aggregate_gold_consistency(per_answer_claims: list[list[dict]]) -> dict:
         n_scored += 1
         total_claims += len(claims)
         supported_claims += sum(1 for c in claims if c.get("gold") == "support")
-        if any(c.get("gold") != "support" for c in claims):
+        has_contradict = any(c.get("gold") == "contradict" for c in claims)
+        has_absent = any(c.get("gold") == "absent" for c in claims)
+        if has_contradict or has_absent:
             hallucinated += 1
+        if has_contradict:
+            contradicted += 1
+        elif has_absent:
+            unsupported_only += 1
     return {
         "hallucination_rate": hallucinated / n_scored if n_scored else 0.0,
+        "contradiction_rate": contradicted / n_scored if n_scored else 0.0,
+        "unsupported_rate": unsupported_only / n_scored if n_scored else 0.0,
         "claim_accuracy": supported_claims / total_claims if total_claims else 0.0,
         "n_scored": n_scored,
         "n_no_claim": n_no_claim,

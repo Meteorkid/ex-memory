@@ -14,6 +14,7 @@ import shutil
 import tempfile
 from dataclasses import dataclass
 
+from config import CHUNK_OVERLAP, CHUNK_TURNS
 from evals import metrics
 from evals.dataset import GoldenItem
 
@@ -34,7 +35,6 @@ class ChunkConfig:
         return f"turns{self.turns}_overlap{self.overlap}"
 
 
-# (5,1) 为当前生产配置 CHUNK_TURNS=5 / CHUNK_OVERLAP=1
 CHUNK_CONFIGS = [
     ChunkConfig(3, 0),
     ChunkConfig(3, 1),
@@ -42,7 +42,14 @@ CHUNK_CONFIGS = [
     ChunkConfig(8, 2),
     ChunkConfig(10, 2),
 ]
-PROD_CONFIG = ChunkConfig(5, 1)
+
+# 从 config.py 读，不再手写。先前硬编码成 (5,1)，而生产在 1d11190 就改成了
+# 3 轮/重叠 1——生成评测与失败分析因此一直跑在一个生产路径召回低 20 个百分点
+# 的配置上（71.1% vs 91.5%），报出来的忠实度与幻觉率都偏悲观。
+# 一个「跟着生产走」的常量比一个需要人记得同步的常量可靠。
+PROD_CONFIG = ChunkConfig(CHUNK_TURNS, CHUNK_OVERLAP)
+if PROD_CONFIG not in CHUNK_CONFIGS:
+    CHUNK_CONFIGS.append(PROD_CONFIG)
 
 
 class CachingEmbedder:

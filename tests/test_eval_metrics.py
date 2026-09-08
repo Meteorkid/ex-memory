@@ -124,6 +124,36 @@ class TestFaithfulness:
         assert agg["n_scored"] == 3
         assert agg["n_no_claim"] == 1
 
+    def test_contradiction_and_unsupported_are_separated(self):
+        """把「记错了」和「多说了一句」合成一个数，前者就被后者淹没了。
+
+        实测 RAG 链路严格口径 17.5%，其中真正的事实错误只有 3.5%——差别大到
+        会影响「达标没达标」的判断，所以两者必须分列。
+        """
+        per_answer = [
+            [{"gold": "support"}],
+            [{"gold": "support"}, {"gold": "absent"}],
+            [{"gold": "contradict"}],
+            [{"gold": "contradict"}, {"gold": "absent"}],
+        ]
+        agg = metrics.aggregate_gold_consistency(per_answer)
+        assert agg["hallucination_rate"] == pytest.approx(3 / 4)
+        assert agg["contradiction_rate"] == pytest.approx(2 / 4)
+        # 同时含 contradict 与 absent 的回答只计入矛盾，不重复计数
+        assert agg["unsupported_rate"] == pytest.approx(1 / 4)
+
+    def test_rates_do_not_double_count(self):
+        """三个比率的口径：矛盾与仅未支持互斥，两者之和等于严格口径。"""
+        per_answer = [
+            [{"gold": "contradict"}, {"gold": "absent"}],
+            [{"gold": "absent"}],
+            [{"gold": "support"}],
+        ]
+        agg = metrics.aggregate_gold_consistency(per_answer)
+        assert agg["contradiction_rate"] + agg["unsupported_rate"] == pytest.approx(
+            agg["hallucination_rate"]
+        )
+
     def test_aggregate_empty(self):
         agg = metrics.aggregate_generation([])
         assert agg["faithfulness"] == 0.0

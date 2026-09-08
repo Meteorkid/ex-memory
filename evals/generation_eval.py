@@ -166,8 +166,11 @@ def run_generation_eval(
                 # 忠实度：论断被检索上下文支持的比例（no_rag 模式无上下文，恒为 0）
                 "faithfulness": faith["faithfulness"],
                 "unfaithful_answer_rate": faith["hallucination_rate"],
-                # 幻觉率：与黄金事实矛盾或凭空编造细节的回答占比
+                # 幻觉率：严格口径（contradict 或 absent），保留以便与历史数据比
                 "hallucination_rate": gold["hallucination_rate"],
+                # 拆开看才有行动性：矛盾是要压到 0 的事实错误，未支持多是人味发挥
+                "contradiction_rate": gold["contradiction_rate"],
+                "unsupported_rate": gold["unsupported_rate"],
                 "claim_accuracy": gold["claim_accuracy"],
                 "n_scored": gold["n_scored"],
                 "n_no_claim": gold["n_no_claim"],

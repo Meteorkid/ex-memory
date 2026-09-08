@@ -4,6 +4,8 @@ import pytest
 
 from evals import build_corpus
 from evals.ab_runner import (
+    CHUNK_CONFIGS,
+    PROD_CONFIG,
     CachingEmbedder,
     ChunkConfig,
     MockEmbedder,
@@ -160,3 +162,19 @@ class TestRetrievalEvalOffline:
         for cfg in results["configs"]:
             t = cfg["target_only"]
             assert t["recall@1"] <= t["recall@3"] <= t["recall@5"] <= t["recall@10"]
+
+
+class TestProdConfigTracksProduction:
+    """PROD_CONFIG 曾被硬编码成 (5,1)，生产改成 3 轮/重叠 1 之后没人同步，
+    生成评测与失败分析一路跑在生产路径召回低 20 个百分点的配置上。
+    这类「两处各写一份、指望人记得改」的漂移只能靠测试守住。"""
+
+    def test_matches_config_module(self):
+        import config
+
+        assert PROD_CONFIG.turns == config.CHUNK_TURNS
+        assert PROD_CONFIG.overlap == config.CHUNK_OVERLAP
+
+    def test_prod_config_is_swept(self):
+        """生产配置必须在扫描列表里，否则 per_query_prod 会静默为空。"""
+        assert PROD_CONFIG in CHUNK_CONFIGS

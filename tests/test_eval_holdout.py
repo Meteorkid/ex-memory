@@ -7,7 +7,7 @@
 import pytest
 
 from evals import build_corpus
-from evals.ab_runner import MockEmbedder
+from evals.ab_runner import PROD_CONFIG, MockEmbedder
 from evals.dataset import GoldenItem
 from evals.holdout import (
     holdout_facts,
@@ -85,10 +85,29 @@ class TestRunHoldoutEvalOffline:
         )
 
     def test_structure(self, results):
-        assert set(results) == {"known", "heldout", "meta"}
+        assert set(results) >= {"known", "heldout", "meta"}
+        assert set(results) & {"known_per_query", "heldout_per_query"}
         assert results["meta"]["n_known"] > 0
         assert results["meta"]["n_heldout"] > 0
-        assert results["meta"]["config"] == "turns5_overlap1"
+        # 断言跟着生产配置走，不写死字面量——写死正是 PROD_CONFIG 漂移没被发现的原因
+        assert results["meta"]["config"] == PROD_CONFIG.label
+
+        # per-query 审计字段齐全且与聚合规模一致
+        known_rows = results["known_per_query"]
+        held_rows = results["heldout_per_query"]
+        assert len(known_rows) == results["meta"]["n_known"]
+        assert len(held_rows) == results["meta"]["n_heldout"]
+        for r in known_rows + held_rows:
+            for key in (
+                "qid",
+                "category",
+                "fact",
+                "recall@5",
+                "recall@10",
+                "mrr",
+                "first_hit_rank",
+            ):
+                assert key in r, f"per-query 缺少 {key}"
 
     def test_metric_bounds(self, results):
         for group in ("known", "heldout"):
