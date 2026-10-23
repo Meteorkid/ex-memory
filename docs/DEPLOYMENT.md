@@ -95,6 +95,9 @@ server {
 线上体验使用 `docker-compose.production.yml`，服务仅监听 `127.0.0.1:18000`，不能把
 该端口直接暴露到公网。需要配置：
 
+该生产配置将 `TURN_PRICE_MICROS` 显式设为 `0`，保留 Meteor Store 实验室的免费体验。
+不能直接采用开发配置的默认按轮次收费值；未来调整收费需另行确认产品规则。
+
 | 变量 | 值 |
 |------|----|
 | `METEOR_STORE_SSO_ENABLED` | `true` |
