@@ -11,6 +11,7 @@ class CreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=64, description="前任名字")
     slug: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_一-鿿]+$")
     answers: list[str] = Field(default_factory=list, description="intake 三问回答")
+    defer_generation: bool = Field(default=False, description="等待聊天记录导入后生成")
 
 
 class ResumeRequest(BaseModel):

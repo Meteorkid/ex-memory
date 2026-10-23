@@ -1,0 +1,197 @@
+{
+  "description": "完全虚构的首次体验示例，不含真人聊天。目标说话人：小雨。",
+  "messages": [
+    {
+      "sender": "小雨",
+      "content": "周六上午十点在公园东门见吧。",
+      "timestamp": "2026-10-01 10:00:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:00:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "我会带蓝色的保温杯。",
+      "timestamp": "2026-10-01 10:01:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "我喜欢无糖冷萃，不加奶。",
+      "timestamp": "2026-10-01 10:02:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "上次你推荐的茉莉花茶也挺好喝。",
+      "timestamp": "2026-10-01 10:03:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:03:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "我这周读完了那本科幻小说。",
+      "timestamp": "2026-10-01 10:04:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "里面关于月球旅行的章节最好看。",
+      "timestamp": "2026-10-01 10:05:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "我喜欢短一点的句子，直接说重点就好。",
+      "timestamp": "2026-10-01 10:06:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:06:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "哈哈，这个主意不错。",
+      "timestamp": "2026-10-01 10:07:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "如果下雨，我们就去东门旁边的图书馆。",
+      "timestamp": "2026-10-01 10:08:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "别着急，路上慢慢来。",
+      "timestamp": "2026-10-01 10:09:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:09:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "我把雨伞放在背包侧面了。",
+      "timestamp": "2026-10-01 10:10:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "我们约好先散步，再去看书。",
+      "timestamp": "2026-10-01 10:11:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "周日我想在家整理照片。",
+      "timestamp": "2026-10-01 10:12:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:12:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "旅行照片都存在蓝色相册里。",
+      "timestamp": "2026-10-01 10:13:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "我给那本相册起名叫春日散步。",
+      "timestamp": "2026-10-01 10:14:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "公园里那只橘猫又出来晒太阳了。",
+      "timestamp": "2026-10-01 10:15:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:15:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "我今天练了二十分钟吉他。",
+      "timestamp": "2026-10-01 10:16:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "下次可以弹那首简单的练习曲。",
+      "timestamp": "2026-10-01 10:17:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "我不太喜欢太甜的点心。",
+      "timestamp": "2026-10-01 10:18:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:18:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "带两块原味饼干就够了。",
+      "timestamp": "2026-10-01 10:19:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "到了给我发消息，我在东门等你。",
+      "timestamp": "2026-10-01 10:20:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "嗯嗯，十点见。",
+      "timestamp": "2026-10-01 10:21:00",
+      "is_target": true
+    },
+    {
+      "sender": "我",
+      "content": "收到，我们按这个计划来。",
+      "timestamp": "2026-10-01 10:21:30",
+      "is_target": false
+    },
+    {
+      "sender": "小雨",
+      "content": "记得带借书证。",
+      "timestamp": "2026-10-01 10:22:00",
+      "is_target": true
+    },
+    {
+      "sender": "小雨",
+      "content": "好呀，周六见！",
+      "timestamp": "2026-10-01 10:23:00",
+      "is_target": true
+    }
+  ]
+}

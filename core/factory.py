@@ -39,7 +39,7 @@ def create_engine_and_store(slug: str, owner: Optional[int] = None):
             logger.warning("向量库加载失败: %s，降级为纯文本模式", e)
             vector_store = None
 
-    engine = ChatEngine(slug=slug, vector_store=vector_store, embedder=embedder)
+    engine = ChatEngine(slug=slug, vector_store=vector_store, embedder=embedder, owner=owner)
     return engine, vector_store, embedder
 
 

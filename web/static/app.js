@@ -10,6 +10,8 @@ let currentSlug = '';
 let currentName = '';
 let tabHistory = [];
 let speechRecognition = null;
+const messagePreviews = new Map();
+let authEpoch = 0;
 
 // ═══════════════════════════════════════
 // 懒加载工具
@@ -852,6 +854,7 @@ async function doLogin() {
         });
         const data = await res.json();
         if (res.ok) {
+            resetSessionView();
             token = data.token;
             localStorage.setItem('ex-memory-token', token);
             localStorage.setItem('ex-memory-username', u);
@@ -885,6 +888,7 @@ async function doRegister() {
         });
         const loginData = await loginRes.json();
         if (loginRes.ok) {
+            resetSessionView();
             token = loginData.token;
             localStorage.setItem('ex-memory-token', token);
             localStorage.setItem('ex-memory-username', u);
@@ -916,7 +920,8 @@ async function api(method, path, body, retries = 2) {
     }
 
     // GET 请求去重
-    const requestKey = method === 'GET' ? `${method}:${path}` : null;
+    const requestEpoch = authEpoch;
+    const requestKey = method === 'GET' ? `${requestEpoch}:${method}:${path}` : null;
     if (requestKey && pendingRequests.has(requestKey)) {
         return pendingRequests.get(requestKey);
     }
@@ -928,17 +933,21 @@ async function api(method, path, body, retries = 2) {
     const promise = (async () => {
         for (let i = 0; i <= retries; i++) {
             try {
+                if (requestEpoch !== authEpoch) throw new Error('会话已变化，请重新读取');
                 const res = await fetch(`${API}${path}`, {
                     method, headers,
                     body: body !== undefined ? JSON.stringify(body) : undefined,
                     signal: AbortSignal.timeout(10000),
                 });
+                if (requestEpoch !== authEpoch) throw new Error('会话已变化，请重新读取');
                 if (res.status === 401) { logout(); throw new Error('登录已过期'); }
                 const data = await res.json().catch(() => ({}));
+                if (requestEpoch !== authEpoch) throw new Error('会话已变化，请重新读取');
                 if (!res.ok) throw new Error(data.detail || `请求失败 (${res.status})`);
                 markNetworkOnline();
                 return data;
             } catch(e) {
+                if (requestEpoch !== authEpoch) throw new Error('会话已变化，请重新读取');
                 const networkFailure = isNetworkFailure(e);
                 if (i < retries && networkFailure) {
                     await new Promise(r => setTimeout(r, 1000 * (i + 1)));
@@ -959,7 +968,20 @@ async function api(method, path, body, retries = 2) {
     return promise;
 }
 
+function resetSessionView() {
+    authEpoch += 1;
+    pendingRequests.clear();
+    messagePreviews.clear();
+    resetImportForm();
+    $('chat-msgs').innerHTML = '';
+    $('contact-list').innerHTML = '';
+    $('msg-input').disabled = true;
+    $('msg-send').disabled = true;
+    currentSlug = ''; currentName = '';
+}
+
 function logout() {
+    resetSessionView();
     if (PROXY_AUTH) {
         window.parent.postMessage({type: 'ex-memory:session-expired'}, window.location.origin);
         return;
@@ -980,6 +1002,7 @@ function logout() {
 // ═══════════════════════════════════════
 
 function switchTab(tab) {
+    if (tab === 'create') loadImportConfig();
     currentTab = tab;
     tabHistory.push(tab);
     if (tabHistory.length > 10) tabHistory.shift();
@@ -1009,6 +1032,7 @@ function switchTab(tab) {
             loadWallet();
             animateTabSwitch($('tab-wallet'));
         } else if (tab === 'create') {
+            $('phone-content').className = 'phone-content create-mode';
             $('tab-me').style.display = 'none';
             $('tab-create').style.display = 'block';
             $('nav-title').textContent = '创建镜像';
@@ -1183,6 +1207,7 @@ function showChatActions() {
 // ═══════════════════════════════════════
 
 async function loadContactList() {
+    const requestEpoch = authEpoch;
     PerfMonitor.start('loadContactList');
     const el = $('contact-list');
     // 清理旧的事件监听器
@@ -1201,6 +1226,7 @@ async function loadContactList() {
     `).join('');
     try {
         const exes = await api('GET', '/exes');
+        if (requestEpoch !== authEpoch) return;
         if (!exes.length) {
             el.innerHTML = `
                 <div class="onboarding-card">
@@ -1210,8 +1236,9 @@ async function loadContactList() {
                         <li><span>1</span><div><strong>导入聊天记录</strong><small>选择微信导出记录或已有文本</small></div></li>
                         <li><span>2</span><div><strong>创建镜像</strong><small>确认资料后即可开始对话</small></div></li>
                     </ol>
-                    <button class="btn onboarding-btn" onclick="switchTab('create')">立即创建</button>
+                    <button class="btn onboarding-btn" id="onboarding-create">导入并创建</button>
                 </div>`;
+            $('onboarding-create').addEventListener('click', () => switchTab('create'));
             PerfMonitor.end('loadContactList');
             return;
         }
@@ -1219,6 +1246,7 @@ async function loadContactList() {
         const fragment = document.createDocumentFragment();
         exes.forEach(e => {
             const lastMsg = getLastMessage(e.slug);
+            const pending = e.state !== 'completed' && e.state !== 'unknown';
             const isOnline = Math.random() > 0.6;
             const div = document.createElement('div');
             div.className = 'contact-item';
@@ -1226,31 +1254,26 @@ async function loadContactList() {
             div.dataset.name = e.name;
             div.innerHTML = `
                 <div class="contact-avatar" style="background:${avatarColor(e.slug)}">
-                    ${(e.name || e.slug)[0]}
+                    ${escHtml((e.name || e.slug)[0])}
                     <span class="online-dot ${isOnline ? 'online' : ''}"></span>
                 </div>
                 <div class="contact-info">
                     <div class="contact-name">${escHtml(e.name)}</div>
                     <div class="contact-preview">
-                        ${lastMsg ? escHtml(lastMsg) : '<span class="preview-source">[点击开始对话]</span>'}
+                        ${pending ? '<span class="preview-source">尚未完成 · 继续导入</span>' : lastMsg ? escHtml(lastMsg) : '<span class="preview-source">[点击开始对话]</span>'}
                     </div>
                 </div>
                 <div class="contact-meta">
                     <div class="contact-time">${(e.created_at || '').slice(0,10)}</div>
                 </div>`;
             div.addEventListener('click', () => {
-                enterChat(div.dataset.slug, div.dataset.name);
+                if (pending) resumeImport(e);
+                else enterChat(div.dataset.slug, div.dataset.name);
             });
             fragment.appendChild(div);
         });
         el.innerHTML = '';
         el.appendChild(fragment);
-
-        el.querySelectorAll('.contact-item').forEach(item => {
-            item.addEventListener('click', () => {
-                enterChat(item.dataset.slug, item.dataset.name);
-            });
-        });
 
         // 桌面端恢复高亮
         if (isDesktop && currentSlug) {
@@ -1270,7 +1293,8 @@ async function loadContactList() {
         }
         loadHealthTip();
     } catch(e) {
-        if (token) el.innerHTML = '<p class="list-empty">加载失败: ' + escHtml(e.message) + '</p>';
+        if (requestEpoch !== authEpoch) return;
+        el.innerHTML = '<p class="list-empty">加载失败: ' + escHtml(e.message) + '</p>';
     }
 }
 
@@ -1332,8 +1356,7 @@ function enterChat(slug, name) {
     } else {
         switchTab('chat-detail');
     }
-    // 持久化当前聊天状态
-    localStorage.setItem('ex-memory-current-chat', JSON.stringify({slug, name}));
+    // 人物名和预览只保留在当前页面会话，避免同设备切换账号时读到旧资料。
     // AI 生成内容标识随对话区一起显示（FR-021）
     const aiNotice = $('ai-notice');
     if (aiNotice) aiNotice.style.display = '';
@@ -1624,13 +1647,12 @@ function buildHistory(msgsEl) {
 }
 
 function storeLastMessage(slug, text) {
-    const key = 'ex-lastmsg-' + slug;
     const preview = text.replace(/\n/g, ' ').slice(0, 50);
-    localStorage.setItem(key, preview);
+    messagePreviews.set(slug, preview);
 }
 
 function getLastMessage(slug) {
-    return localStorage.getItem('ex-lastmsg-' + slug) || '';
+    return messagePreviews.get(slug) || '';
 }
 
 function addRegenerateButton(msgsEl) {
@@ -2004,7 +2026,7 @@ function showContactProfile() {
                 <div class="profile-avatar">${(exe.name || exe.slug)[0]}</div>
                 <div class="profile-name">${escHtml(exe.name)}</div>
                 <div class="profile-id">ID: ${escHtml(exe.slug)}</div>
-                <div class="profile-signature">${escHtml(exe.state === 'completed' ? '这个人还活在数字世界里' : '构建中...')}</div>
+                <div class="profile-signature">${escHtml(exe.state === 'completed' ? '基于聊天记录的 AI 模拟镜像' : '构建中...')}</div>
                 <button class="profile-moments-btn" onclick="viewMoments()">朋友圈</button>
             </div>
         `;
@@ -2093,6 +2115,12 @@ $('wallet-entry').addEventListener('click', () => {
 $('create-entry').addEventListener('click', () => {
     switchTab('create');
 });
+$('create-entry').addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        switchTab('create');
+    }
+});
 
 $('logout-entry').addEventListener('click', () => {
     if (confirm('确定退出登录？')) logout();
@@ -2103,6 +2131,7 @@ $('logout-entry').addEventListener('click', () => {
 // ═══════════════════════════════════════
 
 const STAGE_LABELS = {
+    source: '依据记录',
     dating: '热恋期 💕',
     conflicted: '磨合期 ⚡',
     broken: '分手期 💔',
@@ -2417,63 +2446,147 @@ function drawEmotionCurve(curve) {
 // 创建镜像
 // ═══════════════════════════════════════
 
-$('create-submit').addEventListener('click', async () => {
-    const name = $('create-name').value.trim();
-    const basic = $('create-basic').value.trim();
-    const pers  = $('create-personality').value.trim();
-    const fileInput = $('create-file');
-    const result = $('create-result');
-    const btn = $('create-submit');
-    if (!name) { result.textContent = '请输入代号'; result.style.color = 'var(--danger)'; return; }
-
-    const slug = name.toLowerCase().replace(/\s+/g, '_');
-    const hasFile = fileInput.files.length > 0;
-    result.textContent = '正在创建…'; result.style.color = '#888';
-    btn.textContent = '创建中…'; btn.disabled = true;
-
-    try {
-        await api('POST', '/exes', {name, slug, answers: [basic, pers]});
-        let importMsg = '';
-        if (hasFile) {
-            const file = fileInput.files[0];
-            result.textContent = '正在导入聊天记录…';
-            const formData = new FormData();
-            formData.append('file', file);
-            if (name) formData.append('target_name', name);
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const importRes = await fetch(`${API}/exes/${slug}/import`, {method:'POST', headers, body: formData});
-            if (importRes.status === 401) { logout(); return; }
-            const importData = await importRes.json().catch(()=>({}));
-            if (!importRes.ok) {
-                importMsg = ' 但导入失败';
-            } else {
-                // 导入已改为异步：接口只受理，进度要轮询任务
-                const finished = await pollTask(importData.task_id, (t) => {
-                    result.textContent = `正在导入聊天记录… ${t.progress||0}%${t.detail ? ' · ' + t.detail : ''}`;
-                });
-                importMsg = finished && finished.status === 'succeeded'
-                    ? ' ' + ((finished.result && finished.result.message) || '导入完成')
-                    : ' 但导入失败' + (finished && finished.error ? '：' + finished.error : '');
-            }
-        }
-        result.textContent = `镜像 [${name}] 创建成功！${importMsg}`;
-        result.style.color = 'var(--wechat-green)';
-        $('create-name').value = ''; $('create-basic').value = '';
-        $('create-personality').value = ''; fileInput.value = '';
-        $('create-file-name').textContent = '未选择文件';
-        loadContactList();
-    } catch(e) {
-        result.textContent = '创建失败: ' + e.message;
-        result.style.color = 'var(--danger)';
-    } finally {
-        btn.textContent = '创建镜像'; btn.disabled = false;
-    }
+let importConfig = null;
+let importConfigPromise = null;
+const importFlow = new window.ExMemoryImportFlow({
+    request: (method, path, body) => api(method, path, body, method === 'GET' ? 1 : 0),
+    createSlug: () => 'mirror_' + crypto.randomUUID().replace(/-/g, '').slice(0, 24),
+    onProgress: message => {
+        $('create-result').textContent = message;
+        $('create-result').style.color = 'var(--text-secondary)';
+    },
+    upload: async (slug, file, targetName) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('target_name', targetName);
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(`${API}/exes/${slug}/import`, {
+            method: 'POST', headers, body: formData, signal: AbortSignal.timeout(120000),
+        });
+        if (response.status === 401) { logout(); throw new Error('登录已过期，请重新登录'); }
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `导入失败 (${response.status})`);
+        return data;
+    },
 });
 
+function updateImportControls() {
+    const busy = importFlow.busy;
+    const waiting = !!importFlow.taskId;
+    const done = importFlow.completed;
+    for (const id of ['create-file', 'create-target', 'create-consent']) $(id).disabled = busy || waiting || done;
+    for (const id of ['create-name', 'create-basic', 'create-personality']) $(id).disabled = busy || !!importFlow.draft;
+    const configured = importConfig?.llm_configured && importConfig?.embedding_configured;
+    $('create-submit').disabled = busy || done || (!waiting && !importFlow.needsReconcile && !configured);
+    $('create-submit').textContent = busy ? '正在处理…' : done ? '镜像已准备好' : waiting ? '继续查看进度' : importFlow.needsReconcile ? '核对任务并继续' : importFlow.draft ? '重新导入并完成镜像' : '导入并创建镜像';
+    $('create-open').hidden = !done;
+    $('create-another').hidden = !importFlow.draft;
+    $('create-another').disabled = busy || waiting;
+}
+
+async function loadImportConfig() {
+    if (importConfigPromise) return importConfigPromise;
+    $('import-config-retry').hidden = true;
+    importConfigPromise = (async () => {
+        try {
+            const fresh = await api('GET', '/import/config');
+            if (!Array.isArray(fresh.allowed_extensions) || !fresh.third_party_data_policy_version) throw new Error('服务暂未提供完整导入说明');
+            if (importConfig && fresh.third_party_data_policy_version !== importConfig.third_party_data_policy_version) $('create-consent').checked = false;
+            importConfig = fresh;
+            $('create-file').accept = fresh.allowed_extensions.join(',');
+            $('import-config-status').textContent = fresh.llm_configured && fresh.embedding_configured
+                ? '服务已准备好。先导入记录，再依据记录生成镜像。'
+                : '服务暂未准备好，请稍后重试或联系站主。';
+            $('import-config-retry').hidden = fresh.llm_configured && fresh.embedding_configured;
+            $('import-format-hint').textContent = `支持 ${fresh.allowed_extensions.join(' / ')}，最大 ${Math.floor(fresh.max_upload_bytes / 1024 / 1024)} MB。请保留说话人和正文；HTML、数据库与压缩包需先转换。`;
+            $('import-sample').href = staticUrl('import-example.json');
+        } catch (error) {
+            importConfig = null;
+            $('import-config-status').textContent = `无法读取导入说明：${error.message}`;
+            $('import-config-retry').hidden = false;
+        } finally {
+            importConfigPromise = null;
+            updateImportControls();
+        }
+    })();
+    return importConfigPromise;
+}
+
+function resetImportForm() {
+    importFlow.reset();
+    for (const id of ['create-name', 'create-target', 'create-basic', 'create-personality', 'create-file']) $(id).value = '';
+    $('create-consent').checked = false;
+    $('create-file-name').textContent = '未选择文件';
+    $('create-result').textContent = '';
+    updateImportControls();
+}
+
+async function resumeImport(mirror) {
+    if (importFlow.busy) { showToast('当前导入正在进行，请先等待结果', 'info'); return; }
+    importFlow.restore(mirror);
+    const epoch = importFlow.epoch;
+    $('create-name').value = mirror.name;
+    $('create-basic').value = ''; $('create-personality').value = '';
+    $('create-target').value = ''; $('create-file').value = '';
+    $('create-file-name').textContent = '未选择文件';
+    $('create-consent').checked = false;
+    $('create-result').textContent = '正在核对已提交的任务…';
+    switchTab('create');
+    // 刷新页面后也优先找到仍在处理的任务，不能重新提交一份。
+    importFlow.busy = true;
+    updateImportControls();
+    try {
+        await importFlow.reconcile(epoch);
+        if (epoch !== importFlow.epoch) return;
+        $('create-result').textContent = importFlow.completed ? '镜像已完成，可以开始对话。' : importFlow.taskId
+            ? '导入仍在处理，点击“继续查看进度”。'
+            : '此镜像尚未完成。重新选择聊天文件并确认说话人后继续；已保存的背景会保留。';
+    } catch (error) {
+        if (epoch !== importFlow.epoch) return;
+        $('create-result').textContent = `无法核对任务：${error.message}。请稍后从镜像列表重试。`;
+    } finally {
+        if (epoch === importFlow.epoch) { importFlow.busy = false; updateImportControls(); }
+    }
+}
+
+$('import-config-retry').addEventListener('click', loadImportConfig);
+$('create-another').addEventListener('click', resetImportForm);
+$('create-open').addEventListener('click', () => {
+    if (importFlow.completed && importFlow.draft) enterChat(importFlow.draft.slug, importFlow.draft.name);
+});
+$('create-submit').addEventListener('click', async () => {
+    if (importFlow.busy) return;
+    const epoch = importFlow.epoch;
+    const resultEl = $('create-result');
+    const input = {
+        name: $('create-name').value, targetName: $('create-target').value,
+        basic: $('create-basic').value, personality: $('create-personality').value,
+        file: $('create-file').files[0], consented: $('create-consent').checked, config: importConfig,
+    };
+    try {
+        const pending = importFlow.submit(input);
+        updateImportControls();
+        const result = await pending;
+        if (epoch !== importFlow.epoch) return;
+        resultEl.textContent = result.recovered ? '镜像已完成，可以开始对话。' : `镜像已准备好：已处理 ${result.messages} 条消息，并根据记录生成人物记忆。可以开始对话，也可以用“ta 不会这样”纠正表达。`;
+        resultEl.style.color = 'var(--wechat-green)';
+        $('create-file').value = '';
+        $('create-file-name').textContent = '导入完成';
+        await loadContactList();
+        updateImportControls();
+        $('create-open').focus();
+    } catch (error) {
+        if (epoch !== importFlow.epoch) return;
+        resultEl.textContent = `${error.message}${importFlow.taskId ? '。任务已受理，请继续查看进度。' : importFlow.draft ? '。草稿已保留，请核对文件后重试。' : ''}`;
+        resultEl.style.color = 'var(--red)';
+    } finally {
+        if (epoch === importFlow.epoch) updateImportControls();
+    }
+});
 $('create-file').addEventListener('change', () => {
-    const f = $('create-file').files[0];
-    $('create-file-name').textContent = f ? f.name : '未选择文件';
+    const file = $('create-file').files[0];
+    $('create-file-name').textContent = file ? file.name : '未选择文件';
+    $('create-result').textContent = '';
 });
 
 // ═══════════════════════════════════════
@@ -2494,29 +2607,6 @@ async function renderSegments(msgsEl, streamedRow, segments) {
         msgsEl.appendChild(row);
         msgsEl.scrollTop = msgsEl.scrollHeight;
     }
-}
-
-// ═══════════════════════════════════════
-// 异步任务轮询
-// ═══════════════════════════════════════
-
-// 长任务（导入/反思/朋友圈/备份）都改成了提交后返回 task_id，
-// 这里统一轮询到终态。onProgress 用来更新进度文案。
-async function pollTask(taskId, onProgress, timeoutMs = 600000) {
-    if (!taskId) return null;
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-        let task;
-        try {
-            task = await api('GET', `/tasks/${taskId}`);
-        } catch (e) {
-            return null;
-        }
-        if (onProgress) { try { onProgress(task); } catch (e) {} }
-        if (task.status === 'succeeded' || task.status === 'failed') return task;
-        await new Promise(r => setTimeout(r, 800));
-    }
-    return null;
 }
 
 // ═══════════════════════════════════════
@@ -3090,13 +3180,6 @@ $('chat-msgs').addEventListener('click', () => {
 initTheme();
 if (PROXY_AUTH || token) {
     showMain();
-    // 恢复上次聊天状态
-    try {
-        const savedChat = JSON.parse(localStorage.getItem('ex-memory-current-chat') || '{}');
-        if (savedChat.slug && savedChat.name) {
-            setTimeout(() => enterChat(savedChat.slug, savedChat.name), 500);
-        }
-    } catch(e) {}
 } else { showAuth(); }
 updateStatusTime();
 setInterval(updateStatusTime, 30000);

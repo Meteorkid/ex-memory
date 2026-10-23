@@ -228,9 +228,18 @@ def _get_engine(slug: str, user_id: int):
     """获取或创建 ChatEngine（按 (user_id, slug) 缓存，LRU + TTL 有界）。"""
     from core.factory import create_engine_and_store
 
+    _check_exe_ready(slug, user_id)
     return _engine_cache.get_or_create(
         (user_id, slug), lambda: create_engine_and_store(slug, owner=user_id)[0]
     )
+
+
+def _check_exe_ready(slug: str, user_id: int) -> None:
+    store = mirror_store(slug, user_id)
+    if store.exists("meta.json"):
+        meta = store.read_json("meta.json")
+        if meta.get("creation_source") == "chat_import" and meta.get("pipeline_state") != "completed":
+            raise HTTPException(status_code=409, detail="镜像尚未就绪，请先完成聊天记录导入与生成")
 
 
 def _check_exe_access(slug: str, user_id: int) -> str:
@@ -478,8 +487,11 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
         raise HTTPException(status_code=400, detail=str(e))
 
     ex_dir = resolve_ex_dir(slug, user_id)
-    if ex_dir.exists():
-        raise HTTPException(status_code=409, detail=f"镜像 [{slug}] 已存在")
+    try:
+        # 原子占用目录，两个首次请求不能互相覆盖人物与 owner。
+        ex_dir.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail=f"镜像 [{slug}] 已存在") from None
 
     # 目录虽不存在，同名旧镜像的引擎可能仍残留在缓存中，必须先清掉
     _invalidate_engine(slug)
@@ -491,6 +503,7 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
         name=req.name,
         answers=req.answers,
         owner_user_id=user_id,
+        defer_generation=req.defer_generation,
     )
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
@@ -502,7 +515,10 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
         raise HTTPException(
             status_code=500, detail="镜像创建成功但归属绑定失败，请联系管理员"
         )
-    return StatusResponse(message=f"镜像 [{slug}] 创建成功")
+    return StatusResponse(message=(
+        f"镜像 [{slug}] 草稿已保存，请导入聊天记录"
+        if req.defer_generation else f"镜像 [{slug}] 创建成功"
+    ))
 
 
 @router.post("/exes/{slug}/resume", response_model=StatusResponse)
@@ -510,11 +526,15 @@ def resume_exe(slug: str, req: ResumeRequest, user_id: int = Depends(require_aut
     """从上次失败步骤恢复创建。"""
     slug = _check_exe_access(slug, user_id)
 
-    from pipeline.orchestrator import run_create_flow_api
+    from pipeline.orchestrator import import_creation_lock, run_create_flow_api
 
-    result = run_create_flow_api(
-        slug=slug, name=req.name, answers=[], resume=True, owner_user_id=user_id
-    )
+    try:
+        with import_creation_lock(slug, user_id):
+            result = run_create_flow_api(
+                slug=slug, name=req.name, answers=[], resume=True, owner_user_id=user_id
+            )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     # 恢复流程会重写 SKILL.md 等人格文件，缓存引擎已过期
@@ -530,8 +550,13 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
     slug = _check_exe_access(slug, user_id)
     ex_dir = resolve_ex_dir(slug, user_id)
     import shutil
+    from pipeline.orchestrator import import_creation_lock
 
-    shutil.rmtree(ex_dir)
+    try:
+        with import_creation_lock(slug, user_id):
+            shutil.rmtree(ex_dir)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     # 时间线与状态在数据库里，不会随目录一起消失，必须显式清理
     from core.relationship import clear_for_mirror
 
@@ -545,6 +570,19 @@ def delete_exe(slug: str, req: DeleteRequest, user_id: int = Depends(require_aut
 # --- 数据导入 ---
 
 MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
+IMPORT_EXTENSIONS = [".json", ".jsonl", ".txt", ".mht", ".mhtml"]
+
+
+@router.get("/import/config")
+def get_import_config():
+    """只公开首次体验所需能力与协议版本，不返回模型凭据或服务地址。"""
+    return {
+        "allowed_extensions": IMPORT_EXTENSIONS,
+        "max_upload_bytes": MAX_UPLOAD_SIZE,
+        "third_party_data_policy_version": config.THIRD_PARTY_DATA_POLICY_VERSION,
+        "llm_configured": bool(config.get_llm_config()["api_key"]),
+        "embedding_configured": bool(config.get_embedding_config()["api_key"]),
+    }
 
 
 @router.post("/exes/{slug}/import", response_model=TaskAccepted)
@@ -586,6 +624,18 @@ def import_data(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
+    if Path(safe_name).suffix.lower() not in IMPORT_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="不支持此格式，请上传 JSON、JSONL、TXT 或 QQ MHT 文件")
+    from core.tasks import list_tasks
+    from server.task_handlers import TASK_IMPORT
+
+    if any(
+        task["slug"] == slug and task["task_type"] == TASK_IMPORT
+        and task["status"] in ("queued", "running")
+        for task in list_tasks(user_id, 100)
+    ):
+        raise HTTPException(status_code=409, detail="该镜像正在导入或生成，请等待当前任务完成")
+
     # 落到暂存区而不是请求级临时目录：请求返回后 worker 还要读它。
     # 任务处理器读完即删——原始聊天记录是最敏感的那份数据。
     staging = config.PROJECT_DIR / "data" / "uploads" / uuid.uuid4().hex
@@ -593,7 +643,7 @@ def import_data(
     staged_path = staging / safe_name
     try:
         with open(staged_path, "wb") as f:
-            _copy_upload_limited(file.file, f, MAX_UPLOAD_SIZE)
+            uploaded_bytes = _copy_upload_limited(file.file, f, MAX_UPLOAD_SIZE)
     except ValueError as e:
         shutil.rmtree(staging, ignore_errors=True)
         raise HTTPException(status_code=413, detail=str(e)) from e
@@ -601,22 +651,30 @@ def import_data(
         shutil.rmtree(staging, ignore_errors=True)
         raise
 
+    if uploaded_bytes == 0:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise HTTPException(status_code=400, detail="文件为空，请选择包含聊天消息的文件")
+
     _invalidate_engine(slug)
 
     from core.tasks import enqueue
     from server.task_handlers import TASK_IMPORT
 
-    task_id = enqueue(
-        TASK_IMPORT,
-        user_id,
-        {
-            "slug": slug,
-            "owner": user_id,
-            "source_path": str(staged_path),
-            "target_name": target_name,
-        },
-        slug=slug,
-    )
+    try:
+        task_id = enqueue(
+            TASK_IMPORT,
+            user_id,
+            {
+                "slug": slug,
+                "owner": user_id,
+                "source_path": str(staged_path),
+                "target_name": target_name.strip(),
+            },
+            slug=slug,
+        )
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     return TaskAccepted(task_id=task_id, message="导入已开始，可通过任务接口查看进度")
 
 
@@ -853,6 +911,7 @@ async def chat(
     if blocked is not None:
         return ChatResponse(reply="", stickers=[], tokens=None, notice=blocked)
 
+    _check_exe_ready(slug, user_id)
     # 配额预扣排在审核之后：被危机或内容审核拦下的请求根本没调 LLM，
     # 不该扣用户额度
     try:
@@ -971,6 +1030,7 @@ async def chat_stream(
 
         return StreamingResponse(limit_stream(), media_type="text/event-stream")
 
+    _check_exe_ready(slug, user_id)
     try:
         account_id, _outcome = reserve(user_id)
     except QuotaBlocked as exc:
@@ -1420,14 +1480,16 @@ def get_stage(slug: str, user_id: int = Depends(require_auth)):
     """获取当前关系阶段。"""
     slug = _check_exe_access(slug, user_id)
     meta = _load_meta(slug, user_id)
-    return {"stage": meta.get("stage", "dating")}
+    from core.engine import resolve_relationship_stage
+
+    return {"stage": resolve_relationship_stage(meta)}
 
 
 @router.put("/exes/{slug}/stage")
 def set_stage(slug: str, stage: str = Query(...), user_id: int = Depends(require_auth)):
     """设置关系阶段。"""
     slug = _check_exe_access(slug, user_id)
-    valid_stages = ["dating", "conflicted", "broken", "healing"]
+    valid_stages = ["source", "dating", "conflicted", "broken", "healing"]
     if stage not in valid_stages:
         raise HTTPException(status_code=400, detail=f"无效阶段，可选: {valid_stages}")
     meta = _load_meta(slug, user_id)
@@ -1457,7 +1519,9 @@ def suggest_stage(slug: str, user_id: int = Depends(require_auth)):
     # 读取当前阶段
     try:
         meta = _load_meta(slug, user_id)
-        current_stage = meta.get("stage", "dating")
+        from core.engine import resolve_relationship_stage
+
+        current_stage = resolve_relationship_stage(meta)
     except HTTPException:
         current_stage = "dating"
 
@@ -1829,7 +1893,14 @@ def get_task_status(task_id: str, user_id: int = Depends(require_auth)):
 @router.post("/tasks/{task_id}/retry", response_model=TaskAccepted)
 def retry_task(task_id: str, user_id: int = Depends(require_auth)):
     """重试失败的任务。只有失败态可重试。"""
-    from core.tasks import retry
+    from core.tasks import get_task, retry
+    from server.task_handlers import TASK_IMPORT
+
+    task = get_task(task_id, user_id)
+    if task and task["task_type"] == TASK_IMPORT and task["status"] == "failed":
+        payload = json.loads(task["payload"] or "{}")
+        if not Path(payload.get("source_path", "")).is_file():
+            raise HTTPException(status_code=400, detail="原始上传文件已清理，请重新选择文件上传；已导入语料不会重复保存")
 
     if not retry(task_id, user_id):
         raise HTTPException(status_code=400, detail="任务不存在或当前状态不可重试")

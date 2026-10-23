@@ -26,12 +26,26 @@ RECALL_SCENES = [
     ("约定/计划", "下次 一起 约好 要去 什么时候"),
 ]
 
+SOURCE_SPEECH_SCENES = [
+    ("问候", "你好 最近怎么样"),
+    ("日常分享", "今天 分享 事情"),
+    ("提问与讨论", "为什么 怎么看 讨论"),
+    ("同意与拒绝", "可以 同意 不行 不方便"),
+    ("感谢与告别", "谢谢 再见 下次聊"),
+]
+SOURCE_RECALL_SCENES = [
+    ("计划与约定", "计划 时间 地点 一起"),
+    ("经历与偏好", "经历 喜欢 习惯"),
+]
+
 
 def build_persona(
     slug: str,
     materials_summary: str,
     vector_store=None,
     embedder=None,
+    *,
+    source_grounded: bool = False,
 ) -> str:
     """生成 persona.md 内容。
 
@@ -48,8 +62,9 @@ def build_persona(
     client = get_llm_client()
 
     # 读取 prompt 模板
-    analyzer_prompt = (PROMPTS_DIR / "persona_analyzer.md").read_text(encoding="utf-8")
-    builder_prompt = (PROMPTS_DIR / "persona_builder.md").read_text(encoding="utf-8")
+    suffix = "_source_grounded" if source_grounded else ""
+    analyzer_prompt = (PROMPTS_DIR / f"persona_analyzer{suffix}.md").read_text(encoding="utf-8")
+    builder_prompt = (PROMPTS_DIR / f"persona_builder{suffix}.md").read_text(encoding="utf-8")
 
     # Step 1: 分析性格特征
     analysis_response = client.chat.completions.create(
@@ -69,7 +84,7 @@ def build_persona(
     speech_samples = ""
     if vector_store and embedder:
         samples = []
-        for scene_name, query in SPEECH_SCENES:
+        for scene_name, query in (SOURCE_SPEECH_SCENES if source_grounded else SPEECH_SCENES):
             results = vector_store.search_target_only(query, embedder, top_k=8)
             picked = []
             seen = set()
@@ -91,7 +106,7 @@ def build_persona(
     recall_samples = ""
     if vector_store and embedder:
         recall_parts = []
-        for scene_name, query in RECALL_SCENES:
+        for scene_name, query in (SOURCE_RECALL_SCENES if source_grounded else RECALL_SCENES):
             results = vector_store.search_target_only(query, embedder, top_k=6)
             picked = []
             seen = set()
@@ -125,6 +140,15 @@ def build_persona(
 {speech_samples if speech_samples else "（无原话样本，请基于分析结果推断）"}
 {recall_section}
 请按照 persona_builder.md 的 5 层结构输出完整的 persona.md。"""
+    if source_grounded:
+        user_content = (
+            "请核对材料与检索片段，生成以证据为准的 persona.md。\n"
+            "区分目标人物与其他说话人，区分原话、有限推断、未知。\n\n"
+            f"## 原始材料\n{materials_summary}\n\n## 分析草稿\n{analysis}\n\n"
+            f"## 检索片段（保留说话人，不将他人的话归给目标人物）\n"
+            f"{speech_samples or '无可核验的检索原话，对应项标记未知，不补写。'}\n"
+            f"{recall_samples}"
+        )
 
     build_response = client.chat.completions.create(
         model=cfg["model"],

@@ -2,6 +2,7 @@
 
 import json
 import logging
+from contextlib import contextmanager
 from typing import Optional
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +28,44 @@ logger = logging.getLogger("ex-memory")
 
 # 管线步骤顺序
 PIPELINE_STEPS = ["import", "distill_memory", "distill_persona", "skill"]
+
+
+@contextmanager
+def import_creation_lock(slug: str, owner=None):
+    """同一个镜像的上传和恢复不能同时改写初次生成结果。"""
+    from core.file_utils import _lock, fcntl
+
+    store = mirror_store(slug, owner)
+    with store.path(".import.lock").open("a+") as lock_file:
+        try:
+            _lock(lock_file, fcntl.LOCK_EX)
+        except TimeoutError as exc:
+            raise RuntimeError("该镜像正在导入或生成，请等待当前任务完成") from exc
+        yield
+
+
+def _imported_materials(slug: str, owner=None) -> str:
+    from core.corpus_store import load_messages
+
+    messages = load_messages(slug, owner)
+    if not messages or not any(m.get("is_target") for m in messages):
+        raise ValueError("尚未导入目标人物的有效聊天记录，请重新上传")
+    # 限制输入长度，同时覆盖记录的前后时间段和目标人物原话。
+    sampled = []
+    for group, limit in (
+        ([m for m in messages if m.get("is_target")], 60),
+        ([m for m in messages if not m.get("is_target")], 20),
+    ):
+        for i in range(min(limit, len(group))):
+            sampled.append(group[i * len(group) // min(limit, len(group))])
+    lines = [f"## 已导入聊天记录样本（共 {len(messages)} 条消息）"]
+    for message in sampled:
+        role = "目标人物" if message.get("is_target") else "其他说话人"
+        lines.append(
+            f"- [{message.get('timestamp', '')}] {message.get('sender', '')}"
+            f"（{role}）：{message.get('content', '')[:200]}"
+        )
+    return "\n".join(lines)
 
 
 def _save_failed_state(slug: str, step: str, error: Exception, owner=None):
@@ -319,6 +358,8 @@ def run_create_flow_api(
     answers: list[str],
     resume: bool = False,
     owner_user_id=None,
+    defer_generation: bool = False,
+    from_import: bool = False,
 ) -> dict:
     """API 版创建流程：接收参数而非交互式输入，返回结果字典。
 
@@ -333,7 +374,9 @@ def run_create_flow_api(
             if not store.exists("meta.json"):
                 return {"error": "未找到创建记录，无法恢复"}
             meta = store.read_json("meta.json")
-            if meta.get("pipeline_state") != "failed":
+            if meta.get("pipeline_state") != "failed" and not (
+                from_import and meta.get("pipeline_state") == "awaiting_import"
+            ):
                 return {"error": "该镜像未处于失败状态，无需恢复"}
             failed_step = meta.get("failed_step", "")
             start_idx = (
@@ -345,6 +388,8 @@ def run_create_flow_api(
             personality = meta.get("profile", {}).get("personality", "")
             name = meta.get("name", name)
         else:
+            if store.exists("meta.json"):
+                return {"error": "镜像已存在，不能覆盖已有记录"}
             basic_info = answers[0] if len(answers) > 0 else ""
             personality = answers[1] if len(answers) > 1 else ""
             start_idx = 0
@@ -359,11 +404,17 @@ def run_create_flow_api(
                     "basic_info": basic_info,
                     "personality": personality,
                 },
-                "pipeline_state": "intake_done",
+                "pipeline_state": "awaiting_import" if defer_generation else "intake_done",
             }
+            if defer_generation:
+                meta["creation_source"] = "chat_import"
+                meta["stage"] = "source"
             if owner_user_id is not None:
                 meta["owner_user_id"] = owner_user_id
             store.write_json("meta.json", meta)
+
+            if defer_generation:
+                return {"slug": slug, "name": name, "state": "awaiting_import"}
 
             # 事前备份
             try:
@@ -378,6 +429,18 @@ def run_create_flow_api(
 
         materials_summary = (
             f"代号：{name}\n基本信息：{basic_info}\n性格画像：{personality}\n\n"
+        )
+        if meta.get("creation_source") == "chat_import":
+            try:
+                materials_summary += _imported_materials(slug, owner_user_id)
+            except ValueError as exc:
+                _save_failed_state(slug, "import", exc, owner=owner_user_id)
+                return {"error": str(exc)}
+            if from_import:
+                start_idx = 1
+        generation_options = (
+            {"source_grounded": True}
+            if meta.get("creation_source") == "chat_import" else {}
         )
 
         # 初始化向量库和 embedder
@@ -398,11 +461,16 @@ def run_create_flow_api(
         # 蒸馏
         llm_cfg = get_llm_config()
         if not llm_cfg["api_key"]:
+            _save_failed_state(
+                slug, "distill_memory", RuntimeError("未配置 LLM API Key"), owner=owner_user_id
+            )
             return {"error": "未配置 LLM API Key"}
 
         if start_idx <= 1:
             try:
-                memory_content = build_memory(slug, materials_summary)
+                memory_content = build_memory(slug, materials_summary, **generation_options)
+                if not isinstance(memory_content, str) or not memory_content.strip():
+                    raise ValueError("模型未返回有效记忆，请重试")
                 store.write_text("memory.md", memory_content)
             except Exception as e:
                 _save_failed_state(slug, "distill_memory", e, owner=owner_user_id)
@@ -411,8 +479,10 @@ def run_create_flow_api(
         if start_idx <= 2:
             try:
                 persona_content = build_persona(
-                    slug, materials_summary, vector_store, embedder
+                    slug, materials_summary, vector_store, embedder, **generation_options
                 )
+                if not isinstance(persona_content, str) or not persona_content.strip():
+                    raise ValueError("模型未返回有效人物画像，请重试")
                 store.write_text("persona.md", persona_content)
             except Exception as e:
                 _save_failed_state(slug, "distill_persona", e, owner=owner_user_id)

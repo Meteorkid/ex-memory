@@ -5,6 +5,8 @@
 """
 
 import logging
+import hashlib
+import json
 import shutil
 from pathlib import Path
 
@@ -23,64 +25,96 @@ TASK_PROACTIVE = "proactive_tick"
 def handle_import(
     progress: TaskProgress, *, slug: str, owner: int, source_path: str, target_name: str
 ) -> dict:
-    """解析聊天记录并入向量库。
+    """解析入库，并用实际聊天材料完成首次镜像生成。
 
     源文件由路由落到暂存区，这里读完即删——原始聊天记录是最敏感的那份
     数据，不该在磁盘上多留一分钟。
     """
     from config import get_collection_name, get_embedding_config, resolve_ex_dir
+    from core.exe_access import assert_exe_access
+    from core.mirror_store import mirror_store
     from memory.embedder import Embedder
     from memory.vector_store import VectorStore
-    from parsers.wechat_parser import detect_format
+    from pipeline.orchestrator import import_creation_lock, run_create_flow_api
+    from server.routes import _invalidate_engine
 
     path = Path(source_path)
     try:
-        progress.update(5, "准备解析")
-        emb_cfg = get_embedding_config()
-        if not emb_cfg["api_key"]:
-            raise RuntimeError("未配置 Embedding API Key")
-
-        ex_dir = resolve_ex_dir(slug, owner)
-        embedder = Embedder(
-            api_key=emb_cfg["api_key"],
-            base_url=emb_cfg["base_url"],
-            model=emb_cfg["model"],
-        )
-        vector_store = VectorStore(
-            persist_dir=str(ex_dir / "chroma_db"),
-            collection_name=get_collection_name(slug),
-        )
-
-        progress.update(20, "解析聊天记录")
-        suffix = path.suffix.lower()
-        if suffix in (".mht", ".mhtml"):
-            from memory.ingest import ingest_qq_file
-
-            messages, chunks = ingest_qq_file(
-                str(path), slug, target_name, vector_store, embedder, owner=owner
+        assert_exe_access(slug, owner)
+        if not path.is_file():
+            raise ValueError("原始上传文件已清理，请重新选择文件上传")
+        with import_creation_lock(slug, owner):
+            store = mirror_store(slug, owner)
+            meta = store.read_json("meta.json")
+            first_generation = (
+                meta.get("creation_source") == "chat_import"
+                and meta.get("pipeline_state") != "completed"
             )
-        elif suffix == ".txt" and detect_format(str(path)) == "plaintext":
-            from memory.ingest import ingest_qq_file
+            digest = hashlib.sha256()
+            digest.update((target_name.strip() + path.suffix.lower()).encode())
+            with path.open("rb") as source:
+                for block in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(block)
+            import_id = digest.hexdigest()
+            receipt = meta.get("imported_files", {}).get(import_id)
+            if receipt is None:
+                progress.update(5, "准备解析")
+                emb_cfg = get_embedding_config()
+                if not emb_cfg["api_key"]:
+                    raise RuntimeError("未配置 Embedding API Key")
 
-            messages, chunks = ingest_qq_file(
-                str(path), slug, target_name, vector_store, embedder, owner=owner
-            )
-        else:
-            from memory.ingest import ingest_wechat_file
+                ex_dir = resolve_ex_dir(slug, owner)
+                embedder = Embedder(
+                    api_key=emb_cfg["api_key"],
+                    base_url=emb_cfg["base_url"],
+                    model=emb_cfg["model"],
+                )
+                vector_store = VectorStore(
+                    persist_dir=str(ex_dir / "chroma_db"),
+                    collection_name=get_collection_name(slug),
+                )
+                progress.update(20, "解析聊天记录")
+                suffix = path.suffix.lower()
+                if suffix in (".mht", ".mhtml", ".txt"):
+                    from memory.ingest import ingest_qq_file as ingest_file
+                else:
+                    from memory.ingest import ingest_wechat_file as ingest_file
+                try:
+                    messages, chunks = ingest_file(
+                        str(path), slug, target_name, vector_store, embedder,
+                        owner=owner, import_id=import_id, require_target=True,
+                    )
+                except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                    raise ValueError("文件内容或编码无效，请重新导出 UTF-8 聊天记录后上传") from exc
+                if not messages or not chunks:
+                    raise ValueError("未提取到有效聊天消息，请检查文件内容和格式")
+                receipt = {"messages": len(messages), "chunks": chunks}
 
-            messages, chunks = ingest_wechat_file(
-                str(path), slug, target_name, vector_store, embedder, owner=owner
-            )
+                def save_receipt(current):
+                    current.setdefault("imported_files", {})[import_id] = receipt
+                    return current
 
-        progress.update(95, "入库完成")
-        if not messages:
-            return {"messages": 0, "chunks": 0, "message": "未提取到有效消息"}
-        return {
-            "messages": len(messages),
-            "chunks": chunks,
-            "message": f"导入完成：解析 {len(messages)} 条消息，入库 {chunks} 个切片",
-        }
+                store.locked_update_json("meta.json", {}, save_receipt)
+            if first_generation:
+                progress.update(55, "正在根据聊天记录生成记忆与人物画像")
+                result = run_create_flow_api(
+                    slug, meta.get("name", slug), [], resume=True,
+                    owner_user_id=owner, from_import=True,
+                )
+                if result.get("error"):
+                    raise RuntimeError(result["error"])
+            progress.update(95, "镜像已就绪" if first_generation else "入库完成")
+            return {
+                **receipt,
+                "state": store.read_json("meta.json").get("pipeline_state", "unknown"),
+                "message": (
+                    "聊天记录导入完成，记忆与人物画像已生成，可以开始模拟对话"
+                    if first_generation else
+                    f"导入完成：解析 {receipt['messages']} 条消息，入库 {receipt['chunks']} 个切片"
+                ),
+            }
     finally:
+        _invalidate_engine(slug)
         shutil.rmtree(path.parent, ignore_errors=True)
 
 

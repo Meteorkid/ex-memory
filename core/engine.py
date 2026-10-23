@@ -23,6 +23,11 @@ logger = logging.getLogger("ex-memory")
 
 # 关系阶段语气指令
 STAGE_INSTRUCTIONS = {
+    "source": (
+        "称呼、关系与表达方式依据已提供的记录和用户明确纠正。"
+        "关系未知时保持中性，不主动添加亲密称呼或情感承诺。"
+        "用可核验原话作为参考，推断需明确标注，资料不足时说明未知。"
+    ),
     "dating": (
         "你现在处于热恋期。语气甜蜜、撒娇，频繁表达爱意。"
         "大量使用亲昵称呼，主动说想你爱你，情绪整体偏正面阳光。"
@@ -40,6 +45,12 @@ STAGE_INSTRUCTIONS = {
         "像老朋友一样聊天，有距离感但不冷漠。"
     ),
 }
+
+
+def resolve_relationship_stage(meta: dict) -> str:
+    default = "source" if meta.get("creation_source") == "chat_import" else "dating"
+    stage = meta.get("stage") or meta.get("relationship_stage") or default
+    return stage if stage in STAGE_INSTRUCTIONS else default
 
 # 关键词同义词/联想词扩展表（基于情感对话场景）
 KEYWORD_EXPANSIONS = {
@@ -91,6 +102,7 @@ class ChatEngine:
         self.session_summaries: list[str] = []
         self.corrections = ""
         self.relationship_stage = "dating"  # 默认热恋期
+        self.source_grounded = False
         # 表达风格画像：从真实语料统计而来，没有语料时为 None（不猜）
         self.style_profile = None
         self.last_seen_at = None
@@ -134,10 +146,10 @@ class ChatEngine:
         if self.store.exists("meta.json"):
             try:
                 meta = self.store.read_json("meta.json")
+                self.source_grounded = meta.get("creation_source") == "chat_import"
+                self.relationship_stage = resolve_relationship_stage(meta)
                 stage = meta.get("stage") or meta.get("relationship_stage")
-                if stage in STAGE_INSTRUCTIONS:
-                    self.relationship_stage = stage
-                elif stage:
+                if stage and stage not in STAGE_INSTRUCTIONS:
                     logger.warning(
                         "未知关系阶段 %s，回退 %s", stage, self.relationship_stage
                     )
@@ -225,7 +237,8 @@ class ChatEngine:
 
             # 关系阶段决定整体语气基调（热恋/磨合/分手/治愈）
             stage_instruction = STAGE_INSTRUCTIONS.get(
-                self.relationship_stage, STAGE_INSTRUCTIONS["dating"]
+                self.relationship_stage,
+                STAGE_INSTRUCTIONS["source" if self.source_grounded else "dating"],
             )
             p.append(f"\n---\n## 当前关系阶段（语气基调）\n{stage_instruction}\n")
             if sums:
@@ -247,7 +260,10 @@ class ChatEngine:
 
             from core.persona_style import style_instructions
 
-            p.append(style_instructions(self.style_profile))
+            if self.source_grounded and self.style_profile is None:
+                p.append("\n## 表达方式\n表达样本不足，使用简洁自然的语言，不自造口头禅或性格习惯。\n")
+            else:
+                p.append(style_instructions(self.style_profile))
             p.append(
                 f"\n---\n## 可用图片表情包\n你可以在回复中使用图片表情包来表达情绪。"
                 f"在回复文本末尾加上 [sticker:贴纸ID] 标记即可。\n可用贴纸：{sticker_list}\n"
@@ -265,10 +281,13 @@ class ChatEngine:
             if rag_results:
                 filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
                 if filtered:
-                    p.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
-                    p.append(
-                        "以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n"
-                    )
+                    if self.source_grounded:
+                        p.append("\n---\n## 检索参考\n以下片段可能包含多位说话人，按标注辨认出处；仅将目标人物的原话用于表达参考。\n")
+                    else:
+                        p.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
+                        p.append(
+                            "以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n"
+                        )
                     for r in filtered:
                         p.append(f"- {r.get('display_text', '')}")
                     p.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")

@@ -88,6 +88,7 @@ def parse_wechatmsg_txt(file_path: str, target_name: str = "") -> list[dict]:
                     "timestamp": timestamp,
                     "sender": sender.strip(),
                     "content": "",
+                    "is_target": bool(target_name) and sender.strip() == target_name.strip(),
                 }
             elif current_msg and line.strip():
                 if current_msg["content"]:
@@ -116,25 +117,26 @@ def parse_plaintext(file_path: str, target_name: str = "") -> list[dict]:
 
 def _normalize_messages(messages_raw: list, target_name: str) -> list[dict]:
     """统一消息格式。适配 WeFlow 和留痕的字段差异。"""
+    if not isinstance(messages_raw, list):
+        raise ValueError("聊天记录 messages 必须是消息数组")
     normalized = []
     for msg in messages_raw:
-        # WeFlow 格式
-        if "sender" in msg and "content" in msg:
-            sender = msg.get("sender", "")
-            # WeFlow 的 isSend: 1=我发的, 0=ta发的
-            is_send = msg.get("isSend", 0)
-            if isinstance(is_send, str):
-                is_send = int(is_send)
-            is_me = bool(is_send)
-        # 留痕格式
-        elif "senderDisplayName" in msg:
-            sender = msg.get("senderDisplayName", "")
-            is_me = msg.get("isSend") == 1
+        if not isinstance(msg, dict):
+            raise ValueError("聊天记录中的每条消息必须是对象")
+        sender = str(msg.get("senderDisplayName") or msg.get("sender") or "unknown")
+        if isinstance(msg.get("is_target"), bool):
+            is_target = msg["is_target"]
+        elif "isSend" in msg:
+            # 有明确导出方向时沿用方向；普通 JSON 必须按说话人匹配。
+            if msg["isSend"] not in (0, 1, "0", "1"):
+                raise ValueError("聊天记录 isSend 必须是 0 或 1")
+            is_target = int(msg["isSend"]) == 0
         else:
-            sender = msg.get("sender", "unknown")
-            is_me = False
+            is_target = bool(target_name) and sender.strip() == target_name.strip()
 
         content = msg.get("content", "")
+        if not isinstance(content, str):
+            raise ValueError("聊天消息 content 必须是文本")
         # 非文本消息处理：保留标记但转换为可读描述
         non_text_map = {
             "[表情]": "发了一个表情",
@@ -151,9 +153,9 @@ def _normalize_messages(messages_raw: list, target_name: str) -> list[dict]:
         normalized.append(
             {
                 "timestamp": msg.get("formattedTime", msg.get("timestamp", "")),
-                "sender": "我" if is_me else (target_name or sender),
+                "sender": sender,
                 "content": content,
-                "is_target": not is_me,
+                "is_target": is_target,
             }
         )
 

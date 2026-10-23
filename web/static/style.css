@@ -1435,7 +1435,7 @@ body::after {
    ═══════════════════════════════════════ */
 
 .create-container {
-    padding: 16px; max-width: 100%;
+    padding: 16px; max-width: 760px; margin: 0 auto;
 }
 .create-container h2 {
     font-size: 1.2em; margin-bottom: 16px;
@@ -1467,13 +1467,27 @@ body::after {
     margin-top: 20px;
 }
 .file-upload { display: flex; align-items: center; gap: 10px; }
-.file-upload input[type="file"] { width: auto; flex-shrink: 0; padding: 6px 0; }
+.file-upload input[type="file"] { width: 100%; min-width: 0; padding: 6px 0; }
 .file-name { color: var(--text-secondary); font-size: 0.82em; }
 .file-hint {
     color: var(--text-tertiary); font-size: 0.75em; margin-top: 2px;
 }
 #create-result {
     font-size: 0.85em; min-height: 24px; padding: 8px 0;
+}
+.import-intro { color: var(--text-secondary); font-size: 0.9em; line-height: 1.65; margin-bottom: 12px; }
+.import-link { color: var(--text-primary); text-decoration: underline; background: none; border: 0; text-align: left; cursor: pointer; font: inherit; padding: 8px 0; }
+.import-privacy { margin-top: 20px; color: var(--text-secondary); font-size: 0.85em; line-height: 1.7; }
+.import-privacy p { margin: 8px 0; }
+.create-form label.import-consent { display: flex; align-items: flex-start; gap: 10px; color: var(--text-primary); }
+.create-form .import-consent input { width: 18px; height: 18px; margin-top: 4px; flex-shrink: 0; accent-color: var(--wechat-green); }
+.create-form [hidden] { display: none; }
+.create-form .file-name { overflow-wrap: anywhere; }
+.create-form .file-hint { color: var(--text-secondary); line-height: 1.65; }
+.create-form :disabled { cursor: not-allowed; opacity: 0.65; }
+@media (max-width: 600px) {
+    .create-form { padding: 16px; }
+    .file-upload { flex-direction: column; align-items: stretch; }
 }
 
 /* ═══════════════════════════════════════
@@ -1753,8 +1767,7 @@ body::after {
     .phone-content.me-mode #tab-me {
         flex: 1; display: block !important;
     }
-    .phone-content.me-mode #tab-wallet,
-    .phone-content.me-mode #tab-create {
+    .phone-content.create-mode #tab-create {
         flex: 1; display: block !important;
     }
 

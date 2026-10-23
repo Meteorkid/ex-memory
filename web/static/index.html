@@ -7,11 +7,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#0a0a12">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:17653; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
-    <title>ex-memory</title>
+    <title>Ex-Memory · 个人记忆镜像</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
     <link rel="manifest" href="static/manifest.json">
     <link rel="apple-touch-icon" href="static/icon-192.svg">
-    <link rel="stylesheet" href="static/style.css?v=20260822">
+    <link rel="stylesheet" href="static/style.css?v=20261023-import">
     <link rel="stylesheet" href="static/wechat-helper.css?v=20260822b">
 </head>
 <body>
@@ -280,7 +280,7 @@
                             <span>💰 钱包</span>
                             <span class="discover-arrow">›</span>
                         </div>
-                        <div class="me-item" id="create-entry">
+                        <div class="me-item" id="create-entry" role="button" tabindex="0">
                             <span>➕ 创建新镜像</span>
                             <span class="discover-arrow">›</span>
                         </div>
@@ -309,22 +309,38 @@
                 <!-- ═══ 创建镜像 ═══ -->
                 <div id="tab-create" class="tab-page" style="display:none">
                     <div class="create-container">
-                        <h2>创建新镜像</h2>
+                        <h2>从聊天记录创建个人记忆镜像</h2>
+                        <p class="import-intro">选择记录、确认说话人，再生成镜像。回复是基于记录的 AI 模拟。</p>
                         <div class="create-form">
-                            <label>代号 *</label>
-                            <input type="text" id="create-name" placeholder="例如：前任名字" autocomplete="off">
-                            <label>基本信息</label>
-                            <textarea id="create-basic" rows="2" placeholder="你们的关系、认识时间、分手时间…"></textarea>
-                            <label>ta 的性格特点</label>
-                            <textarea id="create-personality" rows="2" placeholder="说话风格、口头禅、常用标点…"></textarea>
-                            <label>导入聊天记录（可选）</label>
+                            <p id="import-config-status" class="import-intro" role="status">正在读取导入说明…</p>
+                            <button id="import-config-retry" class="import-link" type="button" hidden>重新读取说明</button>
+                            <label for="create-file">1. 选择聊天记录 *</label>
                             <div class="file-upload">
-                                <input type="file" id="create-file" accept=".txt,.json,.jsonl,.csv">
+                                <input type="file" id="create-file" accept=".txt,.json,.jsonl,.csv,.mht,.mhtml" aria-describedby="import-format-hint">
                                 <span class="file-name" id="create-file-name">未选择文件</span>
                             </div>
-                            <p class="file-hint">支持微信导出 txt/json/jsonl/csv 格式</p>
-                            <button id="create-submit" class="btn">创建镜像</button>
-                            <p id="create-result" class="err"></p>
+                            <p id="import-format-hint" class="file-hint">选择受支持的微信或 QQ 导出文件。HTML、数据库和压缩包需先转换。</p>
+                            <a id="import-sample" class="import-link" href="static/import-example.json" download="ex-memory-fictional-example.json">下载虚构示例，先体验完整流程</a>
+                            <p class="file-hint">示例中目标说话人是“小雨”，可以问“周六约在哪里？”。全部人物与对话均为虚构。</p>
+                            <label for="create-name">2. 镜像名称 *</label>
+                            <input type="text" id="create-name" placeholder="例如：小雨的记忆" maxlength="64" autocomplete="off">
+                            <label for="create-target">记录中的目标说话人 *</label>
+                            <input type="text" id="create-target" placeholder="填写聊天记录里的昵称，例如：小雨" maxlength="128" autocomplete="off">
+                            <p class="file-hint">用于区分双方发言，可以与上面的镜像名称不同。</p>
+                            <label for="create-basic">背景补充（可选）</label>
+                            <textarea id="create-basic" rows="2" placeholder="你希望保留的背景，例如认识的时间、共同经历…"></textarea>
+                            <label for="create-personality">表达习惯补充（可选）</label>
+                            <textarea id="create-personality" rows="2" placeholder="例如常用的词、句子长度；导入后也可在对话中纠正"></textarea>
+                            <div class="import-privacy" id="import-privacy">
+                                <strong>3. 确认资料与处理方式</strong>
+                                <p>上传后，当前 Ex-Memory 服务会保存处理后的记录、人物记忆和对话；必要的记录片段会发送给服务所配置的向量与对话模型提供方。网站在线体验在服务器处理，本机微信导出仅负责在电脑上取得文件。</p>
+                                <p>请先移除不希望上传的内容。可在镜像菜单导出资料或删除镜像。</p>
+                                <label class="import-consent"><input type="checkbox" id="create-consent"><span>我已阅读处理说明，并确认拥有处理这份本人或获授权聊天记录的依据。</span></label>
+                            </div>
+                            <button id="create-submit" class="btn" disabled>导入并创建镜像</button>
+                            <p id="create-result" class="err" role="status" aria-live="polite"></p>
+                            <button id="create-open" class="btn" type="button" hidden>开始对话</button>
+                            <button id="create-another" class="import-link" type="button" hidden>新建另一个镜像</button>
                         </div>
                     </div>
                 </div>
@@ -395,7 +411,8 @@
 </div>
 
 <script src="static/effects.js"></script>
-<script src="static/app.js?v=20260823e"></script>
+<script src="static/import-flow.js?v=20261023"></script>
+<script src="static/app.js?v=20261023-import"></script>
 <script src="static/wechat-helper.js?v=20260824c"></script>
 </body>
 </html>

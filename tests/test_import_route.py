@@ -170,7 +170,7 @@ def test_import_does_not_block_event_loop(env):
     _make_exe(env, "imp")
     app = create_app()
 
-    def slow_ingest(file_path, slug, target_name, vector_store, embedder):
+    def slow_ingest(file_path, slug, target_name, vector_store, embedder, owner=None, **kwargs):
         time.sleep(1.5)
         return [{"sender": "ta", "content": "hi"}], 1
 
@@ -207,6 +207,8 @@ def test_import_does_not_block_event_loop(env):
             assert elapsed < 0.7, (
                 f"回归：导入阻塞了事件循环，/health 延迟 {elapsed:.2f}s"
             )
+            task = _await_task(result["resp"].json()["task_id"])
+            assert task["status"] == "succeeded", task.get("error")
 
 
 def _weflow_bytes(n_pairs: int = 12) -> bytes:

@@ -122,7 +122,7 @@ class TestCreateInvalidatesStaleCache:
         shutil.rmtree(env / slug)
 
         def fake_create_flow(**kwargs):
-            _make_exe(env, slug, owner=1, skill_text="# 新画像")
+            _make_exe(env / str(kwargs["owner_user_id"]), slug, owner=1, skill_text="# 新画像")
             return {"state": "completed", "slug": slug}
 
         with patch(

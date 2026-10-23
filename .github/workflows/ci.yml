@@ -89,6 +89,9 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Frontend import and session regression
+        run: node --test tests/test_web_import_flow.cjs tests/test_web_session_isolation.cjs
+
       - name: Cache pip
         uses: actions/cache@v4
         with:
