@@ -12,7 +12,7 @@
 ## 验证
 
 - 隔离快照 Python 回归：991 passed、29 skipped、1 deselected。仅忽略独立研究文件 `test_error_analysis.py`，仅 deselect 既有离线 holdout 的 `test_structure`；其余6项 holdout通过。29项跳过需额外 PostgreSQL/Redis 环境，账号模型设置的5项真实 PostgreSQL 用例通过。
-- Node 导入、会话隔离与模型表单回归：21 passed。
+- Node 导入、会话隔离与模型表单回归：23 passed；包含文字和语音入口对使用时长限制提示的实际渲染，避免保护生效时出现空回复。
 - HTTP 验收：87项通过，包括跨账号、配置轮换/删除、站主 sentinel 零调用、导入和流式对话。HTTP 出口使用合成响应，未调用真实付费模型。
 - 独立输送层审查：真实本地 TLS 校验 SNI、正确/错误 SAN、固定 IP、拒绝跳转及环境代理，共5项通过。
 - 浏览器完成自定义两套配置、保存、示例导入、首轮回复、Key 删除/重设、刷新持久化；375px无横向溢出。密码输入框不保留保存过的 Key。

@@ -349,7 +349,7 @@ async function parseChatStream(res, msgsEl) {
                 const item = JSON.parse(d);
                 if (item.type === 'segments') {
                     await renderSegments(msgsEl, replyRow, item.segments);
-                } else if (item.type === 'crisis' || item.type === 'blocked') {
+                } else if (item.type === 'crisis' || item.type === 'blocked' || item.type === 'usage_limit') {
                     replyRow.remove();
                     msgsEl.appendChild(noticeMsg(item));
                 } else if (item.error) {
@@ -3281,7 +3281,7 @@ async function sendVoiceMessage(duration, sttText) {
                 try {
                     const item = JSON.parse(d);
                     if (item.type === 'segments') { await renderSegments(msgsEl, replyRow, item.segments); }
-                    else if (item.type === 'crisis' || item.type === 'blocked') { replyRow.remove(); msgsEl.appendChild(noticeMsg(item)); }
+                    else if (item.type === 'crisis' || item.type === 'blocked' || item.type === 'usage_limit') { replyRow.remove(); msgsEl.appendChild(noticeMsg(item)); }
                     else if (item.error) { assistantDiv.textContent = item.error; replyRow.className = 'msg-row sys'; }
                     else if (item.type === 'text' && item.content) { assistantDiv.textContent += item.content; }
                     else if (item.type === 'sticker' && item.id) { msgsEl.appendChild(stickerMsg(item.id)); }

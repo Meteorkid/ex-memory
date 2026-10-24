@@ -194,3 +194,57 @@ test('网络重试退避期间切换账号，定时器到期后也不能重发�
     await rejected;
     assert.equal(h.requests.length, 1);
 });
+
+function chatStreamHarness() {
+    function node() {
+        return {
+            children: [], style: {}, textContent: '', parentNode: null,
+            appendChild(child) { child.parentNode = this; this.children.push(child); },
+            querySelector() { return this.children[0]; },
+            remove() {
+                if (this.parentNode) this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1);
+                this.parentNode = null;
+            },
+        };
+    }
+    const messages = node();
+    const message = '今天聊了挺久了，先歇一会儿吧。\n回忆随时都在，但此刻的生活也需要你。';
+    function streamResponse() {
+        const encoded = new TextEncoder().encode(`data: ${JSON.stringify({ type: 'usage_limit', message })}\n\ndata: [DONE]\n\n`);
+        const chunks = [encoded.slice(0, 19), encoded.slice(19)];
+        return { status: 200, ok: true, body: { getReader: () => ({
+            read: async () => chunks.length ? { done: false, value: chunks.shift() } : { done: true },
+        }) } };
+    }
+    const context = vm.createContext({
+        TextDecoder, setTimeout, API: '/api', token: '', currentSlug: 'synthetic', currentName: '虚构镜像',
+        document: { createElement: node },
+        $: id => id === 'chat-msgs' ? messages : { style: { display: 'none' } },
+        chatBubble: (role, text) => {
+            const row = node(); row.className = `msg-row ${role}`;
+            const content = node(); content.textContent = text; row.appendChild(content);
+            return row;
+        },
+        typingIndicator: node, buildHistory: () => [], fetch: async () => streamResponse(),
+        storeLastMessage() {}, showDesktopNotification() {},
+    });
+    vm.runInContext([
+        extractFunction('async function parseChatStream(', 'function initTheme('),
+        extractFunction('function noticeMsg(', 'function sysMsg('),
+        extractFunction('async function sendVoiceMessage(', 'const CHAT_TIME_GAP'),
+    ].join('\n'), context);
+    return { context, messages, message, streamResponse };
+}
+
+for (const mode of ['文字', '语音']) {
+    test(`${mode}流式对话显示服务端使用时长提示，不留下空的镜像回复`, async () => {
+        const h = chatStreamHarness();
+        if (mode === '文字') await h.context.parseChatStream(h.streamResponse(), h.messages);
+        else await h.context.sendVoiceMessage(2, '合成语音转写');
+        assert.equal(h.messages.children.length, 1);
+        const notice = h.messages.children[0];
+        assert.equal(notice.className, 'msg-row sys');
+        assert.equal(notice.children[0].textContent, h.message);
+        assert.equal(notice.children[0].style.whiteSpace, 'pre-wrap');
+    });
+}
