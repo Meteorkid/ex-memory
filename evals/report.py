@@ -44,13 +44,16 @@ def _load(path: Path) -> dict | None:
 
 def plot_recall_vs_k(plt, retrieval: dict, out: Path):
     """各分块配置的 Recall@K 曲线（生产路径 target_only）。"""
+    from evals.ab_runner import PROD_CONFIG
+
     fig, ax = plt.subplots(figsize=(7, 4.5))
     k_values = retrieval["meta"]["k_values"]
     for cfg in retrieval["configs"]:
         recalls = [cfg["target_only"][f"recall@{k}"] for k in k_values]
-        style = "-o" if cfg["label"] == "turns5_overlap1" else "--s"
+        is_prod = cfg["label"] == PROD_CONFIG.label
+        style = "-o" if is_prod else "--s"
         label = f"{cfg['turns']}轮/重叠{cfg['overlap']}"
-        if cfg["label"] == "turns5_overlap1":
+        if is_prod:
             label += "（生产）"
         ax.plot(k_values, recalls, style, label=label, linewidth=2)
     ax.set_xlabel("K")
@@ -66,7 +69,9 @@ def plot_recall_vs_k(plt, retrieval: dict, out: Path):
 
 def plot_threshold_sweep(plt, retrieval: dict, out: Path):
     """生产分块配置下的阈值扫描：召回 vs 注入上下文条数。"""
-    cfg = next(c for c in retrieval["configs"] if c["label"] == "turns5_overlap1")
+    from evals.ab_runner import PROD_CONFIG
+
+    cfg = next(c for c in retrieval["configs"] if c["label"] == PROD_CONFIG.label)
     sweep = cfg["threshold_sweep"]
     ts = [s["threshold"] for s in sweep]
     recalls = [s["recall"] for s in sweep]
@@ -94,7 +99,10 @@ def plot_threshold_sweep(plt, retrieval: dict, out: Path):
     ax2.set_ylabel("平均注入 prompt 的 chunk 数", color="tab:orange")
     ax2.tick_params(axis="y", labelcolor="tab:orange")
 
-    fig.suptitle("阈值扫描：召回 vs 上下文注入量（生产分块 5轮/重叠1）")
+    fig.suptitle(
+        "阈值扫描：召回 vs 上下文注入量"
+        f"（生产分块 {PROD_CONFIG.turns}轮/重叠{PROD_CONFIG.overlap}）"
+    )
     fig.tight_layout()
     fig.savefig(out, dpi=150)
     plt.close(fig)
@@ -268,19 +276,29 @@ def _holdout_verdict_text(holdout: dict) -> str:
 
 
 def _holdout_caveat_text(hmeta: dict) -> str:
-    """已知簇口径提示：剔除消息后重新分块会改变 dominant_speaker 归属。
+    """已知簇口径提示：与主评测的配置一致性 + 重建库的残存扰动。
 
-    剔除 target 消息会使剩余语料重新分块，chunk 的说话人构成随之变化，
-    部分原本被 target 过滤排除的 chunk 可能重新归入 target。因此已知簇的
-    检索候选池与主评测不同，两者不可直接比较。
+    历史问题：`retrieval_results.json` 曾在 PROD_CONFIG 由 (5,1) 改为 (3,1)
+    之后未重跑，`per_query_prod` 停留在旧配置，导致已知簇与主评测口径
+    不一致（94.9% vs 71.7%）。现已统一在 config.py 的生产配置下复跑。
+
+    残存扰动：剔除 target 消息会使剩余语料重新分块，chunk 的说话人构成
+    随之变化，部分原本被 target 过滤排除的 chunk 可能重新归入 target，
+    候选池与主评测不完全相同。
     """
+    from evals.ab_runner import PROD_CONFIG
+
     return (
-        "**已知簇数字不可与主评测直接比较：** 剔除 "
-        f"{hmeta.get('n_removed', 0)} 条消息后，检索库按剩余语料重新分块，"
-        "chunk 的 `dominant_speaker` 归属随之改变，部分原本被目标说话人过滤"
-        "排除的 chunk 会重新归入 target，候选池因此不同于主评测。"
-        "故本节只比较「已知簇 vs 留出簇」两组之间的相对差异，"
-        "不把已知簇数值与主评测的生产配置并列。"
+        "**已知簇与主评测的口径关系：** 两者现均运行在生产配置 "
+        f"`{PROD_CONFIG.label}`（由 `config.py` 的 `CHUNK_TURNS`/"
+        "`CHUNK_OVERLAP` 决定）。此前 `per_query_prod` 停留在旧配置 (5,1)，"
+        "与留出测试 (3,1) 口径不一致，造成两组数字看似悬殊；"
+        "统一配置后该差异已消失。"
+        f"剔除 {hmeta.get('n_removed', 0)} 条消息后检索库重新分块，"
+        "chunk 的 `dominant_speaker` 归属随之改变，候选池与主评测"
+        "仍有轻微不同——实测对已知簇 recall@10 的影响在噪声量级"
+        "（2026-10-25 复测约 0.4 个百分点），可并列参考；"
+        "严格比较时以主评测同配置结果为准。"
     )
 
 
@@ -290,8 +308,11 @@ def build_markdown(
     holdout: dict | None = None,
     analysis: dict | None = None,
 ) -> str:
+    from evals.ab_runner import PROD_CONFIG
+
     meta = retrieval["meta"]
-    prod = next(c for c in retrieval["configs"] if c["label"] == "turns5_overlap1")
+    prod_label = PROD_CONFIG.label
+    prod = next(c for c in retrieval["configs"] if c["label"] == prod_label)
     best = max(retrieval["configs"], key=lambda c: c["target_only"]["recall@5"])
 
     lines = [
@@ -313,7 +334,7 @@ def build_markdown(
     ]
     for cfg in retrieval["configs"]:
         t = cfg["target_only"]
-        mark = "（生产）" if cfg["label"] == "turns5_overlap1" else ""
+        mark = "（生产）" if cfg["label"] == prod_label else ""
         lines.append(
             f"| {cfg['turns']}轮/重叠{cfg['overlap']}{mark} | {cfg['n_chunks']} "
             f"| {_fmt_pct(t['recall@5'])} | {_fmt_pct(t['recall@10'])} "

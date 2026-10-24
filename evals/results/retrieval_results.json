@@ -38,12 +38,12 @@
     "recall@5": 0.8027210884353742,
     "precision@5": 0.20952380952380953,
     "hit@5": 0.8979591836734694,
-    "ndcg@5": 0.7477751948948661,
+    "ndcg@5": 0.7474770741408603,
     "recall@10": 0.8775510204081632,
     "precision@10": 0.11496598639455784,
     "hit@10": 0.9455782312925171,
-    "ndcg@10": 0.774476295211349,
-    "mrr": 0.7991685563114135
+    "ndcg@10": 0.7741781744573432,
+    "mrr": 0.7988284202569916
    },
    "target_only": {
     "recall@1": 0.5011337868480726,
@@ -53,16 +53,16 @@
     "recall@3": 0.6145124716553287,
     "precision@3": 0.23129251700680273,
     "hit@3": 0.6802721088435374,
-    "ndcg@3": 0.6249379900130207,
+    "ndcg@3": 0.6240473114172966,
     "recall@5": 0.6394557823129252,
     "precision@5": 0.145578231292517,
     "hit@5": 0.7074829931972789,
-    "ndcg@5": 0.6381553410608256,
+    "ndcg@5": 0.6372646624651014,
     "recall@10": 0.6768707482993197,
     "precision@10": 0.07755102040816327,
     "hit@10": 0.7551020408163265,
-    "ndcg@10": 0.653615719090106,
-    "mrr": 0.6228620019436346
+    "ndcg@10": 0.6527250404943817,
+    "mrr": 0.621728215095562
    },
    "threshold_sweep": [
     {
@@ -92,8 +92,8 @@
     {
      "threshold": 0.5,
      "recall": 0.5952380952380952,
-     "avg_kept": 3.6530612244897958,
-     "precision_kept": 0.27339920095022135
+     "avg_kept": 3.6598639455782314,
+     "precision_kept": 0.273304718712882
     },
     {
      "threshold": 0.6,
@@ -110,23 +110,23 @@
    "n_chunks": 158,
    "n_target_chunks": 81,
    "unfiltered": {
-    "recall@1": 0.6439909297052154,
-    "precision@1": 0.7891156462585034,
-    "hit@1": 0.7891156462585034,
-    "ndcg@1": 0.7891156462585034,
+    "recall@1": 0.63718820861678,
+    "precision@1": 0.782312925170068,
+    "hit@1": 0.782312925170068,
+    "ndcg@1": 0.782312925170068,
     "recall@3": 0.8412698412698413,
-    "precision@3": 0.4512471655328798,
+    "precision@3": 0.45351473922902485,
     "hit@3": 0.8843537414965986,
-    "ndcg@3": 0.6999676075854814,
+    "ndcg@3": 0.7000885773868829,
     "recall@5": 0.8775510204081632,
     "precision@5": 0.29931972789115646,
     "hit@5": 0.9183673469387755,
-    "ndcg@5": 0.736995613865544,
+    "ndcg@5": 0.7349546180738896,
     "recall@10": 0.9659863945578231,
     "precision@10": 0.16802721088435377,
     "hit@10": 0.9863945578231292,
-    "ndcg@10": 0.7729822801724571,
-    "mrr": 0.8537495950761257
+    "ndcg@10": 0.7709060848407213,
+    "mrr": 0.8498461289277616
    },
    "target_only": {
     "recall@1": 0.7392290249433107,
@@ -140,12 +140,12 @@
     "recall@5": 0.9149659863945578,
     "precision@5": 0.2204081632653061,
     "hit@5": 0.9183673469387755,
-    "ndcg@5": 0.8021116357169864,
+    "ndcg@5": 0.8018135149629807,
     "recall@10": 0.935374149659864,
     "precision@10": 0.11836734693877553,
     "hit@10": 0.9387755102040817,
-    "ndcg@10": 0.8213068998329832,
-    "mrr": 0.8258503401360544
+    "ndcg@10": 0.8210087790789774,
+    "mrr": 0.8255102040816326
    },
    "threshold_sweep": [
     {
@@ -176,7 +176,7 @@
      "threshold": 0.5,
      "recall": 0.8571428571428571,
      "avg_kept": 4.673469387755102,
-     "precision_kept": 0.392943526616996
+     "precision_kept": 0.3937371774106468
     },
     {
      "threshold": 0.6,
@@ -201,15 +201,15 @@
     "precision@3": 0.4240362811791383,
     "hit@3": 0.8639455782312925,
     "ndcg@3": 0.7631145533250154,
-    "recall@5": 0.9217687074829932,
-    "precision@5": 0.28163265306122454,
-    "hit@5": 0.9387755102040817,
-    "ndcg@5": 0.8008534706236925,
+    "recall@5": 0.9183673469387755,
+    "precision@5": 0.2802721088435374,
+    "hit@5": 0.9319727891156463,
+    "ndcg@5": 0.7992398807409082,
     "recall@10": 0.9659863945578231,
     "precision@10": 0.1523809523809524,
     "hit@10": 0.9727891156462585,
-    "ndcg@10": 0.8248470589442746,
-    "mrr": 0.8496301695281288
+    "ndcg@10": 0.8246590250477519,
+    "mrr": 0.8494034121585142
    },
    "target_only": {
     "recall@1": 0.564625850340136,
@@ -217,17 +217,17 @@
     "hit@1": 0.6190476190476191,
     "ndcg@1": 0.6190476190476191,
     "recall@3": 0.6564625850340136,
-    "precision@3": 0.3514739229024943,
+    "precision@3": 0.3492063492063492,
     "hit@3": 0.673469387755102,
-    "ndcg@3": 0.5882852673986193,
+    "ndcg@3": 0.5861997327293491,
     "recall@5": 0.7108843537414966,
     "precision@5": 0.23537414965986395,
     "hit@5": 0.7210884353741497,
-    "ndcg@5": 0.6202911950406675,
+    "ndcg@5": 0.6200020421576053,
     "recall@10": 0.7312925170068028,
     "precision@10": 0.12653061224489798,
     "hit@10": 0.7346938775510204,
-    "ndcg@10": 0.638080046252064,
+    "ndcg@10": 0.6379362093501257,
     "mrr": 0.6552154195011337
    },
    "threshold_sweep": [
@@ -252,14 +252,14 @@
     {
      "threshold": 0.4,
      "recall": 0.7312925170068028,
-     "avg_kept": 9.768707482993197,
-     "precision_kept": 0.1376687182809632
+     "avg_kept": 9.755102040816327,
+     "precision_kept": 0.13785768275564195
     },
     {
      "threshold": 0.5,
      "recall": 0.6462585034013606,
-     "avg_kept": 4.163265306122449,
-     "precision_kept": 0.34785390346614836
+     "avg_kept": 4.197278911564626,
+     "precision_kept": 0.3427518626498218
     },
     {
      "threshold": 0.6,
@@ -283,16 +283,16 @@
     "recall@3": 0.8639455782312925,
     "precision@3": 0.3696145124716553,
     "hit@3": 0.8775510204081632,
-    "ndcg@3": 0.7423801764337141,
+    "ndcg@3": 0.7418340593530895,
     "recall@5": 0.9285714285714286,
     "precision@5": 0.2503401360544218,
     "hit@5": 0.9387755102040817,
-    "ndcg@5": 0.7854618002779508,
+    "ndcg@5": 0.7849156831973262,
     "recall@10": 0.9863945578231292,
     "precision@10": 0.13877551020408166,
     "hit@10": 0.9863945578231292,
-    "ndcg@10": 0.8166698459227937,
-    "mrr": 0.8456322211424252
+    "ndcg@10": 0.8160491982709365,
+    "mrr": 0.8444984342943527
    },
    "target_only": {
     "recall@1": 0.16326530612244897,
@@ -335,13 +335,13 @@
     {
      "threshold": 0.4,
      "recall": 0.2108843537414966,
-     "avg_kept": 4.578231292517007,
+     "avg_kept": 4.585034013605442,
      "precision_kept": 0.06491739552964043
     },
     {
      "threshold": 0.5,
      "recall": 0.1655328798185941,
-     "avg_kept": 0.7278911564625851,
+     "avg_kept": 0.7346938775510204,
      "precision_kept": 0.14705215419501133
     },
     {
@@ -424,8 +424,8 @@
     {
      "threshold": 0.5,
      "recall": 0.35714285714285715,
-     "avg_kept": 1.7210884353741496,
-     "precision_kept": 0.2720494547025159
+     "avg_kept": 1.727891156462585,
+     "precision_kept": 0.2697818810063708
     },
     {
      "threshold": 0.6,
@@ -444,7 +444,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6179,
+   "top1_score": 0.6136,
    "relevant_chunks_target": 2
   },
   {
@@ -452,9 +452,9 @@
    "category": "偏好",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.7061,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.6237,
    "relevant_chunks_target": 2
   },
   {
@@ -464,38 +464,38 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.654,
+   "top1_score": 0.598,
    "relevant_chunks_target": 2
   },
   {
    "qid": "coffee-q1",
    "category": "偏好",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5432,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.558,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "coffee-q2",
    "category": "偏好",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5323,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6784,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "coffee-q3",
    "category": "偏好",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.6185,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6629,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "hotpot-q1",
@@ -504,8 +504,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6377,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6869,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "hotpot-q2",
@@ -514,18 +514,18 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.669,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6998,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "hotpot-q3",
    "category": "偏好",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.5,
-   "first_hit_rank": 2,
-   "top1_score": 0.5684,
-   "relevant_chunks_target": 2
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5847,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "fruit-q1",
@@ -534,8 +534,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5479,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5763,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "fruit-q2",
@@ -544,8 +544,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6164,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6086,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "fruit-q3",
@@ -554,8 +554,8 @@
    "recall@10": 1.0,
    "mrr": 0.5,
    "first_hit_rank": 2,
-   "top1_score": 0.4871,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5107,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "color-q1",
@@ -564,7 +564,7 @@
    "recall@10": 0.0,
    "mrr": 0.0,
    "first_hit_rank": null,
-   "top1_score": 0.5068,
+   "top1_score": 0.5177,
    "relevant_chunks_target": 0
   },
   {
@@ -574,7 +574,7 @@
    "recall@10": 0.0,
    "mrr": 0.0,
    "first_hit_rank": null,
-   "top1_score": 0.5082,
+   "top1_score": 0.5085,
    "relevant_chunks_target": 0
   },
   {
@@ -584,7 +584,7 @@
    "recall@10": 0.0,
    "mrr": 0.0,
    "first_hit_rank": null,
-   "top1_score": 0.5391,
+   "top1_score": 0.5989,
    "relevant_chunks_target": 0
   },
   {
@@ -594,7 +594,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6071,
+   "top1_score": 0.6145,
    "relevant_chunks_target": 2
   },
   {
@@ -604,7 +604,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5908,
+   "top1_score": 0.5763,
    "relevant_chunks_target": 2
   },
   {
@@ -614,7 +614,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5932,
+   "top1_score": 0.6021,
    "relevant_chunks_target": 2
   },
   {
@@ -624,8 +624,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5099,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5702,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "movie-q2",
@@ -634,8 +634,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5539,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6122,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "movie-q3",
@@ -644,68 +644,68 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5176,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6001,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "dessert-q1",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5401,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "dessert-q2",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5768,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "dessert-q3",
+   "category": "偏好",
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5961,
+   "relevant_chunks_target": 0
+  },
+  {
+   "qid": "season-q1",
    "category": "偏好",
    "recall@5": 1.0,
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.656,
+   "top1_score": 0.6419,
    "relevant_chunks_target": 1
-  },
-  {
-   "qid": "dessert-q2",
-   "category": "偏好",
-   "recall@5": 1.0,
-   "recall@10": 1.0,
-   "mrr": 0.3333333333333333,
-   "first_hit_rank": 3,
-   "top1_score": 0.5772,
-   "relevant_chunks_target": 1
-  },
-  {
-   "qid": "dessert-q3",
-   "category": "偏好",
-   "recall@5": 1.0,
-   "recall@10": 1.0,
-   "mrr": 0.3333333333333333,
-   "first_hit_rank": 3,
-   "top1_score": 0.6016,
-   "relevant_chunks_target": 1
-  },
-  {
-   "qid": "season-q1",
-   "category": "偏好",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5205,
-   "relevant_chunks_target": 0
   },
   {
    "qid": "season-q2",
    "category": "偏好",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5464,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6351,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "season-q3",
    "category": "偏好",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5629,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6527,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "cat-q1",
@@ -714,7 +714,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6249,
+   "top1_score": 0.6655,
    "relevant_chunks_target": 1
   },
   {
@@ -724,7 +724,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6186,
+   "top1_score": 0.6696,
    "relevant_chunks_target": 1
   },
   {
@@ -734,7 +734,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5224,
+   "top1_score": 0.5711,
    "relevant_chunks_target": 1
   },
   {
@@ -744,7 +744,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.523,
+   "top1_score": 0.5931,
    "relevant_chunks_target": 1
   },
   {
@@ -754,7 +754,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.4749,
+   "top1_score": 0.5569,
    "relevant_chunks_target": 1
   },
   {
@@ -764,7 +764,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5238,
+   "top1_score": 0.6126,
    "relevant_chunks_target": 1
   },
   {
@@ -774,7 +774,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6092,
+   "top1_score": 0.6125,
    "relevant_chunks_target": 2
   },
   {
@@ -784,7 +784,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.653,
+   "top1_score": 0.6512,
    "relevant_chunks_target": 2
   },
   {
@@ -794,7 +794,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6458,
+   "top1_score": 0.666,
    "relevant_chunks_target": 2
   },
   {
@@ -804,8 +804,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6384,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6107,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "spicy-q2",
@@ -814,18 +814,18 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6259,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6232,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "spicy-q3",
    "category": "偏好",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.6866,
-   "relevant_chunks_target": 2
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.6905,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "first-meet-q1",
@@ -834,7 +834,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.563,
+   "top1_score": 0.6022,
    "relevant_chunks_target": 2
   },
   {
@@ -844,7 +844,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6244,
+   "top1_score": 0.6336,
    "relevant_chunks_target": 2
   },
   {
@@ -854,28 +854,28 @@
    "recall@10": 1.0,
    "mrr": 0.3333333333333333,
    "first_hit_rank": 3,
-   "top1_score": 0.5828,
+   "top1_score": 0.5891,
    "relevant_chunks_target": 2
   },
   {
    "qid": "first-date-q1",
    "category": "经历",
-   "recall@5": 0.5,
-   "recall@10": 0.5,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.5847,
-   "relevant_chunks_target": 2
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5352,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "first-date-q2",
    "category": "经历",
-   "recall@5": 0.5,
-   "recall@10": 1.0,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.5816,
-   "relevant_chunks_target": 2
+   "recall@5": 0.0,
+   "recall@10": 0.0,
+   "mrr": 0.0,
+   "first_hit_rank": null,
+   "top1_score": 0.5506,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "first-date-q3",
@@ -884,38 +884,38 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5926,
-   "relevant_chunks_target": 2
+   "top1_score": 0.589,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "trip-chengdu-q1",
    "category": "经历",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5208,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6115,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "trip-chengdu-q2",
    "category": "经历",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.4905,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5827,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "trip-chengdu-q3",
    "category": "经历",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.4724,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.4969,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "trip-xiamen-q1",
@@ -924,7 +924,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.488,
+   "top1_score": 0.5557,
    "relevant_chunks_target": 2
   },
   {
@@ -934,17 +934,17 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.647,
+   "top1_score": 0.6191,
    "relevant_chunks_target": 2
   },
   {
    "qid": "trip-xiamen-q3",
    "category": "经历",
-   "recall@5": 0.5,
+   "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.2,
-   "first_hit_rank": 5,
-   "top1_score": 0.5569,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5826,
    "relevant_chunks_target": 2
   },
   {
@@ -954,7 +954,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6354,
+   "top1_score": 0.6485,
    "relevant_chunks_target": 2
   },
   {
@@ -964,7 +964,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6503,
+   "top1_score": 0.6872,
    "relevant_chunks_target": 2
   },
   {
@@ -974,7 +974,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.4697,
+   "top1_score": 0.5165,
    "relevant_chunks_target": 2
   },
   {
@@ -984,8 +984,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5793,
-   "relevant_chunks_target": 1
+   "top1_score": 0.5766,
+   "relevant_chunks_target": 2
   },
   {
    "qid": "fight-q2",
@@ -994,8 +994,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6021,
-   "relevant_chunks_target": 1
+   "top1_score": 0.5878,
+   "relevant_chunks_target": 2
   },
   {
    "qid": "fight-q3",
@@ -1004,8 +1004,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.547,
-   "relevant_chunks_target": 1
+   "top1_score": 0.5634,
+   "relevant_chunks_target": 2
   },
   {
    "qid": "gift-q1",
@@ -1014,8 +1014,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6837,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6734,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "gift-q2",
@@ -1024,8 +1024,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6352,
-   "relevant_chunks_target": 2
+   "top1_score": 0.621,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "gift-q3",
@@ -1034,8 +1034,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6654,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6707,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "concert-q1",
@@ -1044,7 +1044,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5868,
+   "top1_score": 0.6069,
    "relevant_chunks_target": 2
   },
   {
@@ -1054,7 +1054,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5983,
+   "top1_score": 0.6035,
    "relevant_chunks_target": 2
   },
   {
@@ -1064,7 +1064,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.673,
+   "top1_score": 0.6503,
    "relevant_chunks_target": 2
   },
   {
@@ -1072,10 +1072,10 @@
    "category": "经历",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.6527,
-   "relevant_chunks_target": 2
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5262,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "newyear-q2",
@@ -1084,8 +1084,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5093,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5375,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "newyear-q3",
@@ -1094,8 +1094,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5934,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6236,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "fever-q1",
@@ -1104,7 +1104,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5933,
+   "top1_score": 0.6268,
    "relevant_chunks_target": 1
   },
   {
@@ -1114,7 +1114,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5412,
+   "top1_score": 0.5689,
    "relevant_chunks_target": 1
   },
   {
@@ -1124,7 +1124,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6281,
+   "top1_score": 0.649,
    "relevant_chunks_target": 1
   },
   {
@@ -1134,8 +1134,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6516,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6954,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "graduation-q2",
@@ -1144,8 +1144,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6402,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6457,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "graduation-q3",
@@ -1154,27 +1154,27 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5966,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6186,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "confession-q1",
    "category": "经历",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.25,
-   "first_hit_rank": 4,
-   "top1_score": 0.5579,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5681,
    "relevant_chunks_target": 2
   },
   {
    "qid": "confession-q2",
    "category": "经历",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.548,
+   "recall@5": 0.5,
+   "recall@10": 0.5,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5449,
    "relevant_chunks_target": 2
   },
   {
@@ -1184,7 +1184,7 @@
    "recall@10": 1.0,
    "mrr": 0.5,
    "first_hit_rank": 2,
-   "top1_score": 0.5444,
+   "top1_score": 0.5859,
    "relevant_chunks_target": 2
   },
   {
@@ -1194,8 +1194,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5749,
-   "relevant_chunks_target": 2
+   "top1_score": 0.579,
+   "relevant_chunks_target": 3
   },
   {
    "qid": "mom-q2",
@@ -1204,8 +1204,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5969,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5989,
+   "relevant_chunks_target": 3
   },
   {
    "qid": "mom-q3",
@@ -1214,8 +1214,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5775,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5702,
+   "relevant_chunks_target": 3
   },
   {
    "qid": "dad-q1",
@@ -1224,7 +1224,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6687,
+   "top1_score": 0.6559,
    "relevant_chunks_target": 2
   },
   {
@@ -1234,7 +1234,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5511,
+   "top1_score": 0.5885,
    "relevant_chunks_target": 2
   },
   {
@@ -1244,7 +1244,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5518,
+   "top1_score": 0.5839,
    "relevant_chunks_target": 2
   },
   {
@@ -1254,7 +1254,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.564,
+   "top1_score": 0.589,
    "relevant_chunks_target": 1
   },
   {
@@ -1264,7 +1264,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.649,
+   "top1_score": 0.6478,
    "relevant_chunks_target": 1
   },
   {
@@ -1274,7 +1274,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5989,
+   "top1_score": 0.6159,
    "relevant_chunks_target": 1
   },
   {
@@ -1282,9 +1282,9 @@
    "category": "家庭朋友",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.25,
-   "first_hit_rank": 4,
-   "top1_score": 0.4933,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5301,
    "relevant_chunks_target": 2
   },
   {
@@ -1294,98 +1294,98 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.597,
+   "top1_score": 0.6519,
    "relevant_chunks_target": 2
   },
   {
    "qid": "bestie-q3",
    "category": "家庭朋友",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5586,
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.58,
    "relevant_chunks_target": 2
   },
   {
    "qid": "grandma-q1",
    "category": "家庭朋友",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.507,
-   "relevant_chunks_target": 0
-  },
-  {
-   "qid": "grandma-q2",
-   "category": "家庭朋友",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.533,
-   "relevant_chunks_target": 0
-  },
-  {
-   "qid": "grandma-q3",
-   "category": "家庭朋友",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5299,
-   "relevant_chunks_target": 0
-  },
-  {
-   "qid": "roommate-q1",
-   "category": "家庭朋友",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5587,
-   "relevant_chunks_target": 0
-  },
-  {
-   "qid": "roommate-q2",
-   "category": "家庭朋友",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5566,
-   "relevant_chunks_target": 0
-  },
-  {
-   "qid": "roommate-q3",
-   "category": "家庭朋友",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5936,
-   "relevant_chunks_target": 0
-  },
-  {
-   "qid": "major-q1",
-   "category": "工作学校",
    "recall@5": 1.0,
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5397,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6164,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "grandma-q2",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6087,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "grandma-q3",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5537,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "roommate-q1",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5643,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "roommate-q2",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5746,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "roommate-q3",
+   "category": "家庭朋友",
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6032,
+   "relevant_chunks_target": 1
+  },
+  {
+   "qid": "major-q1",
+   "category": "工作学校",
+   "recall@5": 0.0,
+   "recall@10": 1.0,
+   "mrr": 0.125,
+   "first_hit_rank": 8,
+   "top1_score": 0.4937,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "major-q2",
    "category": "工作学校",
-   "recall@5": 0.0,
+   "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.16666666666666666,
-   "first_hit_rank": 6,
-   "top1_score": 0.5773,
-   "relevant_chunks_target": 2
+   "mrr": 0.2,
+   "first_hit_rank": 5,
+   "top1_score": 0.5768,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "major-q3",
@@ -1394,8 +1394,8 @@
    "recall@10": 1.0,
    "mrr": 0.2,
    "first_hit_rank": 5,
-   "top1_score": 0.5668,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5673,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "intern-q1",
@@ -1404,7 +1404,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6138,
+   "top1_score": 0.6374,
    "relevant_chunks_target": 2
   },
   {
@@ -1414,7 +1414,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5808,
+   "top1_score": 0.5952,
    "relevant_chunks_target": 2
   },
   {
@@ -1424,48 +1424,48 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.671,
+   "top1_score": 0.7152,
    "relevant_chunks_target": 2
   },
   {
    "qid": "skill-q1",
    "category": "工作学校",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5257,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5453,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "skill-q2",
    "category": "工作学校",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.4792,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.7155,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "skill-q3",
    "category": "工作学校",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5409,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6182,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "dream-q1",
    "category": "工作学校",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.25,
-   "first_hit_rank": 4,
-   "top1_score": 0.501,
-   "relevant_chunks_target": 2
+   "mrr": 0.2,
+   "first_hit_rank": 5,
+   "top1_score": 0.527,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "dream-q2",
@@ -1474,28 +1474,28 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6255,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6427,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "dream-q3",
    "category": "工作学校",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.4997,
-   "relevant_chunks_target": 2
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.5004,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "cert-q1",
    "category": "工作学校",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.6147,
-   "relevant_chunks_target": 2
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.5771,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "cert-q2",
@@ -1504,48 +1504,48 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.567,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5798,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "cert-q3",
    "category": "工作学校",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.25,
-   "first_hit_rank": 4,
-   "top1_score": 0.5476,
-   "relevant_chunks_target": 2
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.5776,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "thesis-q1",
    "category": "工作学校",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5055,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5177,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "thesis-q2",
    "category": "工作学校",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.487,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5926,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "thesis-q3",
    "category": "工作学校",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5063,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6371,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "bear-q1",
@@ -1554,7 +1554,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5632,
+   "top1_score": 0.5704,
    "relevant_chunks_target": 1
   },
   {
@@ -1564,7 +1564,7 @@
    "recall@10": 1.0,
    "mrr": 0.25,
    "first_hit_rank": 4,
-   "top1_score": 0.6189,
+   "top1_score": 0.6666,
    "relevant_chunks_target": 1
   },
   {
@@ -1572,9 +1572,9 @@
    "category": "习惯怪癖",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.5,
-   "first_hit_rank": 2,
-   "top1_score": 0.4697,
+   "mrr": 0.25,
+   "first_hit_rank": 4,
+   "top1_score": 0.5207,
    "relevant_chunks_target": 1
   },
   {
@@ -1584,8 +1584,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6062,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6106,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "catchphrase-q2",
@@ -1594,8 +1594,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.539,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5328,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "catchphrase-q3",
@@ -1604,68 +1604,68 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5381,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5494,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "thunder-q1",
    "category": "习惯怪癖",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.602,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6121,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "thunder-q2",
    "category": "习惯怪癖",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.517,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6528,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "thunder-q3",
    "category": "习惯怪癖",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5707,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6524,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "clean-q1",
    "category": "习惯怪癖",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5403,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 0.3333333333333333,
+   "first_hit_rank": 3,
+   "top1_score": 0.5339,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "clean-q2",
    "category": "习惯怪癖",
    "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5709,
-   "relevant_chunks_target": 0
+   "recall@10": 1.0,
+   "mrr": 0.16666666666666666,
+   "first_hit_rank": 6,
+   "top1_score": 0.5753,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "clean-q3",
    "category": "习惯怪癖",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.4897,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.4953,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "direction-q1",
@@ -1674,8 +1674,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5586,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5739,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "direction-q2",
@@ -1684,8 +1684,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6058,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6273,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "direction-q3",
@@ -1694,17 +1694,17 @@
    "recall@10": 0.0,
    "mrr": 0.0,
    "first_hit_rank": null,
-   "top1_score": 0.5966,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5978,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "latenight-q1",
    "category": "习惯怪癖",
    "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 1.0,
-   "first_hit_rank": 1,
-   "top1_score": 0.5798,
+   "mrr": 0.5,
+   "first_hit_rank": 2,
+   "top1_score": 0.6376,
    "relevant_chunks_target": 2
   },
   {
@@ -1714,7 +1714,7 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.598,
+   "top1_score": 0.5857,
    "relevant_chunks_target": 2
   },
   {
@@ -1724,7 +1724,7 @@
    "recall@10": 1.0,
    "mrr": 0.3333333333333333,
    "first_hit_rank": 3,
-   "top1_score": 0.5655,
+   "top1_score": 0.5931,
    "relevant_chunks_target": 2
   },
   {
@@ -1734,8 +1734,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6005,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6072,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "photo-q2",
@@ -1744,8 +1744,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6385,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6464,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "photo-q3",
@@ -1754,8 +1754,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6161,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6287,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "rainday-q1",
@@ -1764,8 +1764,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6773,
-   "relevant_chunks_target": 2
+   "top1_score": 0.7045,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "rainday-q2",
@@ -1774,8 +1774,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6239,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6656,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "rainday-q3",
@@ -1784,8 +1784,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6199,
-   "relevant_chunks_target": 2
+   "top1_score": 0.66,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "stomach-q1",
@@ -1794,8 +1794,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5686,
-   "relevant_chunks_target": 2
+   "top1_score": 0.5788,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "stomach-q2",
@@ -1804,8 +1804,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.5779,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6179,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "stomach-q3",
@@ -1814,68 +1814,68 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6512,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6509,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "myopia-q1",
    "category": "健康约定",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.4734,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6232,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "myopia-q2",
    "category": "健康约定",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.4962,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.702,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "myopia-q3",
    "category": "健康约定",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.4562,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.6744,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "promise-xinjiang-q1",
    "category": "健康约定",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5408,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.679,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "promise-xinjiang-q2",
    "category": "健康约定",
-   "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5003,
-   "relevant_chunks_target": 0
+   "recall@5": 1.0,
+   "recall@10": 1.0,
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5957,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "promise-xinjiang-q3",
    "category": "健康约定",
    "recall@5": 0.0,
-   "recall@10": 0.0,
-   "mrr": 0.0,
-   "first_hit_rank": null,
-   "top1_score": 0.5653,
-   "relevant_chunks_target": 0
+   "recall@10": 1.0,
+   "mrr": 0.125,
+   "first_hit_rank": 8,
+   "top1_score": 0.5627,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "promise-harbin-q1",
@@ -1884,8 +1884,8 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.6556,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6677,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "promise-harbin-q2",
@@ -1894,18 +1894,18 @@
    "recall@10": 1.0,
    "mrr": 1.0,
    "first_hit_rank": 1,
-   "top1_score": 0.641,
-   "relevant_chunks_target": 2
+   "top1_score": 0.6525,
+   "relevant_chunks_target": 1
   },
   {
    "qid": "promise-harbin-q3",
    "category": "健康约定",
-   "recall@5": 0.0,
+   "recall@5": 1.0,
    "recall@10": 1.0,
-   "mrr": 0.16666666666666666,
-   "first_hit_rank": 6,
-   "top1_score": 0.5169,
-   "relevant_chunks_target": 2
+   "mrr": 1.0,
+   "first_hit_rank": 1,
+   "top1_score": 0.5554,
+   "relevant_chunks_target": 1
   }
  ]
 }
