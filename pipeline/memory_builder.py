@@ -6,7 +6,7 @@ from config import get_llm_config, get_llm_client
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
 
-def build_memory(slug: str, materials_summary: str, *, source_grounded: bool = False) -> str:
+def build_memory(slug: str, materials_summary: str, *, source_grounded: bool = False, owner=None, model_config=None) -> str:
     """生成 memory.md 内容。
 
     Args:
@@ -16,8 +16,10 @@ def build_memory(slug: str, materials_summary: str, *, source_grounded: bool = F
     Returns:
         memory.md 的完整内容
     """
-    cfg = get_llm_config()
-    client = get_llm_client()
+    cfg = model_config if model_config is not None else (
+        get_llm_config(owner) if owner is not None else get_llm_config()
+    )
+    client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
 
     suffix = "_source_grounded" if source_grounded else ""
     analyzer_prompt = (PROMPTS_DIR / f"memory_analyzer{suffix}.md").read_text(encoding="utf-8")

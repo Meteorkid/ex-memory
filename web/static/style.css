@@ -1482,6 +1482,10 @@ body::after {
 .create-form label.import-consent { display: flex; align-items: flex-start; gap: 10px; color: var(--text-primary); }
 .create-form .import-consent input { width: 18px; height: 18px; margin-top: 4px; flex-shrink: 0; accent-color: var(--wechat-green); }
 .create-form [hidden] { display: none; }
+.model-settings-group { border: 0; border-top: 1px solid rgba(255,255,255,.12); padding: 18px 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.model-settings-group legend { padding: 0 8px 0 0; color: var(--text-primary); }
+.model-settings-group select { width: 100%; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid rgba(255,255,255,.16); border-radius: 8px; padding: 10px; font: inherit; }
+.model-settings-group input { width: 100%; box-sizing: border-box; }
 .create-form .file-name { overflow-wrap: anywhere; }
 .create-form .file-hint { color: var(--text-secondary); line-height: 1.65; }
 .create-form :disabled { cursor: not-allowed; opacity: 0.65; }
@@ -1698,7 +1702,7 @@ body::after {
     .phone-content { display: block; }
     #tab-chat-list, #tab-chat-detail,
     #tab-contacts, #tab-discover, #tab-me,
-    #tab-wallet, #tab-create, #tab-wechat-export {
+    #tab-wallet, #tab-create, #tab-models, #tab-wechat-export {
         width: 100% !important; flex: unset !important;
         position: absolute !important;
         border-right: none !important;
@@ -1740,7 +1744,7 @@ body::after {
 
     #tab-chat-list, #tab-chat-detail,
     #tab-contacts, #tab-discover, #tab-me,
-    #tab-wallet, #tab-create, #tab-wechat-export {
+    #tab-wallet, #tab-create, #tab-models, #tab-wechat-export {
         position: relative !important;
         height: 100% !important;
         flex-shrink: 0;
@@ -1768,6 +1772,9 @@ body::after {
         flex: 1; display: block !important;
     }
     .phone-content.create-mode #tab-create {
+        flex: 1; display: block !important;
+    }
+    .phone-content.models-mode #tab-models {
         flex: 1; display: block !important;
     }
 

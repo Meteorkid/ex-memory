@@ -26,7 +26,7 @@ def run_reflection(slug: str, owner=None) -> str:
         FileNotFoundError: 缺少 memory.md
         RuntimeError: LLM 调用失败
     """
-    cfg = get_llm_config()
+    cfg = get_llm_config(owner) if owner is not None else get_llm_config()
     if not cfg["api_key"]:
         raise RuntimeError("未配置 LLM API Key")
 
@@ -37,7 +37,7 @@ def run_reflection(slug: str, owner=None) -> str:
     reflect_prompt = (PROMPTS_DIR / "reflect.md").read_text(encoding="utf-8")
     memory_content = store.read_text("memory.md")
 
-    client = get_llm_client()
+    client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
     response = client.chat.completions.create(
         model=cfg["model"],
         messages=[

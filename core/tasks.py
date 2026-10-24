@@ -129,6 +129,10 @@ def _run(task_id: str) -> None:
     )
     payload = json.loads(task["payload"] or "{}")
     try:
+        if "owner" in payload and (
+            type(payload["owner"]) is not int or payload["owner"] != int(task["user_id"])
+        ):
+            raise ValueError("任务账号与镜像归属不一致")
         result = handler(TaskProgress(task_id), **payload)
         observe_task(task["task_type"], STATUS_SUCCEEDED)
         _update_task(

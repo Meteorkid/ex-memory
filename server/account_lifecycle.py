@@ -1,7 +1,7 @@
 """账户级数据导出与级联删除（FR-019）。
 
 一个账号的数据散落在五处，少删一处就是一次合规事故：
-1. data/users.db —— users / tokens / external_identities / consents / user_activity
+1. data/users.db —— 账号、会话、模型凭据及同意与活动记录
 2. exes/<user_id>/ —— 全部镜像，含 SKILL.md、向量库、对话归档、版本快照
 3. 自定义贴纸目录 —— web/static/stickers/custom/u<user_id>/
 4. data/feedback.jsonl —— 按行携带 user_id
@@ -60,6 +60,7 @@ def export_account(user_id: int) -> Path:
     """
     from server.auth import _get_conn
     from server.consent_store import list_consents
+    from server.model_settings import get_public_settings
 
     tmp = tempfile.NamedTemporaryFile(
         prefix=f"ex-memory-account-{user_id}-", suffix=".zip", delete=False
@@ -97,6 +98,7 @@ def export_account(user_id: int) -> Path:
             "consents": list_consents(user_id),
             "activity": activity,
             "exes": _owned_slugs(user_id),
+            "model_settings": get_public_settings(user_id),
         }
 
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -173,7 +175,10 @@ def delete_account(user_id: int) -> dict:
 
     with _get_conn() as conn:
         receipt["safety_events"] = _handle_safety_events(conn, user_id)
-        for table in ("tokens", "consents", "user_activity", "external_identities"):
+        for table in (
+            "tokens", "refresh_tokens", "consents", "user_activity", "external_identities",
+            "user_model_settings",
+        ):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
@@ -237,6 +242,9 @@ def _purge_memory_caches(user_id: int) -> None:
 
     routes._engine_cache.evict_where(lambda key: key[0] == user_id)
     routes._session_counters.evict_where(lambda key: key[0] == user_id)
+    from server.model_settings_routes import invalidate_model_settings
+
+    invalidate_model_settings(user_id)
 
 
 # ── 完整性回查 ──
@@ -267,9 +275,11 @@ def verify_deletion(user_id: int) -> list[str]:
         for table, column in (
             ("users", "id"),
             ("tokens", "user_id"),
+            ("refresh_tokens", "user_id"),
             ("consents", "user_id"),
             ("user_activity", "user_id"),
             ("external_identities", "user_id"),
+            ("user_model_settings", "user_id"),
         ):
             row = conn.execute(
                 f"SELECT COUNT(*) AS n FROM {table} WHERE {column} = ?",
@@ -289,5 +299,12 @@ def verify_deletion(user_id: int) -> list[str]:
         residues.append("进程内引擎缓存残留")
     if any(k[0] == user_id for k in routes._session_counters):
         residues.append("进程内用量计数残留")
+    from config import _account_llm_clients
+    from core.llm_router import _account_routers
+
+    if any(k[0] == user_id for k in _account_llm_clients):
+        residues.append("进程内模型客户端残留")
+    if any(k[0] == user_id for k in _account_routers):
+        residues.append("进程内模型路由残留")
 
     return residues

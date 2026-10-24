@@ -50,11 +50,11 @@ def handle_correction(
     Returns:
         处理结果的确认消息
     """
-    cfg = get_llm_config()
+    cfg = get_llm_config(owner) if owner is not None else get_llm_config()
     if not cfg["api_key"]:
         return "（未配置 LLM API Key，无法自动处理纠正。请手动编辑 corrections.md。）"
 
-    client = get_llm_client()
+    client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
 
     # 读取 correction_handler prompt
     prompt_template = (PROMPTS_DIR / "correction_handler.md").read_text(

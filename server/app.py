@@ -9,6 +9,7 @@ from pathlib import Path
 
 from server.middleware import setup_cors, RateLimiter, RequestLoggingMiddleware
 from server.routes import router
+from server.model_settings_routes import router as model_settings_router
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "web" / "static"
 
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.middleware("http")(RateLimiter(max_requests=120, window_seconds=60))
 
     app.include_router(router)
+    app.include_router(model_settings_router)
 
     # 静态文件
     if STATIC_DIR.exists():

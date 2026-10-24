@@ -134,7 +134,7 @@ def test_frontend_release_busts_cached_startup_script():
     html = (ROOT / "web/static/index.html").read_text(encoding="utf-8")
     service_worker = (ROOT / "web/static/sw.js").read_text(encoding="utf-8")
 
-    assert 'src="static/app.js?v=20261023-import"' in html
+    assert 'src="static/app.js?v=20261024-byok"' in html
     assert 'src="static/wechat-helper.js?v=20260824c"' in html
     assert "const CACHE_VERSION = 'v14'" in service_worker
 

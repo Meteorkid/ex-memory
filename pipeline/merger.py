@@ -30,11 +30,11 @@ def merge_new_material(
     Returns:
         包含更新状态的字典
     """
-    cfg = get_llm_config()
+    cfg = get_llm_config(owner) if owner is not None else get_llm_config()
     if not cfg["api_key"]:
         return {"error": "未配置 LLM API Key"}
 
-    client = get_llm_client()
+    client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
     store = mirror_store(slug, owner)
 
     merger_prompt = (PROMPTS_DIR / "merger.md").read_text(encoding="utf-8")

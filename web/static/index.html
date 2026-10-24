@@ -11,7 +11,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
     <link rel="manifest" href="static/manifest.json">
     <link rel="apple-touch-icon" href="static/icon-192.svg">
-    <link rel="stylesheet" href="static/style.css?v=20261023-import">
+    <link rel="stylesheet" href="static/style.css?v=20261024-byok">
     <link rel="stylesheet" href="static/wechat-helper.css?v=20260822b">
 </head>
 <body>
@@ -280,6 +280,9 @@
                             <span>💰 钱包</span>
                             <span class="discover-arrow">›</span>
                         </div>
+                        <div class="me-item" id="model-settings-entry" role="button" tabindex="0">
+                            <span>🔑 模型设置</span><span class="discover-arrow">›</span>
+                        </div>
                         <div class="me-item" id="create-entry" role="button" tabindex="0">
                             <span>➕ 创建新镜像</span>
                             <span class="discover-arrow">›</span>
@@ -306,6 +309,55 @@
                     </div>
                 </div>
 
+                <div id="tab-models" class="tab-page" style="display:none">
+                    <div class="create-container">
+                        <h2>当前账号的模型设置</h2>
+                        <p class="import-intro">使用你自己的服务商账户，模型调用费用由该账户承担。对话和 Embedding 可选不同服务；同一平台的 Key 也需分别填写。</p>
+                        <div class="create-form" id="model-settings-form">
+                            <p class="import-intro" id="model-settings-status" role="status">正在读取当前账号配置…</p>
+                            <fieldset class="model-settings-group">
+                                <legend>对话模型</legend>
+                                <label for="settings-llm-provider">服务商</label>
+                                <select id="settings-llm-provider"><option value="deepseek">DeepSeek</option><option value="siliconflow">SiliconFlow</option><option value="openai">OpenAI</option><option value="custom">自定义兼容服务</option></select>
+                                <div id="settings-llm-url-row" hidden>
+                                    <label for="settings-llm-base-url">公网 HTTPS API 地址</label>
+                                    <input type="url" id="settings-llm-base-url" placeholder="https://api.example.com/v1" autocomplete="off" maxlength="2048">
+                                    <p class="file-hint">填写 OpenAI 兼容接口的基础地址，不支持本机、内网或地址跳转。</p>
+                                </div>
+                                <label for="settings-llm-model">模型名称</label>
+                                <input type="text" id="settings-llm-model" placeholder="填写服务商提供的模型名称" autocomplete="off" maxlength="128">
+                                <label for="settings-llm-key">API Key</label>
+                                <input type="password" id="settings-llm-key" placeholder="首次填写；留空保留已保存的 Key" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="4096">
+                                <p id="settings-llm-key-status" class="file-hint">尚未读取配置</p>
+                                <label class="import-consent"><input type="checkbox" id="settings-llm-delete"><span>删除已保存的对话模型 Key</span></label>
+                                <p id="settings-llm-locked" class="file-hint" hidden></p>
+                            </fieldset>
+                            <fieldset class="model-settings-group">
+                                <legend>Embedding 模型</legend>
+                                <label for="settings-embedding-provider">服务商</label>
+                                <select id="settings-embedding-provider"><option value="siliconflow">SiliconFlow</option><option value="openai">OpenAI</option><option value="custom">自定义兼容服务</option></select>
+                                <div id="settings-embedding-url-row" hidden>
+                                    <label for="settings-embedding-base-url">公网 HTTPS API 地址</label>
+                                    <input type="url" id="settings-embedding-base-url" placeholder="https://api.example.com/v1" autocomplete="off" maxlength="2048">
+                                    <p class="file-hint">填写 OpenAI 兼容接口的基础地址，不支持本机、内网或地址跳转。</p>
+                                </div>
+                                <label for="settings-embedding-model">模型名称</label>
+                                <input type="text" id="settings-embedding-model" placeholder="填写服务商提供的模型名称" autocomplete="off" maxlength="128">
+                                <label for="settings-embedding-key">API Key</label>
+                                <input type="password" id="settings-embedding-key" placeholder="首次填写；留空保留已保存的 Key" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="4096">
+                                <p id="settings-embedding-key-status" class="file-hint">尚未读取配置</p>
+                                <label class="import-consent"><input type="checkbox" id="settings-embedding-delete"><span>删除已保存的Embedding 模型 Key</span></label>
+                                <p id="settings-embedding-locked" class="file-hint" hidden></p>
+                            </fieldset>
+                            <p class="import-intro">Key 会在服务器加密保存，读取时仅显示配置状态和末 4 位。必要的聊天内容及对应 Key 只发送至你选择的接口。请勿填写其他人的 Key。</p>
+                            <button class="btn" id="model-settings-save" type="button" disabled>保存当前账号配置</button>
+                            <button class="import-link" id="model-settings-reload" type="button">重新读取配置</button>
+                            <p class="err" id="model-settings-result" role="status" aria-live="polite"></p>
+                            <button class="btn" id="model-settings-continue" type="button" hidden>配置完成，继续导入</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ═══ 创建镜像 ═══ -->
                 <div id="tab-create" class="tab-page" style="display:none">
                     <div class="create-container">
@@ -314,6 +366,7 @@
                         <div class="create-form">
                             <p id="import-config-status" class="import-intro" role="status">正在读取导入说明…</p>
                             <button id="import-config-retry" class="import-link" type="button" hidden>重新读取说明</button>
+                            <button id="import-model-settings" class="import-link" type="button" hidden>配置我的模型</button>
                             <label for="create-file">1. 选择聊天记录 *</label>
                             <div class="file-upload">
                                 <input type="file" id="create-file" accept=".txt,.json,.jsonl,.csv,.mht,.mhtml" aria-describedby="import-format-hint">
@@ -333,7 +386,7 @@
                             <textarea id="create-personality" rows="2" placeholder="例如常用的词、句子长度；导入后也可在对话中纠正"></textarea>
                             <div class="import-privacy" id="import-privacy">
                                 <strong>3. 确认资料与处理方式</strong>
-                                <p>上传后，当前 Ex-Memory 服务会保存处理后的记录、人物记忆和对话；必要的记录片段会发送给服务所配置的向量与对话模型提供方。网站在线体验在服务器处理，本机微信导出仅负责在电脑上取得文件。</p>
+                                <p>上传后，当前 Ex-Memory 服务会保存处理后的记录、人物记忆和对话；必要的记录片段会发送给你在当前账号配置的向量与对话模型提供方。网站在线体验在服务器处理，本机微信导出仅负责在电脑上取得文件。</p>
                                 <p>请先移除不希望上传的内容。可在镜像菜单导出资料或删除镜像。</p>
                                 <label class="import-consent"><input type="checkbox" id="create-consent"><span>我已阅读处理说明，并确认拥有处理这份本人或获授权聊天记录的依据。</span></label>
                             </div>
@@ -411,8 +464,9 @@
 </div>
 
 <script src="static/effects.js"></script>
-<script src="static/import-flow.js?v=20261023"></script>
-<script src="static/app.js?v=20261023-import"></script>
+<script src="static/import-flow.js?v=20261024-byok"></script>
+<script src="static/model-settings.js?v=20261024"></script>
+<script src="static/app.js?v=20261024-byok"></script>
 <script src="static/wechat-helper.js?v=20260824c"></script>
 </body>
 </html>

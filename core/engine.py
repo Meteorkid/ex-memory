@@ -77,8 +77,11 @@ KEYWORD_EXPANSIONS = {
 
 
 class ChatEngine:
-    def __init__(self, slug: str, vector_store=None, embedder=None, owner=None):
-        cfg = get_llm_config()
+    def __init__(self, slug: str, vector_store=None, embedder=None, owner=None, model_config=None):
+        cfg = model_config if model_config is not None else (
+            get_llm_config(owner) if owner is not None else get_llm_config()
+        )
+        self._llm_config = cfg
         # 客户端由 core.llm_router 统一持有：多供应商时每家一个连接池，
         # 引擎自己再存一个只会造成两份配置
         self.model = cfg["model"]
@@ -358,7 +361,8 @@ class ChatEngine:
                 model=model, messages=messages, stream=False, **kwargs
             )
 
-        response, provider = get_router().call(invoke, **self._sampling_kwargs())
+        router = get_router(self.owner, self._llm_config) if self.owner is not None else get_router()
+        response, provider = router.call(invoke, **self._sampling_kwargs())
         self.last_provider = provider.name
         return response
 
@@ -469,7 +473,8 @@ class ChatEngine:
                 **kwargs,
             )
 
-        stream, provider = get_router().call(invoke, **self._sampling_kwargs())
+        router = get_router(self.owner, self._llm_config) if self.owner is not None else get_router()
+        stream, provider = router.call(invoke, **self._sampling_kwargs())
         self.last_provider = provider.name
         return stream
 

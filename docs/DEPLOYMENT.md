@@ -5,7 +5,8 @@
 ```bash
 # 1. 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 API Key，或使用 Keychain（仅 macOS）
+# Web API：在 .env 配置 MODEL_SETTINGS_ENCRYPTION_KEY，登录后保存各账号的模型 Key
+# CLI / Gradio：在 .env 填入 API Key，或使用 Keychain（仅 macOS）
 
 # 2. 启动
 docker compose up -d
@@ -103,6 +104,19 @@ server {
 | `METEOR_STORE_SSO_ENABLED` | `true` |
 | `METEOR_STORE_PROXY_TOKEN` | 与 Meteor Store/Nginx 一致的随机令牌 |
 | `PUBLIC_BASE_PATH` | `/ex-memory-runtime` |
+| `MODEL_SETTINGS_ENCRYPTION_KEY` | 独立生成、持久保存的32字节随机主密钥（Base64） |
+
+Web 请求使用当前登录账号在“模型设置”中保存的对话和 Embedding 凭据，缺少时明确引导配置，
+不会回退到站主的环境变量或 Keychain。生产 Compose 将站主两项 API Key 显式置空。
+全局 `LLM_API_KEY` / `EMBEDDING_API_KEY` 仅保留给无账号上下文的单机 CLI。
+
+账号 Key 使用 AES-GCM 加密，认证数据绑定账号、用途、服务商与地址。主密钥应保存在权限600的
+服务器配置中，并与数据库备份分开保管。不要每次启动重新生成，也不要直接轮换它；更换主密钥需
+先规划重加密。主密钥缺失或密文损坏时停止使用对应配置，不回退其他凭据。
+
+预设服务商包括 DeepSeek、SiliconFlow、OpenAI；Embedding 不提供 DeepSeek 选项。自定义服务仅支持
+带有效证书的公网 HTTPS OpenAI 兼容地址。请求禁用环境代理与重定向，校验所有DNS结果并固定连接IP，
+保留原域名的Host和TLS证书校验。已有向量索引会锁定Embedding服务、地址与模型；同服务同模型仍可换Key。
 
 代理模式下原生注册、登录和退出接口返回 404，所有业务 API 必须同时收到可信代理写入的
 `X-Ex-Memory-User-Id` 与 `X-Ex-Memory-Proxy-Token`。Nginx 必须覆盖而不是透传浏览器提供的
@@ -126,12 +140,13 @@ sudo certbot --nginx -d your-domain.com
 
 | 变量 | 默认值 | 必需 | 说明 |
 |------|--------|------|------|
-| `LLM_API_KEY` | - | 是 | LLM API Key |
+| `LLM_API_KEY` | - | CLI / Gradio 需要 | 无账号调用的 LLM API Key；网站不回退使用 |
 | `LLM_BASE_URL` | `https://api.deepseek.com` | 否 | LLM API 端点 |
 | `LLM_MODEL` | `deepseek-chat` | 否 | 模型名称 |
 | `LLM_TEMPERATURE` | `0.8` | 否 | 生成温度 |
 | `LLM_MAX_TOKENS` | `4096` | 否 | 最大回复 token |
-| `EMBEDDING_API_KEY` | - | RAG 需要 | Embedding API Key |
+| `EMBEDDING_API_KEY` | - | CLI / Gradio RAG 需要 | 无账号调用的 Embedding API Key；网站不回退使用 |
+| `MODEL_SETTINGS_ENCRYPTION_KEY` | - | Web 账号配置需要 | 持久保存的32字节随机主密钥（Base64），用于加密各账号 Key |
 | `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` | 否 | Embedding 端点 |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | 否 | Embedding 模型 |
 | `CORS_ORIGINS` | `http://localhost:8000,http://localhost:7860` | 否 | 允许的来源 |

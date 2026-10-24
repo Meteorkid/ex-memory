@@ -56,6 +56,15 @@ def _mask_messages(messages: list[dict]) -> list[dict]:
     return messages
 
 
+def _prepare_account_index(slug, owner, vector_store, embedder):
+    if owner is not None:
+        from core.factory import check_embedding_identity
+
+        check_embedding_identity(
+            slug, owner, vector_store, embedder.model_config, initialize=True
+        )
+
+
 def ingest_wechat_file(
     file_path: str,
     slug: str,
@@ -97,6 +106,7 @@ def ingest_wechat_file(
     logger.info("切片完成: %d 个 chunks", len(chunks))
 
     if chunks:
+        _prepare_account_index(slug, owner, vector_store, embedder)
         vector_store.ingest(chunks, embedder)
         logger.info("入库完成: %d 条记录", vector_store.count())
 
@@ -150,6 +160,7 @@ def ingest_qq_file(
     logger.info("切片完成: %d 个 chunks", len(chunks))
 
     if chunks:
+        _prepare_account_index(slug, owner, vector_store, embedder)
         vector_store.ingest(chunks, embedder)
         logger.info("入库完成: %d 条记录", vector_store.count())
 

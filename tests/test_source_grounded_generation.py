@@ -64,7 +64,7 @@ def test_new_mirror_actual_engine_prompt_is_neutral_and_identifies_simulation(st
     from pipeline.skill_combiner import write_skill
     import core.engine as engine_module
 
-    monkeypatch.setattr(engine_module, "get_llm_config", lambda: {
+    monkeypatch.setattr(engine_module, "get_llm_config", lambda owner=None: {
         "model": "offline", "temperature": 0, "top_p": 1,
         "frequency_penalty": 0, "max_tokens": 64,
     })

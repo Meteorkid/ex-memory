@@ -146,7 +146,7 @@ def _generate_summary(
     from config import get_llm_config, get_llm_client
 
     store = mirror_store(slug, owner)
-    cfg = get_llm_config()
+    cfg = get_llm_config(owner) if owner is not None else get_llm_config()
     if not cfg["api_key"]:
         return None
 
@@ -162,7 +162,7 @@ def _generate_summary(
             for m in recent
         )
 
-        client = get_llm_client()
+        client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
         response = client.chat.completions.create(
             model=cfg["model"],
             messages=[

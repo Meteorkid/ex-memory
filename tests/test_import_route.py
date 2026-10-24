@@ -53,7 +53,7 @@ def _login(client, username="importer", password="pass1234"):
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
 
-_EMB_CFG = {"api_key": "test-key", "base_url": "http://test", "model": "test-model"}
+_EMB_CFG = {"api_key": "test-key", "base_url": "http://test", "model": "test-model", "provider": "custom", "revision": 1, "locked": False}
 
 
 def test_import_route_is_sync():
@@ -131,6 +131,7 @@ def test_import_success(env):
 
     with (
         patch("config.get_embedding_config", return_value=_EMB_CFG),
+        patch("config.get_llm_config", return_value=_EMB_CFG),
         patch("memory.embedder.Embedder"),
         patch("memory.vector_store.VectorStore"),
         patch(
@@ -176,6 +177,7 @@ def test_import_does_not_block_event_loop(env):
 
     with (
         patch("config.get_embedding_config", return_value=_EMB_CFG),
+        patch("config.get_llm_config", return_value=_EMB_CFG),
         patch("memory.embedder.Embedder"),
         patch("memory.vector_store.VectorStore"),
         patch("memory.ingest.ingest_wechat_file", side_effect=slow_ingest),
@@ -252,7 +254,7 @@ def test_import_actually_lands_in_vector_store(env):
         """吃掉真 Embedder 的构造参数，向量算法沿用离线确定性实现。"""
 
         def __init__(self, *args, **kwargs):
-            pass
+            self.model_config = kwargs["model_config"]
 
     _make_exe(env, "vec")
     client = TestClient(create_app())
@@ -261,7 +263,9 @@ def test_import_actually_lands_in_vector_store(env):
 
     with (
         patch("config.get_embedding_config", return_value=_EMB_CFG),
+        patch("config.get_llm_config", return_value=_EMB_CFG),
         patch("memory.embedder.Embedder", _OfflineEmbedder),
+        patch("server.model_settings.lock_embedding_model"),
     ):
         resp = client.post(
             "/api/exes/vec/import",

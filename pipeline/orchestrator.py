@@ -444,7 +444,7 @@ def run_create_flow_api(
         )
 
         # 初始化向量库和 embedder
-        emb_cfg = get_embedding_config()
+        emb_cfg = get_embedding_config(owner_user_id) if owner_user_id is not None else get_embedding_config()
         embedder = None
         vector_store = None
         if emb_cfg["api_key"]:
@@ -452,6 +452,7 @@ def run_create_flow_api(
                 api_key=emb_cfg["api_key"],
                 base_url=emb_cfg["base_url"],
                 model=emb_cfg["model"],
+                **({"owner": owner_user_id, "model_config": emb_cfg} if owner_user_id is not None else {}),
             )
             vector_store = VectorStore(
                 persist_dir=str(store.path("chroma_db")),
@@ -459,7 +460,16 @@ def run_create_flow_api(
             )
 
         # 蒸馏
-        llm_cfg = get_llm_config()
+        llm_cfg = get_llm_config(owner_user_id) if owner_user_id is not None else get_llm_config()
+        if owner_user_id is not None:
+            from server.model_settings import SettingsConflict
+            from core.factory import check_embedding_identity
+
+            if emb_cfg["api_key"] and emb_cfg["revision"] != llm_cfg["revision"]:
+                raise SettingsConflict("模型配置已更新，请重试")
+            if vector_store is not None:
+                check_embedding_identity(slug, owner_user_id, vector_store, emb_cfg)
+            generation_options.update(owner=owner_user_id, model_config=llm_cfg)
         if not llm_cfg["api_key"]:
             _save_failed_state(
                 slug, "distill_memory", RuntimeError("未配置 LLM API Key"), owner=owner_user_id

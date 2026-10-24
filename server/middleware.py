@@ -159,8 +159,12 @@ class RateLimiter:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "请求过于频繁，请稍后再试"},
+                headers={"Cache-Control": "no-store"},
             )
-        return await call_next(request)
+        response = await call_next(request)
+        if request.url.path.rstrip("/") in ("/api/account/model-settings", "/api/import/config"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
 
 class LoginRateLimiter:

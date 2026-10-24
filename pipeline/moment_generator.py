@@ -32,14 +32,14 @@ def generate_moment(slug: str, owner=None) -> str:
     if not store.exists("persona.md"):
         raise FileNotFoundError("缺少 persona.md")
 
-    cfg = get_llm_config()
+    cfg = get_llm_config(owner) if owner is not None else get_llm_config()
     if not cfg["api_key"]:
         raise RuntimeError("未配置 LLM API Key")
 
     persona_content = store.read_text("persona.md")
     moment_prompt = (PROMPTS_DIR / "moment.md").read_text(encoding="utf-8")
 
-    client = get_llm_client()
+    client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
     response = client.chat.completions.create(
         model=cfg["model"],
         messages=[

@@ -258,7 +258,9 @@ class TestWebPathIntegration:
         assert len(summaries) == 1, "回归：Web 路径满阈值后未生成会话摘要"
 
         # 归档触发了缓存失效 → 新引擎带上记忆层
-        fresh_engine = routes._get_engine(slug, 1)
+        cfg_p, client_p = _mock_llm("记忆层摘要：我们聊了很多")
+        with cfg_p, client_p, patch("core.factory.get_embedding_config", return_value={"api_key": ""}):
+            fresh_engine = routes._get_engine(slug, 1)
         prompt = fresh_engine._build_system_prompt()
         assert "最近对话记忆" in prompt, "回归：记忆层未注入 system prompt"
         assert "记忆层摘要：我们聊了很多" in prompt

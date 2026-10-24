@@ -34,6 +34,12 @@ def env(tmp_path, monkeypatch):
 
     import server.routes as routes
 
+    # 本组只验证本地人格缓存；账号模型配置用离线快照，关闭向量检索。
+    monkeypatch.setattr("server.model_settings.get_model_config", lambda owner, kind: {
+        "api_key": "offline" if kind == "llm" else "",
+        "provider": "custom", "base_url": "https://models.example.com/v1",
+        "model": "offline", "revision": 1, "locked": False,
+    })
     routes._engine_cache.clear()
     monkeypatch.setattr(routes, "_login_limiter", None)
     yield exes

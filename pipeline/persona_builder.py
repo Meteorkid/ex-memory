@@ -46,6 +46,8 @@ def build_persona(
     embedder=None,
     *,
     source_grounded: bool = False,
+    owner=None,
+    model_config=None,
 ) -> str:
     """生成 persona.md 内容。
 
@@ -58,8 +60,10 @@ def build_persona(
     Returns:
         persona.md 的完整内容
     """
-    cfg = get_llm_config()
-    client = get_llm_client()
+    cfg = model_config if model_config is not None else (
+        get_llm_config(owner) if owner is not None else get_llm_config()
+    )
+    client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
 
     # 读取 prompt 模板
     suffix = "_source_grounded" if source_grounded else ""

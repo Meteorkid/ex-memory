@@ -59,7 +59,7 @@ def handle_import(
             receipt = meta.get("imported_files", {}).get(import_id)
             if receipt is None:
                 progress.update(5, "准备解析")
-                emb_cfg = get_embedding_config()
+                emb_cfg = get_embedding_config(owner)
                 if not emb_cfg["api_key"]:
                     raise RuntimeError("未配置 Embedding API Key")
 
@@ -68,6 +68,7 @@ def handle_import(
                     api_key=emb_cfg["api_key"],
                     base_url=emb_cfg["base_url"],
                     model=emb_cfg["model"],
+                    owner=owner, model_config=emb_cfg,
                 )
                 vector_store = VectorStore(
                     persist_dir=str(ex_dir / "chroma_db"),

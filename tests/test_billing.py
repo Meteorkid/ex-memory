@@ -403,7 +403,7 @@ class TestCostAccounting:
 
 
 class TestChatIntegration:
-    def test_insufficient_balance_blocks_chat_before_engine(self, client, request):
+    def test_insufficient_balance_blocks_chat_before_model_call(self, client, request):
         from core.billing import balance_status, ensure_account, reserve_turn
 
         headers, user_id = _account(client, request)
@@ -416,7 +416,9 @@ class TestChatIntegration:
                 "/api/chat", json={"slug": "demo", "message": "在吗"}, headers=headers
             )
         assert resp.json()["notice"]["type"] == "insufficient_balance"
-        get_engine.assert_not_called()
+        # 构造引擎会先验证账号配置，缺 Key 不能先预扣；额度不足仍绝不调模型。
+        get_engine.return_value.chat.assert_not_called()
+        get_engine.return_value.chat_stream.assert_not_called()
 
     def test_successful_chat_settles_usage(self, client, request):
         from core.billing import ensure_account, quota_status

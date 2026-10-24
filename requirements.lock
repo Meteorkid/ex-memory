@@ -14,3 +14,6 @@ httpx==0.28.1
 zstandard==0.25.0
 # 服务启动时初始化指标，需与已验证环境一致。
 prometheus-client==0.26.0
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.12

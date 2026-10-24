@@ -10,6 +10,7 @@ from typing import Iterator, Optional
 from dotenv import load_dotenv
 
 from core.logging import setup_logging
+from core.bounded_cache import BoundedCache
 
 # 项目根目录
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -51,6 +52,8 @@ except ImportError as e:
 EMBEDDING_API_KEY = _EMBEDDING_API_KEY
 EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "https://api.siliconflow.cn/v1")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+# 账号凭据的服务端加密主密钥，不是任何模型供应商的 API Key。
+MODEL_SETTINGS_ENCRYPTION_KEY = os.getenv("MODEL_SETTINGS_ENCRYPTION_KEY", "")
 
 # 对话配置
 ARCHIVE_THRESHOLD = 20
@@ -290,9 +293,24 @@ def require_privacy_consent():
 
 _llm_client = None
 
+_account_llm_clients = BoundedCache(maxsize=128, ttl_seconds=300)
 
-def get_llm_client():
+
+def get_llm_client(owner=None, model_config=None):
     """获取共享的 OpenAI 兼容客户端（懒初始化 + 超时配置）。"""
+    if owner is not None:
+        from openai import OpenAI
+        from core.model_client import account_client, provider_call
+        from core.provider_transport import build_provider_http_client
+
+        cfg = model_config if model_config is not None else get_llm_config(owner)
+        return _account_llm_clients.get_or_create(
+            (owner, cfg["revision"]),
+            lambda: account_client(provider_call(
+                OpenAI, api_key=cfg["api_key"], base_url=cfg["base_url"], timeout=60.0,
+                http_client=build_provider_http_client(cfg["base_url"]),
+            )),
+        )
     global _llm_client
     if _llm_client is None:
         from openai import OpenAI
@@ -305,19 +323,27 @@ def get_llm_client():
     return _llm_client
 
 
-def get_llm_config() -> dict:
-    return {
-        "api_key": LLM_API_KEY,
-        "base_url": LLM_BASE_URL,
-        "model": LLM_MODEL,
+def get_llm_config(owner=None) -> dict:
+    cfg = {
         "temperature": LLM_TEMPERATURE,
         "top_p": LLM_TOP_P,
         "frequency_penalty": LLM_FREQUENCY_PENALTY,
         "max_tokens": LLM_MAX_TOKENS,
     }
+    if owner is not None:
+        from server.model_settings import get_model_config
+
+        cfg.update(get_model_config(owner, "llm"))
+    else:
+        cfg.update(api_key=LLM_API_KEY, base_url=LLM_BASE_URL, model=LLM_MODEL)
+    return cfg
 
 
-def get_embedding_config() -> dict:
+def get_embedding_config(owner=None) -> dict:
+    if owner is not None:
+        from server.model_settings import get_model_config
+
+        return get_model_config(owner, "embedding")
     return {
         "api_key": EMBEDDING_API_KEY,
         "base_url": EMBEDDING_BASE_URL,

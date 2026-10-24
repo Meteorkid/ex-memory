@@ -225,13 +225,29 @@ def _audit(event: str, username: str = "", client_ip: str = "", detail: str = ""
 
 
 def _get_engine(slug: str, user_id: int):
-    """获取或创建 ChatEngine（按 (user_id, slug) 缓存，LRU + TTL 有界）。"""
+    """按账号、镜像与最新配置版本缓存，换 Key 后不会继续命中旧客户端。"""
     from core.factory import create_engine_and_store
+    from server.model_settings import ModelSettingsError, get_settings_revision
 
     _check_exe_ready(slug, user_id)
-    return _engine_cache.get_or_create(
-        (user_id, slug), lambda: create_engine_and_store(slug, owner=user_id)[0]
-    )
+    try:
+        return _engine_cache.get_or_create(
+            (user_id, slug, get_settings_revision(user_id)),
+            lambda: create_engine_and_store(slug, owner=user_id)[0],
+        )
+    except ModelSettingsError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
+
+
+def _require_model_settings(user_id, *, embedding=False):
+    from server.model_settings import ModelSettingsError
+
+    try:
+        config.get_llm_config(user_id)
+        if embedding:
+            config.get_embedding_config(user_id)
+    except ModelSettingsError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
 
 
 def _check_exe_ready(slug: str, user_id: int) -> None:
@@ -486,6 +502,9 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    if not req.defer_generation:
+        _require_model_settings(user_id, embedding=True)
+
     ex_dir = resolve_ex_dir(slug, user_id)
     try:
         # 原子占用目录，两个首次请求不能互相覆盖人物与 owner。
@@ -525,6 +544,7 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
 def resume_exe(slug: str, req: ResumeRequest, user_id: int = Depends(require_auth)):
     """从上次失败步骤恢复创建。"""
     slug = _check_exe_access(slug, user_id)
+    _require_model_settings(user_id, embedding=True)
 
     from pipeline.orchestrator import import_creation_lock, run_create_flow_api
 
@@ -574,14 +594,17 @@ IMPORT_EXTENSIONS = [".json", ".jsonl", ".txt", ".mht", ".mhtml"]
 
 
 @router.get("/import/config")
-def get_import_config():
+def get_import_config(user_id: int = Depends(require_auth)):
     """只公开首次体验所需能力与协议版本，不返回模型凭据或服务地址。"""
+    from server.model_settings import get_public_settings
+
+    settings = get_public_settings(user_id)
     return {
         "allowed_extensions": IMPORT_EXTENSIONS,
         "max_upload_bytes": MAX_UPLOAD_SIZE,
         "third_party_data_policy_version": config.THIRD_PARTY_DATA_POLICY_VERSION,
-        "llm_configured": bool(config.get_llm_config()["api_key"]),
-        "embedding_configured": bool(config.get_embedding_config()["api_key"]),
+        "llm_configured": settings["llm"]["has_key"] and settings["storage_available"],
+        "embedding_configured": settings["embedding"]["has_key"] and settings["storage_available"],
     }
 
 
@@ -654,6 +677,12 @@ def import_data(
     if uploaded_bytes == 0:
         shutil.rmtree(staging, ignore_errors=True)
         raise HTTPException(status_code=400, detail="文件为空，请选择包含聊天消息的文件")
+
+    try:
+        _require_model_settings(user_id, embedding=True)
+    except HTTPException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
 
     _invalidate_engine(slug)
 
@@ -914,13 +943,13 @@ async def chat(
     _check_exe_ready(slug, user_id)
     # 配额预扣排在审核之后：被危机或内容审核拦下的请求根本没调 LLM，
     # 不该扣用户额度
+    engine = _get_engine(slug, user_id)
     try:
         account_id, _outcome = reserve(user_id)
     except QuotaBlocked as e:
         return ChatResponse(reply="", stickers=[], tokens=None, notice=e.notice)
 
     try:
-        engine = _get_engine(slug, user_id)
         reply, stickers, usage = await run_in_threadpool(engine.chat, message, history)
 
         # 违规输出既不下发也不落库
@@ -1031,6 +1060,7 @@ async def chat_stream(
         return StreamingResponse(limit_stream(), media_type="text/event-stream")
 
     _check_exe_ready(slug, user_id)
+    engine = _get_engine(slug, user_id)
     try:
         account_id, _outcome = reserve(user_id)
     except QuotaBlocked as exc:
@@ -1057,9 +1087,7 @@ async def chat_stream(
         full_reply = ""
         collected_stickers: list[str] = []
         stream_usage: Optional[dict] = None
-        engine = None
         try:
-            engine = _get_engine(slug, user_id)
             released = 0  # 已下发字符数
             for item in engine.chat_stream(message, history):
                 if item.get("type") == "text":
@@ -1180,6 +1208,7 @@ async def chat_stream(
 def update_exe(slug: str, req: UpdateRequest, user_id: int = Depends(require_auth)):
     """向镜像追加新素材。"""
     slug = _check_exe_access(slug, user_id)
+    _require_model_settings(user_id)
 
     from pipeline.merger import merge_new_material
 
@@ -1197,6 +1226,7 @@ def update_exe(slug: str, req: UpdateRequest, user_id: int = Depends(require_aut
 def reflect_exe(slug: str, user_id: int = Depends(require_auth)):
     """关系反思分析。"""
     slug = _check_exe_access(slug, user_id)
+    _require_model_settings(user_id)
 
     from core.tasks import enqueue
     from server.task_handlers import TASK_REFLECT
@@ -1225,6 +1255,7 @@ def list_moments(slug: str, user_id: int = Depends(require_auth)):
 def generate_moment(slug: str, user_id: int = Depends(require_auth)):
     """生成一条朋友圈。"""
     slug = _check_exe_access(slug, user_id)
+    _require_model_settings(user_id)
 
     from core.tasks import enqueue
     from server.task_handlers import TASK_MOMENT

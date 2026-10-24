@@ -12,6 +12,9 @@ let tabHistory = [];
 let speechRecognition = null;
 const messagePreviews = new Map();
 let authEpoch = 0;
+let accountModelSettings = null;
+let modelSettingsOperation = 0;
+let modelSettingsBusy = false;
 
 // ═══════════════════════════════════════
 // 懒加载工具
@@ -624,6 +627,7 @@ function initDesktopLayout() {
 }
 
 function setDesktopMode(mode) {
+    clearModelSecrets();
     desktopTab = mode;
     const content = $('phone-content');
     if (!content) return;
@@ -632,7 +636,7 @@ function setDesktopMode(mode) {
 
     // 隐藏所有 tab 页
     const tabs = ['tab-chat-list','tab-chat-detail','tab-contacts',
-                  'tab-discover','tab-me','tab-wallet','tab-create'];
+                  'tab-discover','tab-me','tab-wallet','tab-create','tab-models'];
     tabs.forEach(id => {
         const el = $(id);
         if (el) el.style.display = 'none';
@@ -973,6 +977,8 @@ function resetSessionView() {
     pendingRequests.clear();
     messagePreviews.clear();
     resetImportForm();
+    invalidateImportConfig();
+    resetModelSettings();
     $('chat-msgs').innerHTML = '';
     $('contact-list').innerHTML = '';
     $('msg-input').disabled = true;
@@ -1003,6 +1009,8 @@ function logout() {
 
 function switchTab(tab) {
     if (tab === 'create') loadImportConfig();
+    if (tab === 'models') loadModelSettings();
+    else clearModelSecrets();
     currentTab = tab;
     tabHistory.push(tab);
     if (tabHistory.length > 10) tabHistory.shift();
@@ -1012,7 +1020,7 @@ function switchTab(tab) {
         const modeMap = {
             'chat-list': 'chat', 'chat-detail': 'chat',
             'contacts': 'contacts', 'discover': 'discover',
-            'me': 'me', 'create': 'me', 'wallet': 'me'
+            'me': 'me', 'create': 'me', 'wallet': 'me', 'models': 'me'
         };
         const mode = modeMap[tab] || 'chat';
         // 更新侧边栏高亮
@@ -1037,6 +1045,13 @@ function switchTab(tab) {
             $('tab-create').style.display = 'block';
             $('nav-title').textContent = '创建镜像';
             $('titlebar-app-name').textContent = '创建镜像';
+            $('nav-back-btn').style.display = 'block';
+        } else if (tab === 'models') {
+            $('phone-content').className = 'phone-content models-mode';
+            $('tab-me').style.display = 'none';
+            $('tab-models').style.display = 'block';
+            $('nav-title').textContent = '模型设置';
+            $('titlebar-app-name').textContent = '模型设置';
             $('nav-back-btn').style.display = 'block';
         }
         return;
@@ -1071,7 +1086,7 @@ function switchTab(tab) {
 
     // 更新底部 tab 高亮
     const rootTabs = { 'chat-list': 'chat-list', 'chat-detail': 'chat-list',
-                        contacts:'contacts', discover:'discover', me:'me', create:'me', wallet:'me' };
+                        contacts:'contacts', discover:'discover', me:'me', create:'me', wallet:'me', models:'me' };
     const activeRoot = rootTabs[tab] || 'chat-list';
     document.querySelectorAll('.tabbar-btn').forEach(b => {
         const isActive = b.dataset.tab === activeRoot;
@@ -1100,6 +1115,7 @@ function updateNavbar(tab) {
         'discover': '发现',
         'me': '我',
         'create': '创建镜像',
+        'models': '模型设置',
         'wallet': '钱包',
     };
     title.textContent = titles[tab] || 'ex-memory';
@@ -1108,7 +1124,7 @@ function updateNavbar(tab) {
         back.style.display = 'block';
         action.style.display = 'block';
     }
-    if (tab === 'create') {
+    if (tab === 'create' || tab === 'models') {
         back.style.display = 'block';
     }
 }
@@ -1232,12 +1248,15 @@ async function loadContactList() {
                 <div class="onboarding-card">
                     <div class="onboarding-icon">💬</div>
                     <h3 class="onboarding-title">创建你的第一个镜像</h3>
-                    <ol class="onboarding-steps" aria-label="创建镜像的两个步骤">
-                        <li><span>1</span><div><strong>导入聊天记录</strong><small>选择微信导出记录或已有文本</small></div></li>
-                        <li><span>2</span><div><strong>创建镜像</strong><small>确认资料后即可开始对话</small></div></li>
+                    <ol class="onboarding-steps" aria-label="创建镜像的三个步骤">
+                        <li><span>1</span><div><strong>配置自己的模型</strong><small>按账号保存对话与 Embedding Key</small></div></li>
+                        <li><span>2</span><div><strong>导入聊天记录</strong><small>可先下载虚构示例体验</small></div></li>
+                        <li><span>3</span><div><strong>创建镜像并对话</strong><small>模型费用由你的服务商账户承担</small></div></li>
                     </ol>
+                    <button class="btn onboarding-btn" id="onboarding-models">配置我的模型</button>
                     <button class="btn onboarding-btn" id="onboarding-create">导入并创建</button>
                 </div>`;
+            $('onboarding-models').addEventListener('click', () => switchTab('models'));
             $('onboarding-create').addEventListener('click', () => switchTab('create'));
             PerfMonitor.end('loadContactList');
             return;
@@ -2126,6 +2145,145 @@ $('logout-entry').addEventListener('click', () => {
     if (confirm('确定退出登录？')) logout();
 });
 
+function clearModelSecrets() {
+    for (const kind of ['llm', 'embedding']) {
+        const key = $(`settings-${kind}-key`);
+        if (key) key.value = '';
+        const deletion = $(`settings-${kind}-delete`);
+        if (deletion) deletion.checked = false;
+    }
+}
+
+function resetModelSettings() {
+    modelSettingsOperation += 1;
+    accountModelSettings = null;
+    modelSettingsBusy = false;
+    clearModelSecrets();
+    for (const kind of ['llm', 'embedding']) {
+        $(`settings-${kind}-model`).value = '';
+        $(`settings-${kind}-base-url`).value = '';
+        $(`settings-${kind}-key-status`).textContent = '尚未读取配置';
+    }
+    $('model-settings-status').textContent = '请读取当前账号的模型配置';
+    $('model-settings-result').textContent = '';
+    updateModelSettingsControls();
+}
+
+function updateModelSettingsControls() {
+    const disabled = modelSettingsBusy || !accountModelSettings;
+    for (const kind of ['llm', 'embedding']) {
+        const locked = kind === 'embedding' && accountModelSettings?.embedding.locked;
+        for (const field of ['provider', 'model', 'base-url']) $(`settings-${kind}-${field}`).disabled = disabled || !!locked;
+        $(`settings-${kind}-key`).disabled = disabled;
+        $(`settings-${kind}-delete`).disabled = disabled || !accountModelSettings?.[kind].has_key;
+        $(`settings-${kind}-url-row`).hidden = $(`settings-${kind}-provider`).value !== 'custom';
+    }
+    $('model-settings-save').disabled = disabled;
+    $('model-settings-reload').disabled = modelSettingsBusy;
+    $('model-settings-continue').hidden = !accountModelSettings?.storage_available || !accountModelSettings?.llm.has_key || !accountModelSettings?.embedding.has_key;
+}
+
+function renderModelSettings(settings) {
+    accountModelSettings = settings;
+    clearModelSecrets();
+    for (const kind of ['llm', 'embedding']) {
+        const value = settings[kind];
+        $(`settings-${kind}-provider`).value = value.provider;
+        $(`settings-${kind}-base-url`).value = value.base_url || '';
+        $(`settings-${kind}-model`).value = value.model;
+        $(`settings-${kind}-key-status`).textContent = window.ExMemoryModelSettings.keyLabel(value);
+        $(`settings-${kind}-locked`).hidden = !value.locked;
+        $(`settings-${kind}-locked`).textContent = value.locked_reason || '';
+    }
+    $('model-settings-status').textContent = settings.storage_available
+        ? '这是当前账号的配置。留空会保留已保存的 Key；保存后会用于后续请求，已发出的请求可能继续完成。'
+        : '服务暂时无法安全保存或使用 Key，请稍后重试；仍可删除已保存的 Key。';
+    updateModelSettingsControls();
+}
+
+async function loadModelSettings() {
+    if (modelSettingsBusy) return;
+    const epoch = authEpoch;
+    const operation = ++modelSettingsOperation;
+    modelSettingsBusy = true;
+    clearModelSecrets();
+    $('model-settings-result').textContent = '';
+    updateModelSettingsControls();
+    try {
+        const settings = await api('GET', '/account/model-settings');
+        if (epoch !== authEpoch || operation !== modelSettingsOperation) return;
+        renderModelSettings(settings);
+    } catch (error) {
+        if (epoch !== authEpoch || operation !== modelSettingsOperation) return;
+        accountModelSettings = null;
+        $('model-settings-result').textContent = `读取失败：${error.message}`;
+    } finally {
+        if (epoch === authEpoch && operation === modelSettingsOperation) {
+            modelSettingsBusy = false;
+            updateModelSettingsControls();
+        }
+    }
+}
+
+for (const entry of ['model-settings-entry', 'import-model-settings']) {
+    $(entry).addEventListener('click', () => switchTab('models'));
+}
+$('model-settings-entry').addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); switchTab('models'); }
+});
+$('model-settings-reload').addEventListener('click', loadModelSettings);
+$('model-settings-continue').addEventListener('click', () => switchTab('create'));
+for (const kind of ['llm', 'embedding']) {
+    $(`settings-${kind}-provider`).addEventListener('change', () => {
+        const provider = $(`settings-${kind}-provider`).value;
+        const saved = accountModelSettings?.[kind];
+        $(`settings-${kind}-base-url`).value = provider === saved?.provider ? saved.base_url || '' : '';
+        $(`settings-${kind}-model`).value = provider === saved?.provider ? saved.model
+            : kind === 'llm' && provider === 'deepseek' ? 'deepseek-chat'
+            : kind === 'embedding' && provider === 'siliconflow' ? 'BAAI/bge-m3' : '';
+        $(`settings-${kind}-key`).value = '';
+        $(`settings-${kind}-delete`).checked = false;
+        updateModelSettingsControls();
+    });
+}
+$('model-settings-save').addEventListener('click', async () => {
+    if (modelSettingsBusy || !accountModelSettings) return;
+    const epoch = authEpoch;
+    const operation = ++modelSettingsOperation;
+    const output = $('model-settings-result');
+    const values = Object.fromEntries(['llm', 'embedding'].map(kind => [kind, {
+        provider: $(`settings-${kind}-provider`).value,
+        model: $(`settings-${kind}-model`).value,
+        base_url: $(`settings-${kind}-base-url`).value,
+        api_key: $(`settings-${kind}-key`).value,
+        delete_key: $(`settings-${kind}-delete`).checked,
+    }]));
+    try {
+        const body = window.ExMemoryModelSettings.payload(accountModelSettings, values);
+        if (!accountModelSettings.storage_available && Object.values(values).some(value => value.api_key.trim())) throw new Error('服务暂时无法安全保存新 Key，请稍后重试');
+        modelSettingsBusy = true;
+        output.textContent = '正在保存…'; output.style.color = 'var(--text-secondary)';
+        updateModelSettingsControls();
+        const settings = await api('PUT', '/account/model-settings', body, 0);
+        if (epoch !== authEpoch || operation !== modelSettingsOperation) return;
+        renderModelSettings(settings);
+        invalidateImportConfig();
+        output.textContent = '已保存到当前账号。Key 未回显；实际连接将在导入或对话时验证。';
+        output.style.color = 'var(--wechat-green)';
+    } catch (error) {
+        if (epoch !== authEpoch || operation !== modelSettingsOperation) return;
+        output.textContent = `保存未完成：${error.message}。如结果不确定或配置已变更，请重新读取后再试。`;
+        output.style.color = 'var(--red)';
+    } finally {
+        for (const value of Object.values(values)) value.api_key = '';
+        if (epoch === authEpoch && operation === modelSettingsOperation) {
+            clearModelSecrets();
+            modelSettingsBusy = false;
+            updateModelSettingsControls();
+        }
+    }
+});
+
 // ═══════════════════════════════════════
 // 关系阶段管理
 // ═══════════════════════════════════════
@@ -2448,6 +2606,12 @@ function drawEmotionCurve(curve) {
 
 let importConfig = null;
 let importConfigPromise = null;
+let importConfigOperation = 0;
+function invalidateImportConfig() {
+    importConfigOperation += 1;
+    importConfig = null;
+    importConfigPromise = null;
+}
 const importFlow = new window.ExMemoryImportFlow({
     request: (method, path, body) => api(method, path, body, method === 'GET' ? 1 : 0),
     createSlug: () => 'mirror_' + crypto.randomUUID().replace(/-/g, '').slice(0, 24),
@@ -2486,27 +2650,34 @@ function updateImportControls() {
 
 async function loadImportConfig() {
     if (importConfigPromise) return importConfigPromise;
+    const epoch = authEpoch;
+    const operation = ++importConfigOperation;
     $('import-config-retry').hidden = true;
     importConfigPromise = (async () => {
         try {
             const fresh = await api('GET', '/import/config');
+            if (epoch !== authEpoch || operation !== importConfigOperation) return;
             if (!Array.isArray(fresh.allowed_extensions) || !fresh.third_party_data_policy_version) throw new Error('服务暂未提供完整导入说明');
             if (importConfig && fresh.third_party_data_policy_version !== importConfig.third_party_data_policy_version) $('create-consent').checked = false;
             importConfig = fresh;
             $('create-file').accept = fresh.allowed_extensions.join(',');
             $('import-config-status').textContent = fresh.llm_configured && fresh.embedding_configured
-                ? '服务已准备好。先导入记录，再依据记录生成镜像。'
-                : '服务暂未准备好，请稍后重试或联系站主。';
-            $('import-config-retry').hidden = fresh.llm_configured && fresh.embedding_configured;
+                ? '当前账号已保存两套模型配置。导入会使用你自己的 Key。'
+                : '请先在“模型设置”中为当前账号保存对话与 Embedding 配置。';
+            $('import-model-settings').hidden = fresh.llm_configured && fresh.embedding_configured;
+            $('import-config-retry').hidden = true;
             $('import-format-hint').textContent = `支持 ${fresh.allowed_extensions.join(' / ')}，最大 ${Math.floor(fresh.max_upload_bytes / 1024 / 1024)} MB。请保留说话人和正文；HTML、数据库与压缩包需先转换。`;
             $('import-sample').href = staticUrl('import-example.json');
         } catch (error) {
+            if (epoch !== authEpoch || operation !== importConfigOperation) return;
             importConfig = null;
             $('import-config-status').textContent = `无法读取导入说明：${error.message}`;
             $('import-config-retry').hidden = false;
         } finally {
-            importConfigPromise = null;
-            updateImportControls();
+            if (epoch === authEpoch && operation === importConfigOperation) {
+                importConfigPromise = null;
+                updateImportControls();
+            }
         }
     })();
     return importConfigPromise;

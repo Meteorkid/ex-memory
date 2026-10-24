@@ -111,6 +111,11 @@ class TestPutStageInvalidatesEngineCache:
         import server.routes as routes
 
         monkeypatch.setattr(routes, "_login_limiter", None)
+        monkeypatch.setattr("server.model_settings.get_model_config", lambda owner, kind: {
+            "api_key": "offline" if kind == "llm" else "",
+            "provider": "custom", "base_url": "https://models.example.com/v1",
+            "model": "offline", "revision": 1, "locked": False,
+        })
         routes._engine_cache.clear()
         yield exes
         routes._engine_cache.clear()

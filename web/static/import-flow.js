@@ -39,7 +39,7 @@ window.ExMemoryImportFlow = class {
         const extension = '.' + file.name.split('.').pop().toLowerCase();
         if (!config.allowed_extensions?.includes(extension)) throw new Error('暂不支持此格式，请按说明转换后上传');
         if (file.size > config.max_upload_bytes) throw new Error('文件过大，请拆分后再上传');
-        if (!config.llm_configured || !config.embedding_configured) throw new Error('服务尚未准备好，请稍后重试或联系站主');
+        if (!config.llm_configured || !config.embedding_configured) throw new Error('请先在模型设置中配置当前账号的对话与 Embedding Key');
         if (!config.third_party_data_policy_version || !consented) throw new Error('请先阅读并确认下面的数据处理说明');
     }
 

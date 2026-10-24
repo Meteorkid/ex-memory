@@ -19,14 +19,16 @@ def first_run(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "PROJECT_DIR", tmp_path)
     monkeypatch.setattr(config, "EXES_DIR", tmp_path / "exes")
     monkeypatch.setattr(config, "SINGLE_USER_MODE", False)
-    cfg = {"api_key": "offline-test", "base_url": "http://127.0.0.1:9", "model": "test"}
-    monkeypatch.setattr(config, "get_embedding_config", lambda: cfg)
-    monkeypatch.setattr(config, "get_llm_config", lambda: cfg)
-    monkeypatch.setattr(flow, "get_embedding_config", lambda: cfg)
-    monkeypatch.setattr(flow, "get_llm_config", lambda: cfg)
+    cfg = {"api_key": "offline-test", "base_url": "http://127.0.0.1:9", "model": "test", "provider": "custom", "revision": 1, "locked": False}
+    monkeypatch.setattr(config, "get_embedding_config", lambda owner=None: cfg)
+    monkeypatch.setattr(config, "get_llm_config", lambda owner=None: cfg)
+    monkeypatch.setattr(flow, "get_embedding_config", lambda owner=None: cfg)
+    monkeypatch.setattr(flow, "get_llm_config", lambda owner=None: cfg)
     vector = MagicMock()
+    vector.count.return_value = 0
+    monkeypatch.setattr("server.model_settings.lock_embedding_model", lambda *args: None)
     monkeypatch.setattr("memory.vector_store.VectorStore", lambda **kw: vector)
-    monkeypatch.setattr("memory.embedder.Embedder", MagicMock())
+    monkeypatch.setattr("memory.embedder.Embedder", lambda **kw: MagicMock(model_config=kw.get("model_config")))
     monkeypatch.setattr(flow, "VectorStore", lambda **kw: vector)
     monkeypatch.setattr(flow, "Embedder", MagicMock())
     memory = MagicMock(return_value="# 记忆\n周六去山顶看日出")
@@ -211,7 +213,8 @@ def test_draft_cannot_chat_and_config_has_no_secrets(first_run):
     with pytest.raises(HTTPException) as caught:
         _get_engine("first", 1)
     assert caught.value.status_code == 409
-    response = client.get("/api/import/config")
+    assert client.get("/api/import/config").status_code == 401
+    response = client.get("/api/import/config", headers=headers)
     assert response.status_code == 200
     assert set(response.json()) == {
         "allowed_extensions", "max_upload_bytes", "third_party_data_policy_version",
@@ -283,13 +286,12 @@ def test_json_explicit_direction_and_wechat_text_parser(tmp_path):
 
 def test_factory_loads_real_chat_engine_from_owners_namespace(tmp_path, monkeypatch):
     import config
-    import core.engine as engine_module
     import core.factory as factory
     from core.mirror_store import mirror_store
 
     monkeypatch.setattr(config, "EXES_DIR", tmp_path / "exes")
-    monkeypatch.setattr(factory, "get_embedding_config", lambda: {"api_key": ""})
-    monkeypatch.setattr(engine_module, "get_llm_config", lambda: {
+    monkeypatch.setattr(factory, "get_embedding_config", lambda owner=None: {"api_key": ""})
+    monkeypatch.setattr(config, "get_llm_config", lambda owner=None: {
         "model": "offline", "temperature": 0, "top_p": 1,
         "frequency_penalty": 0, "max_tokens": 32,
     })

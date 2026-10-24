@@ -67,6 +67,8 @@ function harness(fetchOverride, schedule = callback => queueMicrotask(callback))
         markNetworkOnline() {},
         markNetworkOffline() { effects.offline++; },
         resetImportForm() { effects.resets++; },
+        resetModelSettings() {},
+        invalidateImportConfig() {},
         logout() { effects.logouts++; },
         fetch: (url, options) => {
             const pending = deferred();

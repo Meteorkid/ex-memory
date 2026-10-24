@@ -6,10 +6,12 @@ services:
     ports:
       - "127.0.0.1:18000:8000"
     environment:
-      LLM_API_KEY: ${LLM_API_KEY:?LLM_API_KEY is required}
+      # 网站按账号使用自带凭据，不能回退消耗站主的 API 额度。
+      LLM_API_KEY: ""
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
       LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_API_KEY: ""
+      MODEL_SETTINGS_ENCRYPTION_KEY: ${MODEL_SETTINGS_ENCRYPTION_KEY:?MODEL_SETTINGS_ENCRYPTION_KEY is required}
       EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
       METEOR_STORE_SSO_ENABLED: "true"

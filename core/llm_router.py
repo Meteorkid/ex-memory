@@ -18,6 +18,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
+from core.bounded_cache import BoundedCache
 
 logger = logging.getLogger("ex-memory")
 
@@ -33,6 +34,8 @@ class ProviderConfig:
     # 单供应商（未配置 LLM_PROVIDERS）时复用 config 里那个共享客户端，
     # 避免同一份配置维护两个连接池
     use_shared_client: bool = False
+    owner: Optional[int] = None
+    model_config: Optional[dict] = field(default=None, repr=False)
 
 
 @dataclass
@@ -95,6 +98,10 @@ class LLMRouter:
         self._client_lock = threading.Lock()
 
     def _client_for(self, provider: ProviderConfig) -> Any:
+        if provider.owner is not None:
+            from config import get_llm_client
+
+            return get_llm_client(provider.owner, provider.model_config)
         if provider.use_shared_client:
             from config import get_llm_client
 
@@ -173,6 +180,7 @@ class LLMRouter:
 
 _router: Optional[LLMRouter] = None
 _router_lock = threading.Lock()
+_account_routers = BoundedCache(maxsize=128, ttl_seconds=300)
 
 
 def _parse_providers() -> list[ProviderConfig]:
@@ -215,7 +223,22 @@ def _parse_providers() -> list[ProviderConfig]:
     return providers
 
 
-def get_router() -> LLMRouter:
+def get_router(owner=None, model_config=None) -> LLMRouter:
+    if owner is not None:
+        import config
+
+        cfg = model_config if model_config is not None else config.get_llm_config(owner)
+        return _account_routers.get_or_create(
+            (owner, cfg["revision"]),
+            lambda: LLMRouter(
+                [ProviderConfig(
+                    name=cfg["provider"], api_key="", base_url=cfg["base_url"],
+                    model=cfg["model"], owner=owner, model_config=cfg,
+                )],
+                failure_threshold=config.LLM_BREAKER_THRESHOLD,
+                cooldown_seconds=config.LLM_BREAKER_COOLDOWN_SECONDS,
+            ),
+        )
     global _router
     with _router_lock:
         if _router is None:
@@ -233,3 +256,4 @@ def reset_for_tests() -> None:
     global _router
     with _router_lock:
         _router = None
+        _account_routers.clear()

@@ -3,6 +3,8 @@
 from __future__ import annotations
 import argparse
 import json
+import hashlib
+import sqlite3
 from pathlib import Path
 import time
 import urllib.request
@@ -13,7 +15,7 @@ parser = argparse.ArgumentParser(
     description="对仅含合成数据的本机验收服务运行 HTTP 流程"
 )
 parser.add_argument("--workspace", type=Path, required=True)
-parser.add_argument("--port", type=int, default=8765)
+parser.add_argument("--port", type=int, default=8769)
 args = parser.parse_args()
 ROOT = args.workspace.resolve()
 if not (ROOT / ".ex-memory-validation-workspace").is_file():
@@ -23,9 +25,21 @@ RUN = "acceptance_" + uuid.uuid4().hex[:10]
 USER = RUN + "-owner"
 OTHER = RUN + "-other"
 checks = []
+response_headers = {}
+KEYS = {
+    (user, kind, version): f"fixture-{user}-{kind}-v{version}"
+    for user in (USER, OTHER)
+    for kind in ("llm", "embedding")
+    for version in (1, 2, 3)
+}
+
+
+def identity(key):
+    return hashlib.sha256(key.encode()).hexdigest()[:12]
 
 
 def request(method, path, data=None, *, user=USER, file=None, target="小雨"):
+    global response_headers
     headers = {"X-Sandbox-User": user}
     payload = None
     if file is not None:
@@ -40,17 +54,20 @@ def request(method, path, data=None, *, user=USER, file=None, target="小雨"):
         payload = json.dumps(data).encode()
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(
-        BASE + path, data=payload, headers=headers, method=method
+        (BASE.removesuffix("/api") if path.startswith("/__fixture__/") else BASE) + path,
+        data=payload, headers=headers, method=method
     )
     try:
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(
             req, timeout=45
         ) as response:
+            response_headers = dict(response.headers.items())
             content = response.read().decode()
             return response.status, json.loads(content) if response.headers.get(
                 "Content-Type", ""
             ).startswith("application/json") else content
     except urllib.error.HTTPError as exc:
+        response_headers = dict(exc.headers.items())
         content = exc.read().decode()
         try:
             content = json.loads(content)
@@ -65,9 +82,9 @@ def check(name, condition, evidence=None):
         raise AssertionError(f"{name}: {evidence}")
 
 
-def poll(task_id):
+def poll(task_id, *, user=USER):
     for _ in range(200):
-        status, task = request("GET", "/tasks/" + task_id)
+        status, task = request("GET", "/tasks/" + task_id, user=user)
         if status != 200:
             check("task_read_owned", False, status)
         if task["status"] in ("failed", "succeeded"):
@@ -78,17 +95,72 @@ def poll(task_id):
 
 
 def model_count():
+    return len(model_records())
+
+
+def model_records():
     path = ROOT / "model-calls.jsonl"
-    return len(path.read_text().splitlines()) if path.exists() else 0
+    identities = {identity(key) for key in KEYS.values()}
+    return [row for row in (
+        json.loads(line) for line in path.read_text().splitlines()
+    ) if row.get("identity") in identities or row.get("key_class") == "station_sentinel"] if path.exists() else []
+
+
+def private_settings_response(name, status, data):
+    check(name + "_status", status == 200, {"status": status})
+    check(name + "_no_store", any(k.lower() == "cache-control" and v == "no-store" for k, v in response_headers.items()))
+    check(name + "_no_plaintext_key", not any(key in json.dumps(data) for key in KEYS.values()))
+
+
+def save_settings(user, revision, version, *, initial=False):
+    payload = {"expected_revision": revision}
+    for kind in ("llm", "embedding"):
+        payload[kind] = {"api_key": KEYS[(user, kind, version)]}
+        if initial:
+            payload[kind].update(
+                provider="custom", base_url="https://models.example.com/v1",
+                model="fixture-chat-model" if kind == "llm" else "fixture-embedding-model",
+            )
+    status, data = request("PUT", "/account/model-settings", payload, user=user)
+    private_settings_response(f"save_{'owner' if user == USER else 'other'}_v{version}", status, data)
+    check("saved_key_flags", data["llm"]["has_key"] and data["embedding"]["has_key"])
+    return data
+
+
+def stream_chat(user, version):
+    status, stream = request("POST", "/chat/stream", {
+        "slug": RUN, "message": "合成测试：你喜欢喝什么？", "history": [],
+    }, user=user)
+    check("chat_stream_http", status == 200 and isinstance(stream, str), {"status": status})
+    events = [json.loads(line[6:]) for line in stream.splitlines()
+              if line.startswith("data: ") and line != "data: [DONE]"]
+    reply = "".join(event.get("content", "") for event in events if event.get("type") == "text")
+    marker = identity(KEYS[(user, "llm", version)])
+    check("chat_uses_current_account_key", marker in reply and "[DONE]" in stream, {
+        "user": "owner" if user == USER else "other", "version": version, "identity": marker,
+    })
+    check("chat_no_key_echo", not any(key in reply for key in KEYS.values()))
+    return marker
 
 
 def main():
+    status, data = request("GET", "/account/model-settings", user="anonymous")
+    check("anonymous_settings_denied", status == 401, {"status": status})
     status, cfg = request("GET", "/import/config")
     check(
-        "import_configuration",
-        status == 200 and cfg["llm_configured"] and cfg["embedding_configured"],
+        "new_account_does_not_inherit_station_keys",
+        status == 200 and not cfg["llm_configured"] and not cfg["embedding_configured"],
         cfg,
     )
+    status, settings = request("GET", "/account/model-settings")
+    private_settings_response("initial_settings", status, settings)
+    check("new_account_unconfigured", settings["revision"] == 0 and not settings["llm"]["has_key"] and not settings["embedding"]["has_key"])
+    check("fixture_encryption_available", settings["storage_available"])
+    settings = save_settings(USER, settings["revision"], 1, initial=True)
+    status, cfg = request("GET", "/import/config")
+    check("import_configuration", status == 200 and cfg["llm_configured"] and cfg["embedding_configured"], cfg)
+    status, other_settings = request("GET", "/account/model-settings", user=OTHER)
+    check("other_account_has_no_inherited_keys", status == 200 and not other_settings["llm"]["has_key"] and not other_settings["embedding"]["has_key"])
     status, data = request(
         "POST",
         "/exes",
@@ -150,6 +222,12 @@ def main():
     success_task_id = data["task_id"]
     task = poll(success_task_id)
     check("valid_upload_completed", task["status"] == "succeeded", task)
+    status, settings = request("GET", "/account/model-settings")
+    check("embedding_model_locked_after_ingest", status == 200 and settings["embedding"]["locked"])
+    status, blocked_change = request("PUT", "/account/model-settings", {
+        "expected_revision": settings["revision"], "embedding": {"model": "different-vector-model"},
+    })
+    check("embedding_model_switch_rejected", status == 409, blocked_change)
     result = task["result"]
     if isinstance(result, str):
         result = json.loads(result)
@@ -217,6 +295,8 @@ def main():
     )
     status, data = request("GET", "/tasks/" + success_task_id, user=OTHER)
     check("cross_user_task_hidden", status == 404, data)
+    status, data = request("GET", "/tasks/not_a_real_task", user=OTHER)
+    check("unknown_task_is_404", status == 404, {"status": status})
     status, data = request(
         "POST",
         f"/exes/{RUN}/import",
@@ -238,24 +318,43 @@ def main():
     check("same_slug_separate_users", status == 200, data)
     status, data = request("GET", "/exes", user="anonymous")
     check("anonymous_denied", status == 401, data)
-    status, stream = request(
-        "POST",
-        "/chat/stream",
-        {"slug": RUN, "message": "合成测试：你喜欢喝什么？", "history": []},
-    )
-    events = [
-        json.loads(line[6:])
-        for line in stream.splitlines()
-        if line.startswith("data: ") and line != "data: [DONE]"
-    ]
-    reply = "".join(
-        event.get("content", "") for event in events if event.get("type") == "text"
-    )
-    check(
-        "first_chat_stream",
-        status == 200 and "离线验收回复" in reply and "[DONE]" in stream,
-        {"status": status, "reply": reply},
-    )
+    owner_marker = stream_chat(USER, 1)
+    status, state = request("GET", "/__fixture__/state")
+    check("account_caches_populated", status == 200 and state["engine_keys"] and state["client_revisions"] and state["router_revisions"], state)
+    with sqlite3.connect(ROOT / "runtime/data/users.db") as conn:
+        ciphertexts = conn.execute("SELECT llm_key_ciphertext, embedding_key_ciphertext FROM user_model_settings WHERE user_id = ?", (state["user_id"],)).fetchone()
+    check("keys_encrypted_at_rest", all(value.startswith("v1.") for value in ciphertexts) and not any(key in "".join(ciphertexts) for key in KEYS.values()))
+    check("keys_absent_from_sqlite_plaintext", not any(key.encode() in (ROOT / "runtime/data/users.db").read_bytes() for key in KEYS.values()))
+    settings = save_settings(USER, settings["revision"], 2)
+    status, state = request("GET", "/__fixture__/state")
+    check("key_rotation_invalidates_all_account_caches", status == 200 and not state["engine_keys"] and not state["client_revisions"] and not state["router_revisions"], state)
+    owner_rotated_marker = stream_chat(USER, 2)
+    check("rotation_uses_new_key", owner_rotated_marker != owner_marker)
+    calls = model_count()
+    status, settings = request("PUT", "/account/model-settings", {
+        "expected_revision": settings["revision"], "llm": {"delete_key": True}, "embedding": {"delete_key": True},
+    })
+    private_settings_response("delete_keys", status, settings)
+    status, state = request("GET", "/__fixture__/state")
+    check("key_delete_invalidates_all_account_caches", status == 200 and not state["engine_keys"] and not state["client_revisions"] and not state["router_revisions"], state)
+    status, data = request("POST", "/chat", {"slug": RUN, "message": "删除 Key 后不应调用模型"})
+    check("deleted_keys_block_existing_mirror", status == 409 and model_count() == calls, {"status": status, "new_calls": model_count() - calls})
+    status, other_settings = request("GET", "/account/model-settings", user=OTHER)
+    check("other_account_remains_unconfigured", status == 200 and other_settings["revision"] == 0)
+    save_settings(OTHER, other_settings["revision"], 1, initial=True)
+    status, data = request("POST", "/consents", {"policy_type": "third_party_data", "policy_version": cfg["third_party_data_policy_version"]}, user=OTHER)
+    check("other_account_explicit_consent", status == 200)
+    status, data = request("POST", f"/exes/{RUN}/import", file=ROOT / "samples/synthetic-wechat.json", user=OTHER)
+    check("other_account_import_accepted", status == 200, data)
+    task = poll(data["task_id"], user=OTHER)
+    check("other_account_import_completed", task["status"] == "succeeded", task)
+    other_marker = stream_chat(OTHER, 1)
+    check("two_accounts_use_distinct_keys", other_marker not in (owner_marker, owner_rotated_marker))
+    settings = save_settings(USER, settings["revision"], 3)
+    stream_chat(USER, 3)
+    records = model_records()
+    check("account_model_calls_use_real_getter_and_sdk_transport", {row["kind"] for row in records} == {"llm", "embedding"}, {"calls": len(records)})
+    check("station_sentinel_never_called", all(row["key_class"] == "synthetic_account" and row["accepted"] for row in records))
 
 
 try:
@@ -268,6 +367,8 @@ finally:
         "run": RUN,
         "synthetic_only": True,
         "network": "loopback",
+        "provider_substitution": "final_http_transport_only",
+        "account_getters_router_sdk": "real",
         "checks": checks,
         "passed": all(c["passed"] for c in checks),
     }
