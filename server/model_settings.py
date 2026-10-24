@@ -12,12 +12,22 @@ PROVIDERS = {
     "deepseek": "https://api.deepseek.com",
     "siliconflow": "https://api.siliconflow.cn/v1",
     "openai": "https://api.openai.com/v1",
+    "anthropic": "https://api.anthropic.com/v1",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta",
+}
+CUSTOM_PROVIDERS = frozenset({"custom", "custom_anthropic", "custom_gemini"})
+PROVIDER_PROTOCOLS = {
+    "anthropic": "anthropic",
+    "custom_anthropic": "anthropic",
+    "gemini": "gemini",
+    "custom_gemini": "gemini",
 }
 ALLOWED_PROVIDERS = {
-    "llm": frozenset({*PROVIDERS, "custom"}),
-    "embedding": frozenset({"siliconflow", "openai", "custom"}),
+    "llm": frozenset({*PROVIDERS, *CUSTOM_PROVIDERS}),
+    "embedding": frozenset({"siliconflow", "openai", "gemini", "custom", "custom_gemini"}),
 }
 _MODEL_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
+_GEMINI_MODEL_PATTERN = re.compile(r"(?:models/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _LOCK_REASON = "已有向量索引使用此模型；可更新 Key，模型变更需要重建索引。"
 
 
@@ -186,6 +196,7 @@ def get_model_config(user_id: int, kind: str) -> dict:
         "api_key": _decrypt(token, user_id, kind, provider, row[f"{kind}_base_url"]),
         "base_url": row[f"{kind}_base_url"],
         "provider": provider,
+        "protocol": PROVIDER_PROTOCOLS.get(provider, "openai"),
         "model": row[f"{kind}_model"],
         "revision": row["revision"],
     }
@@ -213,10 +224,14 @@ def _apply_update(row: dict, user_id: int, kind: str, update: dict) -> None:
         base_url = normalize_base_url(base_url)
     except (TypeError, ValueError):
         raise SettingsValidationError("请填写有效的公网 HTTPS 模型服务地址") from None
-    if provider != "custom" and base_url != PROVIDERS[provider]:
+    if provider not in CUSTOM_PROVIDERS and base_url != PROVIDERS[provider]:
         raise SettingsValidationError("预设服务商的地址不可更改，请选择自定义服务商")
     if not isinstance(model, str) or not _MODEL_PATTERN.fullmatch(model):
         raise SettingsValidationError("模型名称格式无效或超过 128 个字符")
+    if PROVIDER_PROTOCOLS.get(provider) == "gemini":
+        if not _GEMINI_MODEL_PATTERN.fullmatch(model):
+            raise SettingsValidationError("Gemini 模型名称应为模型 ID，可带 models/ 前缀")
+        model = model.removeprefix("models/")
     api_key = update.get("api_key")
     if api_key is not None and not isinstance(api_key, str):
         raise SettingsValidationError("Key 必须是文本")

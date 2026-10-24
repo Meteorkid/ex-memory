@@ -2176,7 +2176,13 @@ function updateModelSettingsControls() {
         for (const field of ['provider', 'model', 'base-url']) $(`settings-${kind}-${field}`).disabled = disabled || !!locked;
         $(`settings-${kind}-key`).disabled = disabled;
         $(`settings-${kind}-delete`).disabled = disabled || !accountModelSettings?.[kind].has_key;
-        $(`settings-${kind}-url-row`).hidden = $(`settings-${kind}-provider`).value !== 'custom';
+        const provider = $(`settings-${kind}-provider`).value;
+        $(`settings-${kind}-protocol-hint`).hidden = kind === 'llm'
+            ? !['anthropic', 'custom_anthropic'].includes(provider)
+            : !['gemini', 'custom_gemini'].includes(provider);
+        $(`settings-${kind}-url-row`).hidden = !window.ExMemoryModelSettings.isCustom(provider);
+        $(`settings-${kind}-url-hint`).textContent = window.ExMemoryModelSettings.addressHint(provider);
+        $(`settings-${kind}-base-url`).placeholder = provider === 'custom_gemini' ? 'https://api.example.com/v1beta' : 'https://api.example.com/v1';
     }
     $('model-settings-save').disabled = disabled;
     $('model-settings-reload').disabled = modelSettingsBusy;

@@ -304,12 +304,23 @@ def get_llm_client(owner=None, model_config=None):
         from core.provider_transport import build_provider_http_client
 
         cfg = model_config if model_config is not None else get_llm_config(owner)
-        return _account_llm_clients.get_or_create(
-            (owner, cfg["revision"]),
-            lambda: account_client(provider_call(
+
+        def build_account_client():
+            if cfg.get("protocol", "openai") != "openai":
+                from core.native_model_client import NativeModelClient
+
+                return account_client(provider_call(
+                    NativeModelClient, protocol=cfg["protocol"], api_key=cfg["api_key"],
+                    base_url=cfg["base_url"], http_client=build_provider_http_client(cfg["base_url"]),
+                ))
+            return account_client(provider_call(
                 OpenAI, api_key=cfg["api_key"], base_url=cfg["base_url"], timeout=60.0,
                 http_client=build_provider_http_client(cfg["base_url"]),
-            )),
+            ))
+
+        return _account_llm_clients.get_or_create(
+            (owner, cfg["revision"]),
+            build_account_client,
         )
     global _llm_client
     if _llm_client is None:

@@ -15,9 +15,19 @@ class ModelProviderError(RuntimeError):
         super().__init__(message)
 
 
+class IncompleteModelResponse(ModelProviderError):
+    """已确认模型未正常完成，不把部分文本作为成功对话保存。"""
+
+    def __init__(self):
+        self.status_code = 422
+        RuntimeError.__init__(self, "模型未返回完整有效的回复，请检查模型设置或调整请求后重试。")
+
+
 def provider_call(call, *args, **kwargs):
     try:
         return call(*args, **kwargs)
+    except IncompleteModelResponse as error:
+        raise error from None
     except Exception as error:
         # 不保留异常文本、response 或异常链；其中可能包含 Key 和聊天原文。
         raise ModelProviderError(getattr(error, "status_code", None)) from None
@@ -26,6 +36,8 @@ def provider_call(call, *args, **kwargs):
 def _safe_stream(stream):
     try:
         yield from stream
+    except IncompleteModelResponse as error:
+        raise error from None
     except Exception as error:
         raise ModelProviderError(getattr(error, "status_code", None)) from None
     finally:

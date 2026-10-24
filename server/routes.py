@@ -33,6 +33,7 @@ import config
 from core import kv
 from core.bounded_cache import BoundedCache
 from core.token_counter import TokenCounter
+from core.model_client import IncompleteModelResponse
 from core.logging import get_audit_logger
 from server.billing_gate import QuotaBlocked, release, reserve, settle
 from server.usage_guard import check_limit
@@ -1179,13 +1180,19 @@ async def chat_stream(
                     counter.update(usage_obj)
 
             yield "data: [DONE]\n\n"
+        except IncompleteModelResponse as error:
+            full_reply = ""
+            collected_stickers.clear()
+            release(account_id)
+            logger.warning("模型未正常完成流式回复，已丢弃本轮内容")
+            yield f"data: {json.dumps({'error': str(error)})}\n\n"
         except Exception as e:
             release(account_id)
             logger.error("流式对话失败: %s", e, exc_info=True)
             yield f"data: {json.dumps({'error': _INTERNAL_ERROR})}\n\n"
         finally:
-            # 正常结束、生成异常、客户端中断（GeneratorExit/CancelledError，
-            # 均非 Exception 子类，不会被上面捕获）都走这里：已生成的部分必须落库。
+            # 正常结束、一般异常和客户端中断保留已生成文本；
+            # 可信协议异常已清空内容，不把被拒绝或不完整的回复写入记忆。
             # 注意 finally 里禁止 yield（GeneratorExit 期间 yield 会直接报错）
             _persist_stream_turn(slug, user_id, message, full_reply, collected_stickers)
             if engine is not None and full_reply.strip():

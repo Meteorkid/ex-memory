@@ -56,6 +56,69 @@ def test_default_settings_are_public_and_do_not_create_rows(accounts):
         )
 
 
+@pytest.mark.parametrize(
+    ("provider", "kind", "protocol", "address"),
+    [
+        ("anthropic", "llm", "anthropic", "https://api.anthropic.com/v1"),
+        ("custom_anthropic", "llm", "anthropic", "https://models.example.com/claude/v1"),
+        ("gemini", "llm", "gemini", "https://generativelanguage.googleapis.com/v1beta"),
+        ("gemini", "embedding", "gemini", "https://generativelanguage.googleapis.com/v1beta"),
+        ("custom_gemini", "llm", "gemini", "https://models.example.com/google/v1beta"),
+        ("custom_gemini", "embedding", "gemini", "https://models.example.com/google/v1beta"),
+        ("custom", "llm", "openai", "https://models.example.com/v1"),
+    ],
+)
+def test_native_protocol_configs_keep_owner_credentials_isolated(accounts, provider, kind, protocol, address):
+    key = "synthetic-protocol-key-1234"
+    model = "models/gemini-test" if protocol == "gemini" else "chat-test"
+    result = _save(accounts[0], **{kind: {
+        "provider": provider, "base_url": address, "model": model, "api_key": key,
+    }})
+    actual = settings.get_model_config(accounts[0], kind)
+    assert actual["protocol"] == protocol
+    assert actual["base_url"] == address
+    assert actual["api_key"] == key
+    assert actual["model"] == ("gemini-test" if protocol == "gemini" else model)
+    assert not settings.get_public_settings(accounts[1])[kind]["has_key"]
+    assert key not in json.dumps(result)
+
+
+@pytest.mark.parametrize("provider", ["anthropic", "custom_anthropic"])
+def test_messages_protocol_is_not_offered_as_an_embedding_api(accounts, provider):
+    with pytest.raises(settings.SettingsValidationError):
+        _save(accounts[0], embedding={"provider": provider, "api_key": "synthetic-key-1234"})
+    assert settings.get_settings_revision(accounts[0]) == 0
+
+
+def test_changing_protocol_at_same_address_requires_new_key_and_reencrypts(accounts):
+    user_id = accounts[0]
+    address = "https://models.example.com/v1"
+    _save(user_id, llm={"provider": "custom", "base_url": address, "api_key": "old-secret-1234"})
+    with pytest.raises(settings.SettingsValidationError):
+        _save(user_id, 1, llm={"provider": "custom_anthropic", "base_url": address})
+    _save(user_id, 1, llm={"provider": "custom_anthropic", "base_url": address, "api_key": "new-secret-5678"})
+    actual = settings.get_model_config(user_id, "llm")
+    assert actual["protocol"] == "anthropic"
+    assert actual["api_key"] == "new-secret-5678"
+
+
+def test_embedding_protocol_cannot_change_after_indexing(accounts):
+    user_id = accounts[0]
+    _save(user_id, embedding={"api_key": "synthetic-key-1234"})
+    settings.lock_embedding_model(user_id, 1)
+    with pytest.raises(settings.EmbeddingModelLocked):
+        _save(user_id, 1, embedding={
+            "provider": "custom_gemini", "base_url": "https://models.example.com/v1beta",
+            "model": "embedding-test", "api_key": "different-key-5678",
+        })
+
+
+@pytest.mark.parametrize("model", ["models/../secret", "a/b", "a:generateContent", "../other"])
+def test_gemini_model_name_cannot_inject_an_api_path(accounts, model):
+    with pytest.raises(settings.SettingsValidationError):
+        _save(accounts[0], llm={"provider": "gemini", "model": model, "api_key": "synthetic-key-1234"})
+
+
 def test_keys_are_encrypted_and_bound_to_owner_and_kind(accounts):
     from server.auth import _get_conn
 

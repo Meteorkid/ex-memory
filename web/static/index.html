@@ -318,11 +318,12 @@
                             <fieldset class="model-settings-group">
                                 <legend>对话模型</legend>
                                 <label for="settings-llm-provider">服务商</label>
-                                <select id="settings-llm-provider"><option value="deepseek">DeepSeek</option><option value="siliconflow">SiliconFlow</option><option value="openai">OpenAI</option><option value="custom">自定义兼容服务</option></select>
+                                <select id="settings-llm-provider"><option value="deepseek">DeepSeek</option><option value="siliconflow">SiliconFlow</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic / Claude（Messages）</option><option value="gemini">Google Gemini（原生接口）</option><option value="custom">自定义 · OpenAI 兼容</option><option value="custom_anthropic">自定义 · Anthropic Messages</option><option value="custom_gemini">自定义 · Gemini 原生接口</option></select>
+                                <p id="settings-llm-protocol-hint" class="file-hint" hidden>Anthropic 请使用绑定 workspace 的 API Key。</p>
                                 <div id="settings-llm-url-row" hidden>
                                     <label for="settings-llm-base-url">公网 HTTPS API 地址</label>
                                     <input type="url" id="settings-llm-base-url" placeholder="https://api.example.com/v1" autocomplete="off" maxlength="2048">
-                                    <p class="file-hint">填写 OpenAI 兼容接口的基础地址，不支持本机、内网或地址跳转。</p>
+                                    <p id="settings-llm-url-hint" class="file-hint">填写所选协议的基础地址。</p>
                                 </div>
                                 <label for="settings-llm-model">模型名称</label>
                                 <input type="text" id="settings-llm-model" placeholder="填写服务商提供的模型名称" autocomplete="off" maxlength="128">
@@ -335,11 +336,13 @@
                             <fieldset class="model-settings-group">
                                 <legend>Embedding 模型</legend>
                                 <label for="settings-embedding-provider">服务商</label>
-                                <select id="settings-embedding-provider"><option value="siliconflow">SiliconFlow</option><option value="openai">OpenAI</option><option value="custom">自定义兼容服务</option></select>
+                                <select id="settings-embedding-provider"><option value="siliconflow">SiliconFlow</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini（原生接口）</option><option value="custom">自定义 · OpenAI 兼容</option><option value="custom_gemini">自定义 · Gemini 原生接口</option></select>
+                                <p class="file-hint">Anthropic Messages 不提供 Embedding；可与其他服务商的 Embedding 搭配。</p>
+                                <p id="settings-embedding-protocol-hint" class="file-hint" hidden>Gemini 原生 Embedding 使用 1024 维，请选择支持该维数的模型。</p>
                                 <div id="settings-embedding-url-row" hidden>
                                     <label for="settings-embedding-base-url">公网 HTTPS API 地址</label>
                                     <input type="url" id="settings-embedding-base-url" placeholder="https://api.example.com/v1" autocomplete="off" maxlength="2048">
-                                    <p class="file-hint">填写 OpenAI 兼容接口的基础地址，不支持本机、内网或地址跳转。</p>
+                                    <p id="settings-embedding-url-hint" class="file-hint">填写所选协议的基础地址。</p>
                                 </div>
                                 <label for="settings-embedding-model">模型名称</label>
                                 <input type="text" id="settings-embedding-model" placeholder="填写服务商提供的模型名称" autocomplete="off" maxlength="128">
@@ -349,7 +352,7 @@
                                 <label class="import-consent"><input type="checkbox" id="settings-embedding-delete"><span>删除已保存的Embedding 模型 Key</span></label>
                                 <p id="settings-embedding-locked" class="file-hint" hidden></p>
                             </fieldset>
-                            <p class="import-intro">Key 会在服务器加密保存，读取时仅显示配置状态和末 4 位。必要的聊天内容及对应 Key 只发送至你选择的接口。请勿填写其他人的 Key。</p>
+                            <p class="import-intro">自定义地址需使用公网 HTTPS，不支持本机、内网或地址跳转。Key 会在服务器加密保存，读取时仅显示配置状态和末 4 位。必要的聊天内容及对应 Key 只发送至你选择的接口。请勿填写其他人的 Key。</p>
                             <button class="btn" id="model-settings-save" type="button" disabled>保存当前账号配置</button>
                             <button class="import-link" id="model-settings-reload" type="button">重新读取配置</button>
                             <p class="err" id="model-settings-result" role="status" aria-live="polite"></p>
@@ -465,8 +468,8 @@
 
 <script src="static/effects.js"></script>
 <script src="static/import-flow.js?v=20261024-byok"></script>
-<script src="static/model-settings.js?v=20261024"></script>
-<script src="static/app.js?v=20261024-byok"></script>
+<script src="static/model-settings.js?v=20261024-protocols"></script>
+<script src="static/app.js?v=20261024-protocols"></script>
 <script src="static/wechat-helper.js?v=20260824c"></script>
 </body>
 </html>

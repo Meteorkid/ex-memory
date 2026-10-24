@@ -25,7 +25,15 @@ class Embedder:
             from core.provider_transport import build_provider_http_client
 
             kwargs["http_client"] = build_provider_http_client(base_url)
-        self.client = provider_call(OpenAI, **kwargs) if owner is not None else OpenAI(**kwargs)
+        protocol = (model_config or {}).get("protocol", "openai") if owner is not None else "openai"
+        if protocol != "openai":
+            from core.native_model_client import NativeModelClient
+
+            if protocol != "gemini":
+                raise ModelProviderError(400)
+            self.client = provider_call(NativeModelClient, protocol=protocol, **kwargs)
+        else:
+            self.client = provider_call(OpenAI, **kwargs) if owner is not None else OpenAI(**kwargs)
         self.model = model
 
     @retry_api(max_attempts=3, base_delay=1.0)

@@ -114,9 +114,14 @@ Web 请求使用当前登录账号在“模型设置”中保存的对话和 Emb
 服务器配置中，并与数据库备份分开保管。不要每次启动重新生成，也不要直接轮换它；更换主密钥需
 先规划重加密。主密钥缺失或密文损坏时停止使用对应配置，不回退其他凭据。
 
-预设服务商包括 DeepSeek、SiliconFlow、OpenAI；Embedding 不提供 DeepSeek 选项。自定义服务仅支持
-带有效证书的公网 HTTPS OpenAI 兼容地址。请求禁用环境代理与重定向，校验所有DNS结果并固定连接IP，
+对话预设服务商包括 DeepSeek、SiliconFlow、OpenAI、Anthropic 和 Google Gemini；Embedding 提供
+SiliconFlow、OpenAI 和 Google Gemini。自定义服务可选择 OpenAI 兼容、Anthropic Messages 或 Gemini
+原生协议的公网 HTTPS 基础地址；Anthropic Messages 不提供 Embedding。请求禁用环境代理与重定向，校验所有DNS结果并固定连接IP，
 保留原域名的Host和TLS证书校验。已有向量索引会锁定Embedding服务、地址与模型；同服务同模型仍可换Key。
+
+Anthropic 使用绑定 workspace 的 API Key，适配器固定 `anthropic-version: 2023-06-01`，不转发
+旧对话配置中的采样参数。Gemini 原生 Embedding 固定请求1024维并归一化，模型须支持该维数；
+不对错误维数做截断或补齐。两类原生对话当前用于文本消息，不提供工具调用或多模态上传。
 
 代理模式下原生注册、登录和退出接口返回 404，所有业务 API 必须同时收到可信代理写入的
 `X-Ex-Memory-User-Id` 与 `X-Ex-Memory-Proxy-Token`。Nginx 必须覆盖而不是透传浏览器提供的

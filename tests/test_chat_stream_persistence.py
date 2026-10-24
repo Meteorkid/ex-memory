@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import traceback
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import BackgroundTasks
@@ -129,6 +130,47 @@ class TestStreamPersists:
 
 
 class TestStreamInterrupted:
+    def test_incomplete_native_response_discards_partial_turn_and_refunds(self, env, client_from_env):
+        from core.billing import balance_status, ensure_account, quota_status
+        from core.model_client import IncompleteModelResponse, _safe_stream
+        from server.auth import _get_conn
+        import server.routes as routes
+
+        client, headers = client_from_env
+        _make_exe(env, "native_incomplete")
+        account_id = ensure_account(1)
+        before = balance_status(account_id)["balance_micros"]
+
+        def native_stream():
+            yield {"type": "text", "content": "不完整的回复开头"}
+            yield {"type": "sticker", "id": "builtin_happy_laugh"}
+            yield {"type": "usage", "prompt_tokens": 10, "completion_tokens": 4}
+            raise IncompleteModelResponse()
+
+        engine = MagicMock()
+        engine.chat_stream.side_effect = lambda *args: _safe_stream(native_stream())
+        with (
+            patch("server.routes._get_engine", return_value=engine),
+            patch("server.routes._run_session_archive") as archive,
+            patch("server.routes.settle", wraps=routes.settle) as settle,
+        ):
+            response = client.post(
+                "/api/chat/stream",
+                json={"slug": "native_incomplete", "message": "合成问题"},
+                headers=headers,
+            )
+        events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+        assert any(event.get("content") == "不完整的回复开头" for event in events)
+        assert any("error" in event for event in events)
+        assert "[DONE]" not in response.text
+        assert _read_turns(env, "native_incomplete") == []
+        archive.assert_not_called()
+        settle.assert_not_called()
+        assert balance_status(account_id)["balance_micros"] == before
+        assert quota_status(account_id)["turns_used"] == 0
+        with _get_conn() as conn:
+            assert conn.execute("SELECT count(*) AS n FROM usage_records WHERE account_id = ?", (account_id,)).fetchone()["n"] == 0
+
     def test_client_disconnect_persists_partial_reply(self, env):
         """客户端中断（GeneratorExit）时，已生成部分必须落库。
 
@@ -209,6 +251,42 @@ class TestStreamInterrupted:
 
         asyncio.run(scenario())
         assert _read_turns(env, "s5") == []
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_incomplete_response_type_survives_safe_wrapper_without_provider_body(stream):
+    from core.model_client import IncompleteModelResponse, _safe_stream, provider_call
+    from core.retry import is_retryable
+
+    error = IncompleteModelResponse()
+    private_body = "synthetic-provider-secret-and-private-prompt"
+    closed = []
+
+    def fail():
+        try:
+            raise RuntimeError(private_body)
+        except RuntimeError:
+            raise error
+
+    def chunks():
+        try:
+            yield "prefix"
+            fail()
+        finally:
+            closed.append(True)
+
+    with pytest.raises(IncompleteModelResponse) as caught:
+        if stream:
+            iterator = _safe_stream(chunks())
+            assert next(iterator) == "prefix"
+            next(iterator)
+        else:
+            provider_call(fail)
+    assert caught.value is error
+    assert not is_retryable(error)
+    assert private_body not in "".join(traceback.format_exception(caught.value))
+    if stream:
+        assert closed == [True]
 
 
 @pytest.fixture

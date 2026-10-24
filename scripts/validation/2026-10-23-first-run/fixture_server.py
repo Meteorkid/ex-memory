@@ -50,24 +50,33 @@ def run(config, port, workspace: Path):
     calls_file = ROOT / "model-calls.jsonl"
     calls_lock = threading.Lock()
     offline_vectors = MockEmbedder()
+    native_vectors = MockEmbedder()
+    native_vectors.DIM = 1024
 
     def record(entry):
         with calls_lock, calls_file.open("a", encoding="utf-8") as out:
             out.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def supplier_http(request):
-        """仅替代最终 HTTP 出口；OpenAI SDK、账号 getter、router 和 Embedder 均真实执行。"""
-        key = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        """仅替代最终 HTTP 出口；账号、协议适配、router 和 Embedder 均真实执行。"""
+        path = request.url.path
+        protocol = "anthropic" if path.endswith("/messages") else "gemini" if ":" in path else "openai"
+        key = (request.headers.get("x-api-key") or request.headers.get("x-goog-api-key")
+               or request.headers.get("Authorization", "").removeprefix("Bearer "))
         key_class = "synthetic_account" if key.startswith("fixture-") else "rejected"
         if key in (config.LLM_API_KEY, config.EMBEDDING_API_KEY):
             key_class = "station_sentinel"
         identity = hashlib.sha256(key.encode()).hexdigest()[:12]
         kwargs = json.loads(request.content)
-        kind = "embedding" if request.url.path.endswith("/embeddings") else "llm"
+        kind = "embedding" if path.endswith(("/embeddings", ":batchEmbedContents")) else "llm"
         messages = kwargs.get("messages", [])
+        if protocol == "gemini" and kind == "llm":
+            messages = [{"content": "".join(p.get("text", "") for p in item.get("parts", []))}
+                        for item in kwargs.get("contents", [])]
+        streaming = bool(kwargs.get("stream")) or path.endswith(":streamGenerateContent")
         entry = {
             "kind": kind, "identity": identity, "key_class": key_class,
-            "stream": bool(kwargs.get("stream")), "model": kwargs.get("model"),
+            "protocol": protocol, "stream": streaming, "model": kwargs.get("model"),
             "host": request.url.host,
             "prompt_chars": sum(len(str(m.get("content", ""))) for m in messages),
         }
@@ -76,6 +85,12 @@ def run(config, port, workspace: Path):
             return httpx.Response(401, json={"error": {"message": "离线验收仅接受 fixture- 开头的虚构 Key"}})
         record({**entry, "accepted": True})
         if kind == "embedding":
+            if protocol == "gemini":
+                texts = ["".join(p.get("text", "") for p in item["content"]["parts"])
+                         for item in kwargs["requests"]]
+                return httpx.Response(200, json={"embeddings": [
+                    {"values": vector} for vector in native_vectors.embed(texts)
+                ]})
             texts = kwargs.get("input", [])
             if isinstance(texts, str):
                 texts = [texts]
@@ -89,8 +104,35 @@ def run(config, port, workspace: Path):
         text = f"# 合成验收资料（账号模型 {identity}）\n" + last[-3000:]
         usage = {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
         base = {"id": "fixture-" + identity, "created": int(time.time()), "model": kwargs.get("model")}
-        if kwargs.get("stream"):
+        if streaming:
             text = f"离线验收回复（账号模型 {identity}）：合成记录里的小雨喜欢冰美式。此回复仅用于流程测试。"
+        if protocol == "anthropic":
+            message = {"id": base["id"], "type": "message", "role": "assistant",
+                       "model": kwargs["model"], "content": [{"type": "text", "text": text}],
+                       "stop_reason": "end_turn", "usage": {"input_tokens": 100, "output_tokens": 20}}
+            if not streaming:
+                return httpx.Response(200, json=message)
+            events = [
+                {"type": "message_start", "message": {**message, "content": [], "stop_reason": None}},
+                {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+                *[{"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": part}} for part in (text[:16], text[16:])],
+                {"type": "content_block_stop", "index": 0},
+                {"type": "message_delta", "delta": {"stop_reason": "end_turn"}, "usage": {"output_tokens": 20}},
+                {"type": "message_stop"},
+            ]
+            content = "".join("event: " + event["type"] + "\ndata: " + json.dumps(event, ensure_ascii=False) + "\n\n" for event in events)
+            return httpx.Response(200, headers={"Content-Type": "text/event-stream"}, content=content)
+        if protocol == "gemini":
+            def chunk(part, finished=False):
+                candidate = {"index": 0, "content": {"role": "model", "parts": [{"text": part}]}}
+                if finished:
+                    candidate["finishReason"] = "STOP"
+                return {"candidates": [candidate], "usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 20, "totalTokenCount": 120}}
+            if not streaming:
+                return httpx.Response(200, json=chunk(text, True))
+            content = "".join("data: " + json.dumps(event, ensure_ascii=False) + "\n\n" for event in [chunk(text[:16]), chunk(text[16:], True)])
+            return httpx.Response(200, headers={"Content-Type": "text/event-stream"}, content=content)
+        if streaming:
             events = [{**base, "object": "chat.completion.chunk", "choices": [
                 {"index": 0, "delta": {"content": part}, "finish_reason": None}
             ]} for part in (text[:16], text[16:])]
