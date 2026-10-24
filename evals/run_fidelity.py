@@ -100,6 +100,14 @@ def run_conversation(slug: str, owner: int) -> list[str]:
     return replies
 
 
+def _noise_floor(replies: list[str]) -> float:
+    """同分布两半之间的距离，作为漂移的对照基准。"""
+    middle = replies[EDGE // 2 : EDGE // 2 + EDGE * 2]
+    if len(middle) < EDGE * 2:
+        middle = replies[: EDGE * 2]
+    return distance(fingerprint(middle[::2]), fingerprint(middle[1::2]))
+
+
 def measure(slug: str, owner: int) -> dict:
     replies = run_conversation(slug, owner)
     if len(replies) < EDGE * 2:
@@ -114,6 +122,12 @@ def measure(slug: str, owner: int) -> dict:
         "mirror": f"{owner}/{slug}",
         "turns": len(replies),
         "drift": distance(fingerprint(replies[:EDGE]), fingerprint(replies[-EDGE:])),
+        # 噪声地板：同一段对话里交替抽两半，分布本该相同，测出的距离全是采样噪声。
+        # 没有这个参照，0.15 的漂移是「几乎没变」还是「变了不少」根本无从判断。
+        # 刻意保持与漂移相同的 15+15 规模并取中段，避免样本量与位置带来的偏差。
+        "noise_floor": _noise_floor(replies),
+        # 指纹原始向量：只是统计量、不含任何回复原文，留着让人重算距离不必重跑
+        "fingerprint": generated,
         "generated_profile": describe(generated),
     }
     # 语料可能为空（半成品镜像），此时只报漂移，不硬凑一个没意义的距离
@@ -121,6 +135,28 @@ def measure(slug: str, owner: int) -> dict:
         result["fingerprint_distance"] = distance(human, generated)
         result["human_profile"] = describe(human)
     return result
+
+
+def _between_persona(results: list[dict]) -> dict:
+    """两两镜像指纹距离的分布。"""
+    import statistics
+
+    fps = [(r["mirror"], r["fingerprint"]) for r in results if "fingerprint" in r]
+    pairs = [
+        {"pair": f"{a[0]} vs {b[0]}", "distance": distance(a[1], b[1])}
+        for i, a in enumerate(fps)
+        for b in fps[i + 1 :]
+    ]
+    if not pairs:
+        return {"n_pairs": 0}
+    values = [p["distance"] for p in pairs]
+    return {
+        "n_pairs": len(pairs),
+        "median": round(statistics.median(values), 6),
+        "min": round(min(values), 6),
+        "max": round(max(values), 6),
+        "pairs": pairs,
+    }
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -146,13 +182,17 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps({"edge": EDGE, "mirrors": results}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    payload = {
+        "edge": EDGE,
+        # 人格间距离：不同镜像之间的指纹差，作为「变成另一个人」的上界参照。
+        # 漂移要放在 [噪声地板, 人格间距离] 这个区间里读才有意义。
+        "between_persona": _between_persona(results),
+        "mirrors": results,
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n结果 -> {out}\n")
 
-    print(f"{'镜像':<18}{'轮次':>5}{'漂移':>9}{'指纹距离':>11}")
+    print(f"{'镜像':<18}{'轮次':>5}{'漂移':>9}{'噪声地板':>10}{'指纹距离':>11}")
     for r in results:
         if "error" in r:
             print(f"{r['mirror']:<18} {r['error']}")
@@ -160,7 +200,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         fd = r.get("fingerprint_distance")
         print(
             f"{r['mirror']:<18}{r['turns']:>5}{r['drift']:>9.4f}"
+            f"{r['noise_floor']:>10.4f}"
             f"{(f'{fd:.4f}' if fd is not None else '无语料'):>11}"
+        )
+    bp = payload["between_persona"]
+    if bp.get("n_pairs"):
+        print(
+            f"\n人格间距离（{bp['n_pairs']} 对）中位 {bp['median']:.4f}，"
+            f"区间 {bp['min']:.4f}~{bp['max']:.4f}"
+        )
+        print(
+            "漂移放在 [噪声地板, 人格间距离] 之间读：贴近前者=没跑偏，逼近后者=换了个人"
         )
     return 0
 

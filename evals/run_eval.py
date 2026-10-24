@@ -4,6 +4,7 @@
     python -m evals.run_eval retrieval [--mock] [--limit N]
     python -m evals.run_eval generation [--limit N] [--threshold 0.3]
     python -m evals.run_eval holdout [--mock] [--facts N] [--seed N] [--fact F,...]
+    python -m evals.run_eval error
     python -m evals.run_eval report
     python -m evals.run_eval all [--limit N]
 
@@ -17,12 +18,22 @@ import os
 import sys
 
 from evals.dataset import load_corpus, load_golden
-from evals.report import RESULTS_DIR, RETRIEVAL_RESULTS, GENERATION_RESULTS
+from evals.report import (
+    ERROR_ANALYSIS_RESULTS,
+    GENERATION_RESULTS,
+    HOLDOUT_RESULTS,
+    RESULTS_DIR,
+    RETRIEVAL_RESULTS,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("ex-memory.evals")
 
-HOLDOUT_RESULTS = RESULTS_DIR / "holdout_results.json"
+def _load_json(path):
+    if not path.exists():
+        sys.exit(f"缺少 {path}，先运行生成它的子命令")
+    with path.open(encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _make_embedder(mock: bool):
@@ -129,6 +140,22 @@ def cmd_holdout(args):
     )
 
 
+def cmd_error(_args):
+    from evals.error_analysis import run_error_analysis
+
+    retrieval = _load_json(RETRIEVAL_RESULTS)
+    holdout = _load_json(HOLDOUT_RESULTS)
+    results = run_error_analysis(retrieval, holdout)
+    _save(ERROR_ANALYSIS_RESULTS, results)
+    m = results["meta"]
+    print(
+        f"错误分析：{m['n_queries']} 条查询，{m['n_failed']} 条失败"
+        f"（失败率 {m['fail_rate']:.1%}）"
+    )
+    for line in results["summary"]:
+        print(f"  - {line}")
+
+
 def cmd_report(_args):
     from evals.report import generate_report
 
@@ -166,6 +193,9 @@ def main():
     )
     p_hold.set_defaults(func=cmd_holdout)
 
+    p_err = sub.add_parser("error", help="错误分析：从检索/留出结果归因失败模式")
+    p_err.set_defaults(func=cmd_error)
+
     p_rep = sub.add_parser("report", help="从已有结果生成图表与报告")
     p_rep.set_defaults(func=cmd_report)
 
@@ -181,6 +211,9 @@ def main():
             mock=args.mock, limit=args.limit, threshold=args.threshold
         )
         cmd_generation(gen_args)
+        hold_args = argparse.Namespace(mock=args.mock, facts=3, seed=7, fact=None)
+        cmd_holdout(hold_args)
+        cmd_error(argparse.Namespace())
         cmd_report(args)
 
     p_all.set_defaults(func=_run_all)

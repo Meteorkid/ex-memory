@@ -11,6 +11,8 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 RETRIEVAL_RESULTS = RESULTS_DIR / "retrieval_results.json"
 GENERATION_RESULTS = RESULTS_DIR / "generation_results.json"
+HOLDOUT_RESULTS = RESULTS_DIR / "holdout_results.json"
+ERROR_ANALYSIS_RESULTS = RESULTS_DIR / "error_analysis.json"
 REPORT_IMG_DIR = PROJECT_DIR / "docs" / "eval"
 REPORT_PATH = PROJECT_DIR / "docs" / "eval_report.md"
 
@@ -179,12 +181,115 @@ def _fmt_pct(v: float) -> str:
     return f"{v:.1%}"
 
 
+def plot_holdout(plt, holdout: dict, out: Path):
+    """留出泛化：known vs heldout 的 recall@5/@10/mrr 分组柱状图。"""
+    groups = ["known", "heldout"]
+    metric_keys = ["recall@5", "recall@10", "mrr"]
+    names = {"known": "已知簇", "heldout": "留出簇"}
+    x = range(len(metric_keys))
+    width = 0.35
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    for i, g in enumerate(groups):
+        vals = [holdout[g][k] for k in metric_keys]
+        offset = i * width - width / 2
+        ax.bar(
+            [v + offset for v in x],
+            vals,
+            width,
+            label=names[g],
+            color="tab:blue" if g == "known" else "tab:orange",
+        )
+        for v, val in zip(x, vals):
+            ax.annotate(
+                f"{val:.2f}",
+                (v + offset, val),
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(metric_keys)
+    ax.set_ylim(0, 1.0)
+    ax.set_ylabel("指标值")
+    ax.set_title("留出泛化测试：known vs heldout")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(fontsize=9)
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+
+
+def plot_failure_modes(plt, analysis: dict, out: Path):
+    """错误分析：失败模式分布横向条形图。"""
+    dist = analysis.get("failure_modes", {})
+    if not dist:
+        return
+    labels = analysis.get("failure_mode_labels", {})
+    modes = list(dist.keys())
+    counts = [dist[m] for m in modes]
+    fig, ax = plt.subplots(figsize=(7, max(2.4, 0.5 * len(modes) + 1.2)))
+    y = range(len(modes))
+    ax.barh(list(y), counts, color="tab:red", alpha=0.85)
+    for i, c in enumerate(counts):
+        ax.annotate(str(c), (c, i), va="center", fontsize=10)
+    ax.set_yticks(list(y))
+    ax.set_yticklabels([labels.get(m, m) for m in modes], fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlabel("失败查询数")
+    ax.set_title("错误分析：失败模式分布")
+    ax.grid(axis="x", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+
+
 def _worst_queries(retrieval: dict, n: int = 5) -> list[dict]:
     rows = [r for r in retrieval.get("per_query_prod", []) if r["recall@10"] < 1.0]
     return sorted(rows, key=lambda r: (r["recall@10"], r["mrr"]))[:n]
 
 
-def build_markdown(retrieval: dict, generation: dict | None) -> str:
+def _holdout_verdict_text(holdout: dict) -> str:
+    """留出泛化判定的结论文字。"""
+    known = holdout.get("known", {}).get("recall@10", 0.0)
+    held = holdout.get("heldout", {}).get("recall@10", 0.0)
+    gap = known - held
+    if held <= 0.05 and gap > 0:
+        return (
+            f"留出簇 recall@10={_fmt_pct(held)}，远低于已知簇 "
+            f"({_fmt_pct(known)}，gap {_fmt_pct(gap)})：被剔除的证据未被误召回，"
+            "留出切分生效。这是「切分无泄漏」的流程有效性检查——"
+            "留出组的 gold 消息本就不在库中，recall=0 属构造性必然，"
+            "既不说明检索质量，也不代表模型能正确拒答。"
+        )
+    return (
+        f"注意：留出簇 recall@10={_fmt_pct(held)} 仍有一定召回（已知簇 "
+        f"{_fmt_pct(known)}）。留出后的消息仍可能被误召回，需检查切分或检索阈值。"
+    )
+
+
+def _holdout_caveat_text(hmeta: dict) -> str:
+    """已知簇口径提示：剔除消息后重新分块会改变 dominant_speaker 归属。
+
+    剔除 target 消息会使剩余语料重新分块，chunk 的说话人构成随之变化，
+    部分原本被 target 过滤排除的 chunk 可能重新归入 target。因此已知簇的
+    检索候选池与主评测不同，两者不可直接比较。
+    """
+    return (
+        "**已知簇数字不可与主评测直接比较：** 剔除 "
+        f"{hmeta.get('n_removed', 0)} 条消息后，检索库按剩余语料重新分块，"
+        "chunk 的 `dominant_speaker` 归属随之改变，部分原本被目标说话人过滤"
+        "排除的 chunk 会重新归入 target，候选池因此不同于主评测。"
+        "故本节只比较「已知簇 vs 留出簇」两组之间的相对差异，"
+        "不把已知簇数值与主评测的生产配置并列。"
+    )
+
+
+def build_markdown(
+    retrieval: dict,
+    generation: dict | None,
+    holdout: dict | None = None,
+    analysis: dict | None = None,
+) -> str:
     meta = retrieval["meta"]
     prod = next(c for c in retrieval["configs"] if c["label"] == "turns5_overlap1")
     best = max(retrieval["configs"], key=lambda c: c["target_only"]["recall@5"])
@@ -273,10 +378,84 @@ def build_markdown(retrieval: dict, generation: dict | None) -> str:
             "",
         ]
 
+    if holdout is not None:
+        ko = holdout.get("known", {})
+        ho = holdout.get("heldout", {})
+        hmeta = holdout.get("meta", {})
+        lines += [
+            "## 5. 留出泛化测试（独立开发集）",
+            "",
+            f"把 {len(hmeta.get('heldout_facts', []))} 个事实簇的 target 消息（"
+            f"{hmeta.get('n_removed', 0)} 条）从检索库剔除，其余事实簇照常建库。"
+            "同查询集分两组对比：",
+            "",
+            "| 分组 | 查询数 | Recall@5 | Recall@10 | MRR | nDCG@10 |",
+            "|---|---|---|---|---|---|",
+            f"| 已知簇 | {hmeta.get('n_known', 0)} | {_fmt_pct(ko.get('recall@5', 0))} "
+            f"| {_fmt_pct(ko.get('recall@10', 0))} | {ko.get('mrr', 0):.3f} "
+            f"| {ko.get('ndcg@10', 0):.3f} |",
+            f"| 留出簇 | {hmeta.get('n_heldout', 0)} | {_fmt_pct(ho.get('recall@5', 0))} "
+            f"| {_fmt_pct(ho.get('recall@10', 0))} | {ho.get('mrr', 0):.3f} "
+            f"| {ho.get('ndcg@10', 0):.3f} |",
+            "",
+            _holdout_verdict_text(holdout),
+            "",
+            _holdout_caveat_text(hmeta),
+            "",
+            "![留出泛化测试](eval/holdout.png)",
+            "",
+        ]
+
+    if analysis is not None:
+        ameta = analysis.get("meta", {})
+        cats = analysis.get("by_category", [])
+        dist = analysis.get("failure_modes", {})
+        labels = analysis.get("failure_mode_labels", {})
+        lines += [
+            "## 6. 错误分析：失败模式与薄弱类别",
+            "",
+            f"本轮 {ameta.get('n_queries', 0)} 条查询，"
+            f"{ameta.get('n_failed', 0)} 条未完全召回"
+            f"（失败率 {_fmt_pct(ameta.get('fail_rate', 0))}）。"
+            "逐条失败归因见下。",
+            "",
+        ]
+        if cats:
+            lines += [
+                "| 类别 | 查询数 | recall@10 | MRR | 失败数 | 失败率 |",
+                "|---|---|---|---|---|---|",
+            ]
+            for c in cats:
+                lines.append(
+                    f"| {c['category']} | {c['n']} | {_fmt_pct(c['recall@10'])} "
+                    f"| {c['mrr']:.3f} | {c['n_failed']} | {_fmt_pct(c['fail_rate'])} |"
+                )
+            lines.append("")
+        if dist:
+            lines += [
+                "| 失败模式 | 数量 |",
+                "|---|---|",
+            ]
+            for mode, count in dist.items():
+                lines.append(f"| {labels.get(mode, mode)} | {count} |")
+            lines += [
+                "",
+                "![错误分析：失败模式](eval/failure_modes.png)",
+                "",
+            ]
+        if analysis.get("summary"):
+            lines += [
+                "**归纳：**",
+                "",
+            ]
+            for s in analysis["summary"]:
+                lines.append(f"- {s}")
+            lines.append("")
+
     worst = _worst_queries(retrieval)
     if worst:
         lines += [
-            "## 5. 失败案例（生产配置下 Recall@10 最低）",
+            "## 7. 失败案例（生产配置下 Recall@10 最低）",
             "",
             "| qid | 类别 | Recall@10 | 首个命中排名 | 库中相关 chunks |",
             "|---|---|---|---|---|",
@@ -313,6 +492,8 @@ def generate_report() -> Path:
             f"缺少 {RETRIEVAL_RESULTS}，先运行 python -m evals.run_eval retrieval"
         )
     generation = _load(GENERATION_RESULTS)
+    holdout = _load(HOLDOUT_RESULTS)
+    analysis = _load(ERROR_ANALYSIS_RESULTS)
 
     plt = _setup_matplotlib()
     REPORT_IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -321,6 +502,12 @@ def generate_report() -> Path:
     plot_filter_impact(plt, retrieval, REPORT_IMG_DIR / "filter_impact.png")
     if generation:
         plot_generation(plt, generation, REPORT_IMG_DIR / "generation.png")
+    if holdout:
+        plot_holdout(plt, holdout, REPORT_IMG_DIR / "holdout.png")
+    if analysis:
+        plot_failure_modes(plt, analysis, REPORT_IMG_DIR / "failure_modes.png")
 
-    REPORT_PATH.write_text(build_markdown(retrieval, generation), encoding="utf-8")
+    REPORT_PATH.write_text(
+        build_markdown(retrieval, generation, holdout, analysis), encoding="utf-8"
+    )
     return REPORT_PATH

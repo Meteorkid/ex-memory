@@ -186,8 +186,25 @@ def run_holdout_eval(
                     for h in hits
                 ]
                 row = _query_metrics(ranked, gold, relevant)
-                row["qid"] = item.qid
-                row["top1_score"] = round(hits[0]["score"], 4) if hits else None
+                # 逐条审计字段：与 ab_runner.per_query_prod 的口径保持一致
+                first_rank = next(
+                    (i + 1 for i, ids in enumerate(ranked) if ids & gold), None
+                )
+                row.update(
+                    {
+                        "qid": item.qid,
+                        "category": item.category,
+                        "fact": item.fact,
+                        "recall@5": row["recall@5"],
+                        "recall@10": row["recall@10"],
+                        "mrr": row["mrr"],
+                        "first_hit_rank": first_rank,
+                        "relevant": relevant,
+                        "top1_score": (
+                            round(hits[0]["score"], 4) if hits else None
+                        ),
+                    }
+                )
                 per_q.append(row)
             agg = {
                 k: metrics.mean([q[k] for q in per_q if q[k] is not None])
@@ -204,6 +221,8 @@ def run_holdout_eval(
     return {
         "known": known_agg,
         "heldout": heldout_agg,
+        "known_per_query": known_per,
+        "heldout_per_query": heldout_per,
         "meta": {
             "config": PROD_CONFIG.label,
             "corpus_size": len(corpus),
