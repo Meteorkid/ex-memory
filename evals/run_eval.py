@@ -4,6 +4,7 @@
     python -m evals.run_eval retrieval [--mock] [--limit N]
     python -m evals.run_eval generation [--limit N] [--threshold 0.3]
     python -m evals.run_eval holdout [--mock] [--facts N] [--seed N] [--fact F,...]
+    python -m evals.run_eval abstention [--facts N] [--seed N] [--threshold 0.3]
     python -m evals.run_eval error
     python -m evals.run_eval report
     python -m evals.run_eval all [--limit N]
@@ -19,6 +20,7 @@ import sys
 
 from evals.dataset import load_corpus, load_golden
 from evals.report import (
+    ABSTENTION_RESULTS,
     ERROR_ANALYSIS_RESULTS,
     GENERATION_RESULTS,
     HOLDOUT_RESULTS,
@@ -140,6 +142,46 @@ def cmd_holdout(args):
     )
 
 
+def cmd_abstention(args):
+    from config import get_llm_client, get_llm_config
+    from evals.abstention_eval import run_abstention_eval
+    from evals.holdout import holdout_facts
+
+    corpus = load_corpus()
+    golden = load_golden(corpus=corpus)
+    embedder = _make_embedder(args.mock)
+
+    llm_cfg = get_llm_config()
+    if not llm_cfg["api_key"]:
+        sys.exit("LLM_API_KEY 未配置：拒答评测需要 LLM 服务")
+    judge_model = os.getenv("EVAL_JUDGE_MODEL", llm_cfg["model"])
+
+    if args.fact:
+        heldout = set(args.fact)
+    else:
+        heldout = holdout_facts(golden, n=args.facts, seed=args.seed)
+    logger.info("留出事实簇：%s", "、".join(sorted(heldout)))
+
+    results = run_abstention_eval(
+        corpus,
+        golden,
+        embedder,
+        llm_client=get_llm_client(),
+        llm_cfg=llm_cfg,
+        judge_model=judge_model,
+        heldout_facts=heldout,
+        threshold=args.threshold,
+        repeats=args.repeats,
+    )
+    _save(ABSTENTION_RESULTS, results)
+    for cond, m in results["conditions"].items():
+        print(
+            f"{cond:>6}: abstain={m['abstention_rate']:.3f} "
+            f"hedge={m['hedge_rate']:.3f} fabricate={m['fabrication_rate']:.3f} "
+            f"consistent={m['consistent_rate']:.3f} n={m['n_scored']}"
+        )
+
+
 def cmd_error(_args):
     from evals.error_analysis import run_error_analysis
 
@@ -193,6 +235,23 @@ def main():
     )
     p_hold.set_defaults(func=cmd_holdout)
 
+    p_abs = sub.add_parser(
+        "abstention", help="证据缺失时的生成端行为：拒答 vs 编造"
+    )
+    p_abs.add_argument("--mock", action="store_true", help="离线伪向量冒烟")
+    p_abs.add_argument("--facts", type=int, default=3, help="留出事实簇数量")
+    p_abs.add_argument("--seed", type=int, default=7, help="抽样随机种子")
+    p_abs.add_argument(
+        "--fact",
+        action="append",
+        help="显式指定留出事实簇（可多次），覆盖自动抽样",
+    )
+    p_abs.add_argument("--threshold", type=float, default=0.3, help="噪声条件阈值")
+    p_abs.add_argument(
+        "--repeats", type=int, default=3, help="每条件重复采样次数（温度非 0）"
+    )
+    p_abs.set_defaults(func=cmd_abstention)
+
     p_err = sub.add_parser("error", help="错误分析：从检索/留出结果归因失败模式")
     p_err.set_defaults(func=cmd_error)
 
@@ -213,6 +272,15 @@ def main():
         cmd_generation(gen_args)
         hold_args = argparse.Namespace(mock=args.mock, facts=3, seed=7, fact=None)
         cmd_holdout(hold_args)
+        abs_args = argparse.Namespace(
+            mock=args.mock,
+            facts=3,
+            seed=7,
+            fact=None,
+            threshold=args.threshold,
+            repeats=3,
+        )
+        cmd_abstention(abs_args)
         cmd_error(argparse.Namespace())
         cmd_report(args)
 

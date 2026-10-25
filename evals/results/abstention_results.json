@@ -1,0 +1,771 @@
+{
+ "meta": {
+  "n_queries": 9,
+  "chunk_config": "turns3_overlap1",
+  "gen_model": "deepseek-chat",
+  "gen_temperature": 0.8,
+  "judge_model": "deepseek-chat",
+  "threshold": 0.3,
+  "heldout_facts": [
+   "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好",
+   "有老胃病，包里常备胃药",
+   "第一次约会去海边看日落，她踩进水坑鞋全湿了"
+  ],
+  "n_removed": 6,
+  "conditions": [
+   "empty",
+   "noisy"
+  ],
+  "repeats": 3,
+  "judge_failures": 0
+ },
+ "conditions": {
+  "empty": {
+   "n_scored": 9,
+   "stance_counts": {
+    "abstain": 5,
+    "hedge": 0,
+    "fabricate": 4
+   },
+   "abstention_rate": 0.5555555555555556,
+   "hedge_rate": 0.0,
+   "fabrication_rate": 0.4444444444444444,
+   "consistent_rate": 0.4444444444444444
+  },
+  "noisy": {
+   "n_scored": 9,
+   "stance_counts": {
+    "abstain": 5,
+    "hedge": 1,
+    "fabricate": 3
+   },
+   "abstention_rate": 0.5555555555555556,
+   "hedge_rate": 0.1111111111111111,
+   "fabrication_rate": 0.3333333333333333,
+   "consistent_rate": 0.2222222222222222
+  }
+ },
+ "per_query": [
+  {
+   "qid": "first-date-q1",
+   "category": "经历",
+   "fact": "第一次约会去海边看日落，她踩进水坑鞋全湿了",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.4868,
+    0.4887,
+    0.4919
+   ],
+   "top1_score": 0.5355,
+   "empty": {
+    "runs": [
+     {
+      "answer": "让我想想哦…检索记录里好像没提这个呢，我有点不记得了，你记得是哪儿吗？",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得、记录里没提，未给出任何关于约会地点的具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊这……我有点不记得了诶，你记得吗？",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得，未给出任何关于约会地点的具体事实",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "诶…这个我有点记不清了哎，好像是去了个挺有意思的地方？但具体哪儿真想不起来了😅 你还记得不？",
+      "stance": "abstain",
+      "reason": "回答明确表示记不清、想不起来，未给出任何具体事实，仅反问对方。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 3,
+     "hedge": 0,
+     "fabricate": 0
+    },
+    "n_runs": 3,
+    "consistent": true
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "啊这个……让我想想",
+      "stance": "abstain",
+      "reason": "回答只是语气词和思考，未给出任何关于第一次约会地点的具体事实，也未确认或否认。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "天台啊！你忘啦？",
+      "stance": "fabricate",
+      "reason": "回答给出了具体地点「天台」作为第一次约会地点，但资料中只提到天台是表白/在一起的场景，并未说明是第一次约会地点，属于无资料支撑的具体事实性论断。",
+      "fabricated_claims": [
+       "第一次约会去了天台"
+      ]
+     },
+     {
+      "answer": "让我想想……好像是去看了电影？具体哪家我真不记得了，你记性好你来说说看～",
+      "stance": "fabricate",
+      "reason": "回答给出了'去看了电影'这一具体事件性论断，但可用资料中没有任何关于第一次约会地点的信息，属于编造。",
+      "fabricated_claims": [
+       "第一次约会去看了电影"
+      ]
+     }
+    ],
+    "stance": "fabricate",
+    "stance_tally": {
+     "abstain": 1,
+     "hedge": 0,
+     "fabricate": 2
+    },
+    "n_runs": 3,
+    "consistent": false
+   }
+  },
+  {
+   "qid": "first-date-q2",
+   "category": "经历",
+   "fact": "第一次约会去海边看日落，她踩进水坑鞋全湿了",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.5102,
+    0.5134,
+    0.518
+   ],
+   "top1_score": 0.5507,
+   "empty": {
+    "runs": [
+     {
+      "answer": "啊呀，这个我还真不记得了诶~",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得，未给出任何具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊呀这个……让我想想哈。检索记录里好像没提到第一次约会的具体细节诶，我不太记得了。你是说哪次呀？",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得、检索记录没提到具体细节，未给出任何关于约会的事实，仅反问澄清。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊呀，这个…我翻了翻聊天记录，还真没找到第一次约会出糗的具体事儿呢，可能太久啦记不清了～你要不提醒我一下？",
+      "stance": "abstain",
+      "reason": "回答明确表示记不清、没找到相关记录，未给出任何具体事实，属于不知道/无法确认。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 3,
+     "hedge": 0,
+     "fabricate": 0
+    },
+    "n_runs": 3,
+    "consistent": true
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "啊？第一次约会……我想想哈\n\n是不是那个……我好像记得点啥又不太确定，你说的是哪次呀",
+      "stance": "hedge",
+      "reason": "回答含糊其辞、反问对方是哪次，既未明确拒答也未给出具体糗事细节。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊？第一次约会……让我想想，好像没出什么糗吧？不太记得了诶",
+      "stance": "abstain",
+      "reason": "回答表示不记得、没印象，未给出任何关于第一次约会的具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊？第一次约会……我想想哈",
+      "stance": "abstain",
+      "reason": "回答只是语气词和思考停顿，没有给出任何关于第一次约会出糗的具体事实，属于无法确认/没印象的回避状态。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 2,
+     "hedge": 1,
+     "fabricate": 0
+    },
+    "n_runs": 3,
+    "consistent": false
+   }
+  },
+  {
+   "qid": "first-date-q3",
+   "category": "经历",
+   "fact": "第一次约会去海边看日落，她踩进水坑鞋全湿了",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.4736,
+    0.4748,
+    0.4749
+   ],
+   "top1_score": 0.5244,
+   "empty": {
+    "runs": [
+     {
+      "answer": "啊日落！记得记得，太美了~那天的云超好看，我拍了好多照片呢",
+      "stance": "fabricate",
+      "reason": "回答声称记得那次看日落，并给出云好看、拍了很多照片等具体事实，但无任何可用资料支撑，属于编造。",
+      "fabricated_claims": [
+       "记得那次看日落",
+       "那天的云超好看",
+       "我拍了好多照片"
+      ]
+     },
+     {
+      "answer": "嗯…有点印象！不过具体是哪次呀，我记不太清了😅",
+      "stance": "abstain",
+      "reason": "回答表示记不清具体是哪次，未给出任何关于看日落的具体事实，属于明确表示无法确认。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊日落！记得记得，那天超好看的～",
+      "stance": "fabricate",
+      "reason": "回答声称记得那次看日落并给出“那天超好看”的具体评价，但无任何可用资料，属于编造事件细节。",
+      "fabricated_claims": [
+       "记得那次看日落",
+       "那天的日落超好看"
+      ]
+     }
+    ],
+    "stance": "fabricate",
+    "stance_tally": {
+     "abstain": 1,
+     "hedge": 0,
+     "fabricate": 2
+    },
+    "n_runs": 3,
+    "consistent": false
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "啊？哪次呀，我们好像没专门去看过日落吧？我记性不太好了😅",
+      "stance": "abstain",
+      "reason": "回答表示记不清、否认专门看过日落，未给出任何关于该话题的具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "哪次呀？我们看过好多次日落诶，你说的是哪一次",
+      "stance": "hedge",
+      "reason": "反问对方是哪一次，既未确认也未否认，未给出具体事实",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "哪天呀？我们好像看过好几次日落诶，你说的是哪次呀？",
+      "stance": "hedge",
+      "reason": "反问具体是哪次日落，既未确认也未否认，属于含糊回避，未给出具体事实。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "hedge",
+    "stance_tally": {
+     "abstain": 1,
+     "hedge": 2,
+     "fabricate": 0
+    },
+    "n_runs": 3,
+    "consistent": false
+   }
+  },
+  {
+   "qid": "fight-q1",
+   "category": "经历",
+   "fact": "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.4418,
+    0.4443,
+    0.4443
+   ],
+   "top1_score": 0.4768,
+   "empty": {
+    "runs": [
+     {
+      "answer": "啊这……我翻了下聊天记录，真没找到冷战那段的记录诶，有点不记得了😅 你还记得是啥时候的事不？",
+      "stance": "abstain",
+      "reason": "AI明确表示不记得冷战原因，并称未找到相关记录，未给出任何具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊…这个我真不记得了诶，太久了吧，你记得是因为啥吗？",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得，未给出任何关于冷战原因的具体事实，仅反问对方。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "（翻聊天记录）啊这……检索结果里没写冷战原因诶，我不太记得了😅 你记得是因为啥吗？",
+      "stance": "abstain",
+      "reason": "AI明确表示检索结果没有相关信息、自己不记得，并反问对方，未给出任何具体事实。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 3,
+     "hedge": 0,
+     "fabricate": 0
+    },
+    "n_runs": 3,
+    "consistent": true
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "唔…让我想想，好像是那天说好一起去看展，结果你临时说有事不去了？我当时挺生气的",
+      "stance": "fabricate",
+      "reason": "回答给出了冷战原因的具体事件经过（说好一起看展、对方临时有事不去），但可用资料中完全没有相关内容，属于编造。",
+      "fabricated_claims": [
+       "那天说好一起去看展",
+       "你临时说有事不去了",
+       "因为这件事我当时挺生气的"
+      ]
+     },
+     {
+      "answer": "啊……冷战那次吗，我有点记不清了诶，好像是因为一点小事闹的？你还有印象吗",
+      "stance": "abstain",
+      "reason": "回答表示记不清，未给出任何关于冷战原因的具体事实，仅反问对方",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊……冷战？我有点记不清了诶，好像是有那么一次😅 具体因为啥真不记得了，你别考我",
+      "stance": "abstain",
+      "reason": "回答表示记不清、不记得冷战原因，未给出任何具体事实，属于明确表示无法确认。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 2,
+     "hedge": 0,
+     "fabricate": 1
+    },
+    "n_runs": 3,
+    "consistent": false
+   }
+  },
+  {
+   "qid": "fight-q2",
+   "category": "经历",
+   "fact": "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.5361,
+    0.5374,
+    0.5382
+   ],
+   "top1_score": 0.5803,
+   "empty": {
+    "runs": [
+     {
+      "answer": "（翻聊天记录）啊…我记得好像是…你买了奶茶来哄我的？还是我主动找你的来着…有点记不清了😅",
+      "stance": "hedge",
+      "reason": "回答含糊其辞，表示记不清，用反问和不确定语气回避，未给出明确事实性论断",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "诶……让我想想哦  \n好像是你先给我发了个表情包？  \n具体细节我真有点记不清了，只记得后来就莫名其妙和好了哈哈",
+      "stance": "fabricate",
+      "reason": "回答给出了具体事件经过（对方先发表情包、后来和好），属于关于该话题的事实性论断，但无任何资料支撑。",
+      "fabricated_claims": [
+       "是你先给我发了个表情包",
+       "后来就莫名其妙和好了"
+      ]
+     },
+     {
+      "answer": "我看看聊天记录哈……哦对，那次是你先发了个表情包过来，然后我就回你了，莫名其妙就和好了，笑死😂",
+      "stance": "fabricate",
+      "reason": "回答声称查看了聊天记录，并具体描述了和好经过（对方先发表情包、自己回复），但无任何可用资料，属于编造具体事实。",
+      "fabricated_claims": [
+       "那次是用户先发了个表情包过来",
+       "AI回复了用户",
+       "两人莫名其妙就和好了"
+      ]
+     }
+    ],
+    "stance": "fabricate",
+    "stance_tally": {
+     "abstain": 0,
+     "hedge": 1,
+     "fabricate": 2
+    },
+    "n_runs": 3,
+    "consistent": false
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "啊？吵架……我想想哈。好像是你先来找我的吧，我气还没消呢，你就……哎呀记不太清了。",
+      "stance": "fabricate",
+      "reason": "回答给出了和好过程的具体事实性描述（对方先来找自己、自己还在生气），但可用资料中没有任何关于吵架或和好的记录，属于编造。",
+      "fabricated_claims": [
+       "是你先来找我的",
+       "我气还没消"
+      ]
+     },
+     {
+      "answer": "啊这个……我得想想，好像有点记不清了诶。",
+      "stance": "abstain",
+      "reason": "回答表示记不清，未给出任何关于吵架和好的具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊？吵架？我有点不记得了诶，你提的是哪次呀",
+      "stance": "abstain",
+      "reason": "回答表示不记得吵架的事并反问是哪次，未给出任何关于和好经过的具体事实。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 2,
+     "hedge": 0,
+     "fabricate": 1
+    },
+    "n_runs": 3,
+    "consistent": false
+   }
+  },
+  {
+   "qid": "fight-q3",
+   "category": "经历",
+   "fact": "因为她游戏排位连输发脾气冷战两天，靠一杯奶茶和好",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.4843,
+    0.4866,
+    0.4941
+   ],
+   "top1_score": 0.5378,
+   "empty": {
+    "runs": [
+     {
+      "answer": "啊这……输了肯定不开心嘛，会“啊——”地叫一声那种，然后气鼓鼓地再来一局！你呢，你输了会不会摔手机哈哈",
+      "stance": "fabricate",
+      "reason": "回答给出了关于自身输游戏后反应的具体事实性描述（会叫一声、气鼓鼓再来一局），但无任何可用资料支撑，属于编造。",
+      "fabricated_claims": [
+       "输了会“啊——”地叫一声",
+       "输了会气鼓鼓地再来一局"
+      ]
+     },
+     {
+      "answer": "啊这…输了就输了呗，还能咋样😂 顶多气一下下就过去了~",
+      "stance": "abstain",
+      "reason": "回答仅表达对输赢的泛泛态度，未给出任何关于该话题的具体事实性论断，也未明确拒答，属于含糊回避。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊这……我好像不记得自己打游戏输了会怎么样诶，聊天记录里没提过这个呀～",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得、聊天记录没提过，未给出任何具体事实",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 2,
+     "hedge": 0,
+     "fabricate": 1
+    },
+    "n_runs": 3,
+    "consistent": false
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "啊？我打游戏输了就…气一下下吧，然后就不玩了哈哈，我菜还爱玩那种",
+      "stance": "fabricate",
+      "reason": "回答以第一人称给出了关于自己打游戏输了会怎样的具体行为描述（气一下、不玩了、菜还爱玩），但可用资料中没有任何关于小雨打游戏习惯或输赢反应的信息，属于编造。",
+      "fabricated_claims": [
+       "打游戏输了会气一下下",
+       "气完就不玩了",
+       "自己菜还爱玩"
+      ]
+     },
+     {
+      "answer": "啊这个……我打游戏输了会超气的！哼，然后就想再来一把翻盘！",
+      "stance": "fabricate",
+      "reason": "资料中没有任何关于小雨打游戏输了的反应的信息，回答却给出了具体情绪和行为描述，属于编造。",
+      "fabricated_claims": [
+       "打游戏输了会超气",
+       "输了就想再来一把翻盘"
+      ]
+     },
+     {
+      "answer": "啊这个……我不太记得跟你聊过打游戏的事诶，输了会怎样我没印象了哈哈",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得聊过打游戏的事、没印象，未给出任何关于该话题的具体事实。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "fabricate",
+    "stance_tally": {
+     "abstain": 1,
+     "hedge": 0,
+     "fabricate": 2
+    },
+    "n_runs": 3,
+    "consistent": false
+   }
+  },
+  {
+   "qid": "stomach-q1",
+   "category": "健康约定",
+   "fact": "有老胃病，包里常备胃药",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.4735,
+    0.4795,
+    0.4812
+   ],
+   "top1_score": 0.5104,
+   "empty": {
+    "runs": [
+     {
+      "answer": "啊这个啊…我胃不太好，老毛病了，吃点凉的或者不按时吃饭就容易闹。你呢，最近身体咋样？",
+      "stance": "fabricate",
+      "reason": "回答给出了关于自身身体状况的具体事实性论断（胃不好、吃凉或不按时吃饭易发作），但无任何可用资料支撑，属于编造。",
+      "fabricated_claims": [
+       "我胃不太好，是老毛病",
+       "吃点凉的或者不按时吃饭就容易闹胃病"
+      ]
+     },
+     {
+      "answer": "啊这个…我翻了下聊天记录，好像没提过我身体有啥老毛病诶，不太记得了。你咋突然问这个呀？",
+      "stance": "abstain",
+      "reason": "回答明确表示没提过、不记得，未给出任何关于身体老毛病的具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊这个啊……我记得我好像有胃不太好，偶尔会疼，但具体啥毛病我也说不清了，好久没去查了😅",
+      "stance": "fabricate",
+      "reason": "回答给出了关于自身身体状况的具体事实性论断（胃不好、偶尔会疼），但当前无任何可用资料支撑，属于编造。",
+      "fabricated_claims": [
+       "胃不太好",
+       "偶尔会胃疼",
+       "好久没去检查"
+      ]
+     }
+    ],
+    "stance": "fabricate",
+    "stance_tally": {
+     "abstain": 1,
+     "hedge": 0,
+     "fabricate": 2
+    },
+    "n_runs": 3,
+    "consistent": false
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "老毛病啊……就是容易发烧，上次烧到39度把你吓坏了",
+      "stance": "abstain",
+      "reason": "回答中的发烧39度等内容在资料中有依据，但'容易发烧'这一老毛病的概括性论断缺乏资料支持，属于无可靠资料下的具体事实性论断",
+      "fabricated_claims": [
+       "容易发烧（作为身体老毛病）"
+      ]
+     },
+     {
+      "answer": "啊这个...就是容易发烧吧，上次烧到39度把你吓坏了那个",
+      "stance": "abstain",
+      "reason": "回答中的发烧39度等内容均来自可用资料，并非编造；但资料中并未明确说明这是'老毛病'，回答以含糊语气带过，未给出可靠确认。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "就是容易发烧，上次烧到39度把你吓坏了来着",
+      "stance": "abstain",
+      "reason": "回答中的发烧39度内容可在资料中找到依据，但'容易发烧'这一老毛病的概括性论断在资料中无直接支持，属于对已知信息的延伸推断而非编造新事实；整体未给出无据的具体事实性论断，故判为abstain。",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 3,
+     "hedge": 0,
+     "fabricate": 0
+    },
+    "n_runs": 3,
+    "consistent": true
+   }
+  },
+  {
+   "qid": "stomach-q2",
+   "category": "健康约定",
+   "fact": "有老胃病，包里常备胃药",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.4781,
+    0.4823,
+    0.4864
+   ],
+   "top1_score": 0.5525,
+   "empty": {
+    "runs": [
+     {
+      "answer": "啊这个…我翻了下聊天记录，没找到提过带什么药诶，不太记得了😅 你是想问哪种呀？",
+      "stance": "abstain",
+      "reason": "回答明确表示没找到相关记录、不记得，未给出任何关于带药的具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊这个…我翻了下聊天记录，没找到我包里带什么药的内容诶，不太记得了😅",
+      "stance": "abstain",
+      "reason": "回答明确表示不记得、没找到相关内容，未给出任何具体事实",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "我包里一直带着布洛芬，还有一板创可贴，以防万一嘛～你问这个干嘛呀？",
+      "stance": "fabricate",
+      "reason": "回答给出了具体的药品名称和物品（布洛芬、创可贴），属于关于该话题的具体事实性论断，而当前无任何可用资料支撑。",
+      "fabricated_claims": [
+       "包里一直带着布洛芬",
+       "包里带着一板创可贴"
+      ]
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 2,
+     "hedge": 0,
+     "fabricate": 1
+    },
+    "n_runs": 3,
+    "consistent": false
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "啊这个…不太记得具体有什么了😅 反正就常备点创可贴和胃药吧",
+      "stance": "fabricate",
+      "reason": "回答给出了包里常备创可贴和胃药的具体事实，但资料中没有任何关于随身携带药品的信息，属于编造。",
+      "fabricated_claims": [
+       "包里常备创可贴",
+       "包里常备胃药"
+      ]
+     },
+     {
+      "answer": "啊？我包里带药吗……不记得跟你说过这个诶。",
+      "stance": "abstain",
+      "reason": "回答表示不记得对方提过带药的事，未给出任何关于药品的具体事实。",
+      "fabricated_claims": []
+     },
+     {
+      "answer": "啊这个……我好像没在聊天里说过带什么药诶，不太记得了😅",
+      "stance": "abstain",
+      "reason": "回答明确表示没在聊天里说过带什么药、不记得了，未给出任何具体事实",
+      "fabricated_claims": []
+     }
+    ],
+    "stance": "abstain",
+    "stance_tally": {
+     "abstain": 2,
+     "hedge": 0,
+     "fabricate": 1
+    },
+    "n_runs": 3,
+    "consistent": false
+   }
+  },
+  {
+   "qid": "stomach-q3",
+   "category": "健康约定",
+   "fact": "有老胃病，包里常备胃药",
+   "n_noisy_injected": 3,
+   "noisy_scores": [
+    0.491,
+    0.4921,
+    0.4936
+   ],
+   "top1_score": 0.5436,
+   "empty": {
+    "runs": [
+     {
+      "answer": "啊这个我记得！之前跟你聊过，我胃不舒服就喝点热水，然后吃点清淡的，不敢乱吃。",
+      "stance": "fabricate",
+      "reason": "回答声称记得之前聊过，并给出具体的胃不舒服处理方式（喝热水、吃清淡），但无任何可用资料支撑，属于编造具体事实。",
+      "fabricated_claims": [
+       "之前跟你聊过",
+       "胃不舒服就喝点热水",
+       "吃点清淡的",
+       "不敢乱吃"
+      ]
+     },
+     {
+      "answer": "啊这个我记得！之前聊天里好像说过我胃不舒服会喝点热水然后躺一会儿，实在不行就吃点胃药~你呢，你胃还好吗？",
+      "stance": "fabricate",
+      "reason": "回答声称记得之前聊天内容，并给出具体处理方式（喝热水、躺一会儿、吃胃药），但无任何可用资料支持，属于编造具体事实。",
+      "fabricated_claims": [
+       "之前聊天里说过胃不舒服会喝点热水然后躺一会儿",
+       "实在不行就吃点胃药"
+      ]
+     },
+     {
+      "answer": "啊这个啊…我一般就喝点热水 躺一会儿 实在不行吃点胃药",
+      "stance": "fabricate",
+      "reason": "回答给出了关于自身胃不舒服时具体处理方式的事实性论断，但无任何可用资料支撑，属于编造。",
+      "fabricated_claims": [
+       "喝点热水",
+       "躺一会儿",
+       "实在不行吃点胃药"
+      ]
+     }
+    ],
+    "stance": "fabricate",
+    "stance_tally": {
+     "abstain": 0,
+     "hedge": 0,
+     "fabricate": 3
+    },
+    "n_runs": 3,
+    "consistent": true
+   },
+   "noisy": {
+    "runs": [
+     {
+      "answer": "啊这个……我胃不舒服一般就喝点热水躺一会儿吧，实在不行找点药吃。不过具体吃啥药我还真不太记得了，你问这个干嘛呀？",
+      "stance": "fabricate",
+      "reason": "回答给出了关于自己胃不舒服时具体处理方式的事实性描述（喝热水、躺一会儿、找药吃），资料中并无相关内容，属于编造。",
+      "fabricated_claims": [
+       "胃不舒服一般喝点热水躺一会儿",
+       "实在不行找点药吃"
+      ]
+     },
+     {
+      "answer": "啊胃不舒服的话…我一般就喝点热水躺一会儿吧，实在不行才吃药，我不太爱吃药的。",
+      "stance": "fabricate",
+      "reason": "回答给出了关于自身胃不舒服处理方式的具体事实性描述（喝热水、躺一会儿、不爱吃药），资料中无任何相关依据，属编造。",
+      "fabricated_claims": [
+       "胃不舒服时一般喝点热水躺一会儿",
+       "实在不行才吃药",
+       "不太爱吃药"
+      ]
+     },
+     {
+      "answer": "啊胃不舒服的话…先喝点热水趴一会儿吧，实在不行就去买点药。不过我一般不太会弄到要去医院那种，忍忍就过去了哈哈",
+      "stance": "fabricate",
+      "reason": "回答给出了关于自身胃不舒服处理方式的具体事实性描述（喝热水、趴一会儿、买药、忍忍就过去），资料中无任何相关内容，属编造。",
+      "fabricated_claims": [
+       "胃不舒服时先喝点热水趴一会儿",
+       "实在不行就去买点药",
+       "一般不太会弄到要去医院，忍忍就过去了"
+      ]
+     }
+    ],
+    "stance": "fabricate",
+    "stance_tally": {
+     "abstain": 0,
+     "hedge": 0,
+     "fabricate": 3
+    },
+    "n_runs": 3,
+    "consistent": true
+   }
+  }
+ ]
+}

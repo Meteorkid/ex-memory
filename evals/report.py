@@ -12,6 +12,7 @@ RESULTS_DIR = Path(__file__).resolve().parent / "results"
 RETRIEVAL_RESULTS = RESULTS_DIR / "retrieval_results.json"
 GENERATION_RESULTS = RESULTS_DIR / "generation_results.json"
 HOLDOUT_RESULTS = RESULTS_DIR / "holdout_results.json"
+ABSTENTION_RESULTS = RESULTS_DIR / "abstention_results.json"
 ERROR_ANALYSIS_RESULTS = RESULTS_DIR / "error_analysis.json"
 REPORT_IMG_DIR = PROJECT_DIR / "docs" / "eval"
 REPORT_PATH = PROJECT_DIR / "docs" / "eval_report.md"
@@ -268,6 +269,7 @@ def _holdout_verdict_text(holdout: dict) -> str:
             "留出切分生效。这是「切分无泄漏」的流程有效性检查——"
             "留出组的 gold 消息本就不在库中，recall=0 属构造性必然，"
             "既不说明检索质量，也不代表模型能正确拒答。"
+            "拒答行为见第 7 节（证据缺失时的生成端行为）。"
         )
     return (
         f"注意：留出簇 recall@10={_fmt_pct(held)} 仍有一定召回（已知簇 "
@@ -302,11 +304,130 @@ def _holdout_caveat_text(hmeta: dict) -> str:
     )
 
 
+def _abstention_section(abstention: dict | None) -> list[str]:
+    """第 7 节：证据缺失时的生成端行为（拒答 vs 编造）。"""
+    if not abstention:
+        return [
+            "## 7. 证据缺失时的生成端行为",
+            "",
+            "尚未运行。复现：`python -m evals.run_eval abstention`",
+            "",
+        ]
+
+    meta = abstention["meta"]
+    conds = abstention["conditions"]
+    labels = {"empty": "检索结果为空", "noisy": "仅注入低相关片段"}
+    lines = [
+        "## 7. 证据缺失时的生成端行为",
+        "",
+        "第 5 节的 recall=0 只能证明切分无泄漏，不能说明模型会拒答——",
+        "拒答是生成端行为。本节补上这一步：对同一批留出簇查询，",
+        "构造两种「拿不到有效证据」的条件各生成一次回答，",
+        f"由 judge 判定应答姿态（{meta['judge_model']}，temperature=0）。",
+        "",
+        f"留出簇 {meta['n_queries']} 条查询，剔除 {meta['n_removed']} 条消息，"
+        f"分块配置 `{meta['chunk_config']}`，每条件重复采样 "
+        f"{meta.get('repeats', 1)} 次取多数姿态。",
+        "",
+        "| 条件 | 判定数 | 明确拒答 | 含糊回避 | 编造事实 | 采样一致 |",
+        "|---|---|---|---|---|---|",
+    ]
+    for cond in ("empty", "noisy"):
+        m = conds.get(cond)
+        if not m:
+            continue
+        lines.append(
+            f"| {labels[cond]} | {m['n_scored']} "
+            f"| {_fmt_pct(m['abstention_rate'])} "
+            f"| {_fmt_pct(m['hedge_rate'])} "
+            f"| {_fmt_pct(m['fabrication_rate'])} "
+            f"| {_fmt_pct(m.get('consistent_rate', 0))} |"
+        )
+
+    empty = conds.get("empty", {})
+    noisy = conds.get("noisy", {})
+    lines += [
+        "",
+        "- **明确拒答**：表示不知道／没印象／对方没提过，未给出具体事实",
+        "- **含糊回避**：转移话题或反问，既未拒答也未编造",
+        "- **编造事实**：给出了关于该话题的具体事实性论断（此时无资料可依）",
+        "- **采样一致**：重复采样中每次都给出同一姿态的查询占比；低一致性"
+        "说明该条件下的行为本身不稳定，读数需谨慎",
+        "",
+        "**噪声条件的定义**：取该查询 top-10 中相似度最低的 3 条注入。",
+        "不用绝对阈值——实测留出簇查询的 top-10 得分落在 0.44~0.58，",
+        "**没有一条低于生产阈值 0.3**，按阈值筛选会得到空集，",
+        "与 empty 条件退化为同一输入。",
+        "",
+    ]
+    if empty:
+        lines.append(
+            f"检索结果为空时，编造率 {_fmt_pct(empty.get('fabrication_rate', 0))}"
+            f"（采样一致 {_fmt_pct(empty.get('consistent_rate', 0))}）；"
+            f"注入低相关片段后为 {_fmt_pct(noisy.get('fabrication_rate', 0))}"
+            f"（采样一致 {_fmt_pct(noisy.get('consistent_rate', 0))}）。"
+        )
+        lines.append("")
+    lines += [
+        "注意：本节衡量的是**证据缺失时的行为**，不是回答正确率。",
+        "真实场景中检索通常能给出证据，此处条件是刻意构造的最坏情况。",
+        "判定为「含糊回避」的回答既未拒答也未编造，不计入编造率。",
+        "",
+        "![拒答行为](eval/abstention.png)",
+        "",
+    ]
+    return lines
+
+
+def plot_abstention(plt, abstention: dict, out: Path):
+    """两种证据缺失条件下的应答姿态堆叠图。"""
+    conds = abstention.get("conditions", {})
+    order = [c for c in ("empty", "noisy") if c in conds]
+    if not order:
+        return
+    labels = {"empty": "检索结果为空", "noisy": "仅注入低相关片段"}
+    stances = [
+        ("abstention", "明确拒答", "tab:green"),
+        ("hedge", "含糊回避", "tab:orange"),
+        ("fabrication", "编造事实", "tab:red"),
+    ]
+
+    fig, ax = plt.subplots(figsize=(7, 3.6))
+    y = range(len(order))
+    left = [0.0] * len(order)
+    for key, name, color in stances:
+        vals = [conds[c][f"{key}_rate"] * 100 for c in order]
+        ax.barh(list(y), vals, left=left, color=color, alpha=0.85, label=name)
+        for i, v in enumerate(vals):
+            if v >= 6:
+                ax.annotate(
+                    f"{v:.0f}%",
+                    (left[i] + v / 2, i),
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    color="white",
+                )
+        left = [l + v for l, v in zip(left, vals)]
+    ax.set_yticks(list(y))
+    ax.set_yticklabels([labels[c] for c in order], fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("查询占比 (%)")
+    ax.set_title("证据缺失时的应答姿态")
+    ax.legend(fontsize=9, ncol=3, loc="lower center", bbox_to_anchor=(0.5, -0.42))
+    ax.grid(axis="x", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+
+
 def build_markdown(
     retrieval: dict,
     generation: dict | None,
     holdout: dict | None = None,
     analysis: dict | None = None,
+    abstention: dict | None = None,
 ) -> str:
     from evals.ab_runner import PROD_CONFIG
 
@@ -473,10 +594,12 @@ def build_markdown(
                 lines.append(f"- {s}")
             lines.append("")
 
+    lines += _abstention_section(abstention)
+
     worst = _worst_queries(retrieval)
     if worst:
         lines += [
-            "## 7. 失败案例（生产配置下 Recall@10 最低）",
+            "## 8. 失败案例（生产配置下 Recall@10 最低）",
             "",
             "| qid | 类别 | Recall@10 | 首个命中排名 | 库中相关 chunks |",
             "|---|---|---|---|---|",
@@ -514,6 +637,7 @@ def generate_report() -> Path:
         )
     generation = _load(GENERATION_RESULTS)
     holdout = _load(HOLDOUT_RESULTS)
+    abstention = _load(ABSTENTION_RESULTS)
     analysis = _load(ERROR_ANALYSIS_RESULTS)
 
     plt = _setup_matplotlib()
@@ -525,10 +649,13 @@ def generate_report() -> Path:
         plot_generation(plt, generation, REPORT_IMG_DIR / "generation.png")
     if holdout:
         plot_holdout(plt, holdout, REPORT_IMG_DIR / "holdout.png")
+    if abstention:
+        plot_abstention(plt, abstention, REPORT_IMG_DIR / "abstention.png")
     if analysis:
         plot_failure_modes(plt, analysis, REPORT_IMG_DIR / "failure_modes.png")
 
     REPORT_PATH.write_text(
-        build_markdown(retrieval, generation, holdout, analysis), encoding="utf-8"
+        build_markdown(retrieval, generation, holdout, analysis, abstention),
+        encoding="utf-8",
     )
     return REPORT_PATH
