@@ -68,6 +68,7 @@ function harness(fetchOverride, schedule = callback => queueMicrotask(callback))
         markNetworkOffline() { effects.offline++; },
         resetImportForm() { effects.resets++; },
         resetModelSettings() {},
+        memoryLoop: { reset() {} },
         invalidateImportConfig() {},
         logout() { effects.logouts++; },
         fetch: (url, options) => {
@@ -217,7 +218,8 @@ function chatStreamHarness() {
         }) } };
     }
     const context = vm.createContext({
-        TextDecoder, setTimeout, API: '/api', token: '', currentSlug: 'synthetic', currentName: '虚构镜像',
+        TextDecoder, setTimeout, AbortController, API: '/api', token: '', currentSlug: 'synthetic', currentName: '虚构镜像',
+        memoryLoop: { ready: true, capture: () => ({slug: 'synthetic', conversationId: 'web'}), isCurrent: () => true, track() {}, untrack() {}, decorate() {} },
         document: { createElement: node },
         $: id => id === 'chat-msgs' ? messages : { style: { display: 'none' } },
         chatBubble: (role, text) => {
@@ -229,6 +231,7 @@ function chatStreamHarness() {
         storeLastMessage() {}, showDesktopNotification() {},
     });
     vm.runInContext([
+        extractFunction('function authHeaders(', 'function safeStickerUrl('),
         extractFunction('async function parseChatStream(', 'function initTheme('),
         extractFunction('function noticeMsg(', 'function sysMsg('),
         extractFunction('async function sendVoiceMessage(', 'const CHAT_TIME_GAP'),

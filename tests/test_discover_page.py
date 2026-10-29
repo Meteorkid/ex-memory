@@ -134,10 +134,11 @@ def test_frontend_release_busts_cached_startup_script():
     html = (ROOT / "web/static/index.html").read_text(encoding="utf-8")
     service_worker = (ROOT / "web/static/sw.js").read_text(encoding="utf-8")
 
-    assert 'src="static/app.js?v=20261024-protocols"' in html
+    assert 'src="static/app.js?v=20261029-loop"' in html
+    assert 'src="static/memory-loop.js?v=20261029-loop"' in html
     assert 'src="static/model-settings.js?v=20261024-protocols"' in html
     assert 'src="static/wechat-helper.js?v=20260824c"' in html
-    assert "const CACHE_VERSION = 'v14'" in service_worker
+    assert "const CACHE_VERSION = 'v15'" in service_worker
 
 
 def test_frontend_request_dedup_cleanup_does_not_leak_rejections():

@@ -5,6 +5,8 @@
 """
 
 import json
+import fcntl
+import hashlib
 import logging
 from datetime import datetime
 from typing import Optional
@@ -24,6 +26,7 @@ def maybe_archive(
     embedder=None,
     threshold: int = ARCHIVE_THRESHOLD,
     owner: Optional[int] = None,
+    conversation_id: Optional[str] = None,
 ) -> bool:
     """检查未归档轮数，达到阈值则归档一次会话。
 
@@ -34,12 +37,15 @@ def maybe_archive(
     Returns:
         是否触发了归档
     """
+    if conversation_id is not None:
+        return _maybe_archive_conversation(slug, owner, conversation_id, threshold)
     store = mirror_store(slug, owner)
 
     def _claim(state: dict) -> Optional[dict]:
         from core.conversation_store import load_jsonl_messages
 
-        messages = load_jsonl_messages(slug, owner)
+        # 旧全局摘要只兼容网页记录，不能把新 IM 独立会话提升为共享人物记忆。
+        messages = load_jsonl_messages(slug, owner, conversation_id="web")
         total = len(messages)
         archived = int(state.get("archived_messages", 0))
         # 对话文件可能被留存策略清理而变短，重新对齐
@@ -54,9 +60,7 @@ def maybe_archive(
         return {"start": archived, "end": total, "turns": turns}
 
     try:
-        claim = store.locked_update_json(
-            f"sessions/{_STATE_FILENAME}", dict, _claim
-        )
+        claim = store.locked_update_json(f"sessions/{_STATE_FILENAME}", dict, _claim)
     except (OSError, ValueError, TimeoutError, json.JSONDecodeError) as e:
         logger.warning("会话归档认领失败 slug=%s: %s", slug, e)
         return False
@@ -66,7 +70,9 @@ def maybe_archive(
 
     from core.conversation_store import load_jsonl_messages
 
-    pending = load_jsonl_messages(slug, owner)[claim["start"] : claim["end"]]
+    pending = load_jsonl_messages(slug, owner, conversation_id="web")[
+        claim["start"] : claim["end"]
+    ]
     try:
         archive_session(
             slug,
@@ -253,3 +259,203 @@ def _insert_summary(content: str, marker: str, new_summary: str) -> str:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     addition = f"\n\n### 对话摘要 ({timestamp})\n{new_summary}\n"
     return content.replace(marker, addition + marker)
+
+
+def _conversation_directory(conversation_id: str) -> str:
+    from core.conversation_store import conversation_key
+
+    return f"sessions/conversations/{conversation_key(conversation_id)}"
+
+
+def _read_conversation_state(store, directory: str) -> dict:
+    rel = f"{directory}/state.json"
+    if not store.exists(rel):
+        return {}
+    state = store.read_json(rel)
+    if not isinstance(state, dict):
+        raise ValueError("会话归档状态无效")
+    return state
+
+
+def _pending_conversation_messages(messages: list[dict], state: dict) -> list[dict]:
+    last_id = state.get("last_message_id")
+    if last_id:
+        for index, message in enumerate(messages):
+            if message.get("id") == last_id:
+                return messages[index + 1 :]
+        # 留存清理可以删掉游标前的记录；锚点不在时不按旧下标跳过新消息。
+    return messages
+
+
+def _maybe_archive_conversation(
+    slug: str, owner: Optional[int], conversation_id: str, threshold: int
+) -> bool:
+    from core.conversation_store import load_jsonl_messages
+
+    if type(threshold) is not int or threshold < 1:
+        raise ValueError("归档轮数阈值无效")
+    directory = _conversation_directory(conversation_id)
+    store = mirror_store(slug, owner)
+    store.mkdir(directory)
+    # 慢调用期间也持有独立非阻塞锁；崩溃会由 OS 释放，无需猜测租约时长。
+    with open(store.path(f"{directory}/archive.lock"), "a+", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        try:
+            state = _read_conversation_state(store, directory)
+            batch_id = state.get("pending_batch")
+            if batch_id:
+                if not isinstance(batch_id, str) or not _valid_batch_id(batch_id):
+                    raise ValueError("归档批次标识无效")
+                batch = store.read_json(f"{directory}/{batch_id}.json")
+                pending = batch["messages"]
+            else:
+                messages = load_jsonl_messages(slug, owner, conversation_id)
+                pending = _pending_conversation_messages(messages, state)
+                if sum(m.get("role") == "user" for m in pending) < threshold:
+                    return False
+                # 每批最多二十轮，避免一次积压让早期内容被摘要窗口静默丢掉。
+                pending = pending[:40]
+                if pending and pending[-1].get("role") == "user":
+                    pending = pending[:-1]
+                if not pending:
+                    return False
+                encoded = json.dumps(pending, ensure_ascii=False, sort_keys=True)
+                batch_id = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+                batch = {
+                    "batch_id": batch_id,
+                    "conversation_id": conversation_id,
+                    "created_at": datetime.now().isoformat(),
+                    "kind": "generated_conversation",
+                    "messages": pending,
+                }
+                store.write_json(f"{directory}/{batch_id}.json", batch)
+                state.update(pending_batch=batch_id, batch_id=batch_id)
+            state.update(status="running", last_error="")
+            store.write_json(f"{directory}/state.json", state)
+            try:
+                summary_rel = f"{directory}/{batch_id}.summary.json"
+                if store.exists(summary_rel):
+                    summary_record = store.read_json(summary_rel)
+                    if (
+                        not isinstance(summary_record.get("text"), str)
+                        or not summary_record["text"].strip()
+                    ):
+                        raise ValueError("已保存摘要无效")
+                else:
+                    summary = _generate_conversation_summary(slug, owner, pending)
+                    summary_record = {
+                        "id": batch_id,
+                        "text": summary,
+                        "source": "session_summary",
+                        "kind": "generated_summary",
+                        "created_at": batch["created_at"],
+                        "conversation_id": conversation_id,
+                    }
+                    store.write_json(summary_rel, summary_record)
+                from core.memory_state import touch_memory
+
+                touch_memory(slug, owner)
+                completed = dict(state)
+                completed.update(
+                    status="complete",
+                    pending_batch=None,
+                    last_message_id=pending[-1]["id"],
+                    archived_messages=int(state.get("archived_messages", 0))
+                    + len(pending),
+                    updated_at=datetime.now().isoformat(),
+                    last_error="",
+                )
+                store.write_json(f"{directory}/state.json", completed)
+                return True
+            except Exception as exc:  # noqa: BLE001 — 留下原始批次，由下次请求重试
+                state.update(status="failed", last_error="摘要未完成，下次对话可重试")
+                store.write_json(f"{directory}/state.json", state)
+                logger.warning("会话摘要失败 slug=%s kind=%s", slug, type(exc).__name__)
+                return False
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def _valid_batch_id(value: str) -> bool:
+    return len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
+def _generate_conversation_summary(
+    slug: str, owner: Optional[int], messages: list[dict]
+) -> str:
+    from config import get_llm_config, get_llm_client
+
+    cfg = get_llm_config(owner) if owner is not None else get_llm_config()
+    if not cfg.get("api_key"):
+        raise ValueError("未配置摘要模型")
+    prompt = (_PROMPTS_DIR / "session_summary.md").read_text(encoding="utf-8")
+    prompt += (
+        "\n本材料是用户与记忆体的生成对话。AI 回复不是原始人物说过的话。"
+        "只为本会话保留话题与用户明确表达的信息，不把 AI 推测写成新增人物事实。"
+    )
+    history = "\n".join(
+        f"{'用户' if m['role'] == 'user' else 'AI生成回复'}: {m['content'][:1000]}"
+        for m in messages
+    )
+    client = get_llm_client(owner, cfg) if owner is not None else get_llm_client()
+    response = client.chat.completions.create(
+        model=cfg["model"],
+        temperature=0.3,
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": history},
+        ],
+    )
+    summary = response.choices[0].message.content
+    if not isinstance(summary, str) or not summary.strip() or len(summary) > 16000:
+        raise ValueError("摘要内容无效")
+    return summary.strip()
+
+
+def load_conversation_summaries(
+    slug: str, owner: Optional[int], conversation_id: str
+) -> list[dict]:
+    directory = _conversation_directory(conversation_id)
+    store = mirror_store(slug, owner)
+    records = []
+    for rel in store.list(directory, "*.summary.json"):
+        record = store.read_json(rel)
+        if (
+            isinstance(record, dict)
+            and record.get("conversation_id") == conversation_id
+            and isinstance(record.get("text"), str)
+            and record["text"].strip()
+        ):
+            records.append(record)
+    return sorted(
+        records, key=lambda item: (item.get("created_at", ""), item.get("id", ""))
+    )[-3:]
+
+
+def get_archive_status(
+    slug: str, owner: Optional[int], conversation_id: str = "web"
+) -> dict:
+    from core.conversation_store import load_jsonl_messages
+
+    directory = _conversation_directory(conversation_id)
+    store = mirror_store(slug, owner)
+    state = _read_conversation_state(store, directory)
+    pending = _pending_conversation_messages(
+        load_jsonl_messages(slug, owner, conversation_id), state
+    )
+    pending_turns = sum(message["role"] == "user" for message in pending)
+    status = state.get("status", "idle")
+    if pending_turns and status in ("idle", "complete"):
+        status = "pending"
+    return {
+        "status": status,
+        "pending_turns": pending_turns,
+        "archived_messages": int(state.get("archived_messages", 0)),
+        "last_error": state.get("last_error", ""),
+        "batch_id": state.get("batch_id"),
+    }

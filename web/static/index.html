@@ -11,7 +11,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
     <link rel="manifest" href="static/manifest.json">
     <link rel="apple-touch-icon" href="static/icon-192.svg">
-    <link rel="stylesheet" href="static/style.css?v=20261024-byok">
+    <link rel="stylesheet" href="static/style.css?v=20261029-loop">
     <link rel="stylesheet" href="static/wechat-helper.css?v=20260822b">
 </head>
 <body>
@@ -145,6 +145,13 @@
 
                 <!-- ═══ 聊天详情 ═══ -->
                 <div id="tab-chat-detail" class="tab-page" style="display:none">
+                    <div id="conversation-bar" class="conversation-bar" hidden>
+                        <label for="conversation-select">会话</label>
+                        <select id="conversation-select" aria-label="选择要继续的会话"></select>
+                        <button id="conversation-refresh" type="button">刷新</button>
+                        <button id="conversation-new" type="button">新会话</button>
+                        <p id="conversation-status" role="status" aria-live="polite"></p>
+                    </div>
                     <div class="chat-empty-hint" id="chat-empty-hint">
                         <div class="chat-empty-icon">💬</div>
                         <div class="chat-empty-text"><strong>还没有可对话的镜像</strong><span>导入记录 → 创建镜像，然后从左侧选择开始对话</span></div>
@@ -466,10 +473,27 @@
     </div>
 </div>
 
+<dialog id="correction-dialog" class="correction-dialog" aria-labelledby="correction-title">
+    <form id="correction-form">
+        <h2 id="correction-title">纠正这条回答</h2>
+        <p>写清希望记住的事实或表达习惯。保存后用于这个镜像的后续回答，包含其他会话。</p>
+        <blockquote id="correction-answer"></blockquote>
+        <blockquote id="correction-source" hidden></blockquote>
+        <label for="correction-content">纠正内容</label>
+        <textarea id="correction-content" maxlength="500" rows="4" required placeholder="例如：他不使用这个称呼，请直接叫我的名字。"></textarea>
+        <p id="correction-result" role="status" aria-live="polite"></p>
+        <div class="correction-actions">
+            <button id="correction-cancel" type="button">取消</button>
+            <button id="correction-save" type="submit">保存纠正</button>
+        </div>
+    </form>
+</dialog>
+
 <script src="static/effects.js"></script>
 <script src="static/import-flow.js?v=20261024-byok"></script>
 <script src="static/model-settings.js?v=20261024-protocols"></script>
-<script src="static/app.js?v=20261024-protocols"></script>
+<script src="static/memory-loop.js?v=20261029-loop"></script>
+<script src="static/app.js?v=20261029-loop"></script>
 <script src="static/wechat-helper.js?v=20260824c"></script>
 </body>
 </html>

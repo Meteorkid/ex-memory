@@ -113,7 +113,7 @@ class PgVectorStore:
             params.extend([key, str(value)])
 
         sql = f"""
-            SELECT display_text, document, metadata,
+            SELECT id, display_text, document, metadata,
                    1 - (embedding <=> ?::vector) AS score
             FROM memory_vectors
             WHERE {" AND ".join(conditions)}
@@ -130,6 +130,7 @@ class PgVectorStore:
                 metadata = json.loads(metadata)
             output.append(
                 {
+                    "id": row["id"],
                     "display_text": metadata.get("display_text")
                     or row["display_text"]
                     or row["document"],

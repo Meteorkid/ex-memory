@@ -26,6 +26,24 @@ class ChatRequest(BaseModel):
         default=None, description="贴纸 ID（发送贴纸消息时使用）"
     )
     history: list[dict] = Field(default_factory=list)
+    conversation_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+    )
+
+
+class CorrectionRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500)
+    conversation_id: str = Field(
+        default="web",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+    )
+    message_id: Optional[str] = Field(default=None, max_length=128)
+    source_ids: list[str] = Field(default_factory=list, max_length=16)
 
 
 class UpdateRequest(BaseModel):
@@ -82,6 +100,9 @@ class ChatResponse(BaseModel):
     reply: str
     stickers: list[str] = Field(default_factory=list, description="AI 选择的贴纸 ID")
     tokens: Optional[dict] = None
+    conversation_id: Optional[str] = None
+    message_id: Optional[str] = None
+    sources: list[dict] = Field(default_factory=list)
     # 平台身份的通知（当前只有危机干预）。存在时 reply 为空，
     # 前端必须按系统消息渲染，不能显示成镜像说的话。
     notice: Optional[dict] = Field(default=None, description="平台通知，如危机干预响应")

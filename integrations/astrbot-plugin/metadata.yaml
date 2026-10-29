@@ -1,0 +1,31 @@
+name: astrbot_plugin_exmemory
+display_name: ExMemory 记忆体
+desc: |
+  把 ex-memory 的记忆镜像接入 AstrBot，让你在 QQ、Telegram、飞书等聊天软件里
+  直接与记忆体对话。
+
+  本插件不含任何记忆逻辑，只做三件事：把当前会话绑定到某个记忆镜像、
+  把消息转交给 ex-memory 的 MCP Server、把回复发回聊天窗口。
+  记忆检索、人格、安全审核、计费全部由 ex-memory 侧负责。
+
+  使用前需要：安装 ex-memory、配置可信发送者白名单并签发一枚 MCP 令牌
+  （`python run.py "/mcp-token issue --label astrbot"`）。
+short_desc: 在聊天软件里与 ex-memory 记忆体对话
+version: 0.1.0
+author: Meteorkid
+repo: https://github.com/Meteorkid/ex-memory
+social_link: https://www.imagentx.top
+tags:
+  - 记忆
+  - 角色扮演
+  - RAG
+astrbot_version: ">=4.16,<5"
+support_platforms:
+  - telegram
+  - discord
+  - lark
+  - wecom
+  - aiocqhttp
+  - slack
+  - kook
+  - dingtalk

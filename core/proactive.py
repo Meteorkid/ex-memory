@@ -158,6 +158,25 @@ def _quiet_now(config: dict, now: datetime) -> bool:
     return hour >= start or hour < end  # 跨午夜
 
 
+def delivery_blocked_reason(
+    slug: str,
+    user_id: int,
+    *,
+    owner: Optional[int] = None,
+    now: Optional[datetime] = None,
+) -> Optional[str]:
+    """投递前重新检查：已排队的消息也必须遵守当前开关与免打扰。"""
+    blocked = health_blocks(user_id)
+    if blocked:
+        return blocked
+    config = get_config(slug, owner)
+    if not config["enabled"]:
+        return "主动消息已关闭"
+    if _quiet_now(config, now or datetime.now()):
+        return "当前处于免打扰时段"
+    return None
+
+
 def _sent_today(user_id: int, slug: str, now: datetime) -> int:
     """统计本地自然日内已排队的条数。
 
@@ -231,18 +250,20 @@ TRIGGER_PROMPTS = {
 }
 
 
-def compose(engine, trigger: str) -> str:
-    """让镜像自己生成主动消息。
-
-    走同一个引擎，所以人格、风格、时间感知全都一致——另写一套模板会让
-    主动消息一眼看出是系统发的。
-    """
+def compose_with_usage(engine, trigger: str) -> tuple[str, object]:
+    """生成主动消息并保留用量，让调用方执行审核与结算。"""
     instruction = TRIGGER_PROMPTS.get(trigger, TRIGGER_PROMPTS[TRIGGER_MORNING])
-    reply, _stickers, _usage = engine.chat(
+    reply, _stickers, usage = engine.chat(
         f"[系统提示：{instruction}只说一两句，像平时那样自然，不要解释你在做什么]",
         [],
     )
-    return reply.strip()
+    return reply.strip(), usage
+
+
+def compose(engine, trigger: str) -> str:
+    """保留既有 CLI 与任务处理器的字符串返回契约。"""
+    content, _usage = compose_with_usage(engine, trigger)
+    return content
 
 
 # ── 存取 ──
@@ -281,6 +302,22 @@ def pending_messages(user_id: int, slug: Optional[str] = None) -> list[dict]:
     with _get_conn() as conn:
         rows = conn.execute(sql, tuple(params)).fetchall()
     return [dict(r) for r in rows]
+
+
+def dismiss_message(message_id: int, user_id: int, slug: str) -> int:
+    """永久不可投递的消息退出待送队列，保留原文与记录，不伪装成已送达。"""
+    if type(message_id) is not int or message_id <= 0:
+        raise ValueError("message_id 必须是正整数")
+    from server.auth import _get_conn
+
+    with _get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE proactive_messages SET status = 'dismissed'"
+            " WHERE id = ? AND user_id = ? AND slug = ? AND status = 'pending'",
+            (message_id, user_id, slug),
+        )
+        conn.commit()
+    return cursor.rowcount
 
 
 def mark_delivered(message_ids: list[int], user_id: int) -> int:

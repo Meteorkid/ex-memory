@@ -15,6 +15,16 @@ let authEpoch = 0;
 let accountModelSettings = null;
 let modelSettingsOperation = 0;
 let modelSettingsBusy = false;
+const memoryLoop = window.ExMemoryMemoryLoop.create({
+    document, storage: localStorage, request: api,
+    identity: () => ({epoch: authEpoch, slug: currentSlug}),
+    renderMessages: renderStoredMessages,
+    setBusy: busy => {
+        $('msg-input').disabled = busy;
+        $('msg-send').disabled = busy;
+    },
+    notify: showToast,
+});
 
 // ═══════════════════════════════════════
 // 懒加载工具
@@ -299,94 +309,81 @@ function safeStickerUrl(url) {
     return '';
 }
 
-async function parseChatStream(res, msgsEl) {
+async function parseChatStream(res, msgsEl, view = memoryLoop.capture()) {
+    if (!memoryLoop.isCurrent(view)) { await res.body?.cancel?.(); return null; }
     if (res.status === 401) { logout(); return null; }
     if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        const detail = d.detail;
-        const msg = typeof detail === 'string' ? detail : '请求失败';
-        throw new Error(msg);
+        if (!memoryLoop.isCurrent(view)) return null;
+        throw new Error(typeof d.detail === 'string' ? d.detail : '请求失败');
     }
 
     const replyRow = chatBubble('assistant', '');
     msgsEl.appendChild(replyRow);
     const assistantDiv = replyRow.querySelector('.msg');
-
-    // 打字延迟：模拟真人打字节奏
-    const typeQueue = [];
-    let isTyping = false;
-    function typeNext() {
-        if (typeQueue.length === 0) { isTyping = false; return; }
-        isTyping = true;
-        const text = typeQueue.shift();
-        assistantDiv.textContent += text;
-        msgsEl.scrollTop = msgsEl.scrollHeight;
-        // 随机延迟 30-80ms，模拟打字节奏
-        const delay = 30 + Math.random() * 50;
-        setTimeout(typeNext, delay);
-    }
-    function queueType(text) {
-        typeQueue.push(text);
-        if (!isTyping) typeNext();
-    }
-
+    let answerRows = [replyRow];
+    let metadata = null;
+    let sources = [];
+    let blocked = false;
+    let completed = false;
+    let text = '';
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
     while (true) {
         const {done, value} = await reader.read();
+        if (!memoryLoop.isCurrent(view)) { await reader.cancel?.(); return null; }
         if (done) break;
         buffer += decoder.decode(value, {stream: true});
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
-
         for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
-            const d = line.slice(6);
-            if (d === '[DONE]') continue;
-            try {
-                const item = JSON.parse(d);
-                if (item.type === 'segments') {
-                    await renderSegments(msgsEl, replyRow, item.segments);
-                } else if (item.type === 'crisis' || item.type === 'blocked' || item.type === 'usage_limit') {
-                    replyRow.remove();
-                    msgsEl.appendChild(noticeMsg(item));
-                } else if (item.error) {
-                    assistantDiv.textContent = item.error;
-                    replyRow.className = 'msg-row sys';
-                } else if (item.type === 'text' && item.content) {
-                    queueType(item.content);
-                } else if (item.type === 'sticker' && item.id) {
-                    msgsEl.appendChild(stickerMsg(item.id));
-                } else if (item.type === 'red_packet') {
-                    msgsEl.appendChild(redPacketBubble(item));
-                } else if (item.type === 'transfer') {
-                    msgsEl.appendChild(transferBubble(item));
-                }
-            } catch (e) { /* skip malformed SSE */ }
+            const raw = line.slice(6);
+            if (raw === '[DONE]') { completed = true; continue; }
+            let item;
+            try { item = JSON.parse(raw); } catch (_) { continue; }
+            if (item.type === 'metadata') {
+                metadata = item;
+            } else if (item.type === 'sources') {
+                sources = item.sources || [];
+            } else if (item.type === 'segments') {
+                answerRows = await renderSegments(msgsEl, replyRow, item.segments, view);
+            } else if (item.type === 'crisis' || item.type === 'blocked' || item.type === 'usage_limit') {
+                blocked = true;
+                answerRows.forEach(row => row.remove());
+                msgsEl.appendChild(noticeMsg(item));
+            } else if (item.error) {
+                blocked = true;
+                answerRows.forEach(row => row.remove());
+                msgsEl.appendChild(sysMsg(item.error));
+            } else if (item.type === 'text' && item.content) {
+                text += item.content;
+                assistantDiv.textContent = text;
+            } else if (item.type === 'sticker' && item.id) {
+                msgsEl.appendChild(stickerMsg(item.id));
+            } else if (item.type === 'red_packet') {
+                msgsEl.appendChild(redPacketBubble(item));
+            } else if (item.type === 'transfer') {
+                msgsEl.appendChild(transferBubble(item));
+            }
+            if (!memoryLoop.isCurrent(view)) { await reader.cancel?.(); return null; }
         }
+        msgsEl.scrollTop = msgsEl.scrollHeight;
     }
-
-    // 等待打字队列完成
-    while (typeQueue.length > 0 || isTyping) {
-        await new Promise(r => setTimeout(r, 50));
-    }
-
-    if (!assistantDiv.textContent.trim() && replyRow.parentNode) {
-        replyRow.remove();
-        return null;
-    }
-    if (currentSlug) {
-        const text = assistantDiv.textContent.trim();
-        storeLastMessage(currentSlug, text);
-        // 桌面通知
-        showDesktopNotification(currentName || currentSlug, text.slice(0, 60), currentSlug);
-    }
-    return assistantDiv;
+    if (!memoryLoop.isCurrent(view)) return null;
+    if (!completed) throw new Error('回复未完整接收，请刷新会话查看已保存记录');
+    if (blocked) return null;
+    const finalRow = answerRows[answerRows.length - 1];
+    const finalDiv = finalRow?.querySelector('.msg');
+    if (!finalDiv?.textContent.trim()) { finalRow?.remove(); return null; }
+    memoryLoop.decorate(finalRow, metadata || {conversation_id: view.conversationId, sources}, view);
+    storeLastMessage(view.slug, text || finalDiv.textContent);
+    showDesktopNotification(currentName || view.slug, (text || finalDiv.textContent).slice(0, 60), view.slug);
+    return finalDiv;
 }
 
-// ── 主题管理 ──
 function initTheme() {
     const saved = localStorage.getItem('ex-memory-theme') || 'auto';
     applyTheme(saved);
@@ -974,6 +971,7 @@ async function api(method, path, body, retries = 2) {
 
 function resetSessionView() {
     authEpoch += 1;
+    memoryLoop.reset();
     pendingRequests.clear();
     messagePreviews.clear();
     resetImportForm();
@@ -1201,7 +1199,7 @@ function showConfirm(title, message, onConfirm, danger = false) {
 
 function showChatActions() {
     showActionSheet([
-        { label: '清空对话', onClick: () => { $('chat-msgs').innerHTML = ''; } },
+        { label: '新建会话', onClick: () => memoryLoop.newConversation() },
         { label: '删除镜像', danger: true, onClick: () => {
             showConfirm(
                 '删除镜像',
@@ -1343,6 +1341,25 @@ function initSearch() {
     });
 }
 
+function renderStoredMessages(messages, view) {
+    if (!memoryLoop.isCurrent(view)) return;
+    const msgsEl = $('chat-msgs');
+    msgsEl.innerHTML = '';
+    lastMsgTime = 0;
+    messages.forEach(message => {
+        const row = chatBubble(message.role, message.content);
+        row.dataset.timestamp = Date.parse(message.created_at) || Date.now();
+        msgsEl.appendChild(row);
+        if (message.role === 'assistant') {
+            memoryLoop.decorate(row, {
+                message_id: message.id, conversation_id: view.conversationId,
+                sources: message.sources || [],
+            }, view);
+        }
+    });
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
 function enterChat(slug, name) {
     currentSlug = slug;
     currentName = name;
@@ -1379,6 +1396,7 @@ function enterChat(slug, name) {
     // AI 生成内容标识随对话区一起显示（FR-021）
     const aiNotice = $('ai-notice');
     if (aiNotice) aiNotice.style.display = '';
+    memoryLoop.open(slug);
     setTimeout(() => $('msg-input').focus(), 300);
 }
 
@@ -1429,7 +1447,10 @@ function renderStickerGrid() {
 }
 
 async function sendStickerMessage(stickerId) {
-    if (!currentSlug) return;
+    if (!currentSlug || !memoryLoop.ready) return;
+    const view = memoryLoop.capture();
+    const controller = new AbortController();
+    memoryLoop.track(controller);
     const panel = $('sticker-panel');
     panel.style.display = 'none';
     $('chat-msgs').classList.remove('has-panel');
@@ -1465,19 +1486,23 @@ async function sendStickerMessage(stickerId) {
     msgsEl.appendChild(typingRow);
     msgsEl.scrollTop = msgsEl.scrollHeight;
 
-    const hist = buildHistory(msgsEl);
     try {
         const resp = await fetch(`${API}/chat/stream`, {
             method: 'POST',
             headers: authHeaders(),
-            body: JSON.stringify({ slug: currentSlug, message: '', sticker_id: stickerId, history: hist.slice(-50) }),
+            body: JSON.stringify({slug: view.slug, message: '', sticker_id: stickerId, conversation_id: view.conversationId}),
+            signal: controller.signal,
         });
+        if (!memoryLoop.isCurrent(view)) { await resp.body?.cancel?.(); return; }
         typingRow.remove();
-        await parseChatStream(resp, msgsEl);
+        await parseChatStream(resp, msgsEl, view);
     } catch(e) {
+        if (!memoryLoop.isCurrent(view)) return;
         typingRow.remove();
-        msgsEl.appendChild(chatBubble('assistant', '消息发送失败，请重试'));
+        msgsEl.appendChild(sysMsg('消息发送失败，请重试'));
         msgsEl.scrollTop = msgsEl.scrollHeight;
+    } finally {
+        memoryLoop.untrack(controller);
     }
 }
 
@@ -1537,7 +1562,10 @@ document.querySelectorAll('.sticker-tab').forEach(tab => {
 async function sendMessage() {
     const input = $('msg-input'), btn = $('msg-send');
     const msg = input.value.trim();
-    if (!msg || !currentSlug) return;
+    if (!msg || !currentSlug || !memoryLoop.ready) return;
+    const view = memoryLoop.capture();
+    const controller = new AbortController();
+    memoryLoop.track(controller);
 
     input.value = ''; input.disabled = true; btn.disabled = true;
     const msgsEl = $('chat-msgs');
@@ -1586,37 +1614,44 @@ async function sendMessage() {
         readStatus.textContent = '已送达';
     }, 1000);
 
-    // 构建历史
-    const hist = buildHistory(msgsEl);
 
     try {
         const res = await fetch(`${API}/chat/stream`, {
             method: 'POST',
             headers: authHeaders(),
-            body: JSON.stringify({slug: currentSlug, message: msg, history: hist.slice(-50)}),
+            body: JSON.stringify({slug: view.slug, message: msg, conversation_id: view.conversationId}),
+            signal: controller.signal,
         });
+
+        if (!memoryLoop.isCurrent(view)) { await res.body?.cancel?.(); return; }
 
         // 模拟对方"看到消息后思考"的延迟（1-3秒）
         await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
+        if (!memoryLoop.isCurrent(view)) { await res.body?.cancel?.(); return; }
         typingRow.remove();
         if (navTitle) navTitle.textContent = origTitle;
-        await parseChatStream(res, msgsEl);
+        const reply = await parseChatStream(res, msgsEl, view);
+        if (!memoryLoop.isCurrent(view)) return;
 
         // 更新已读状态
         readStatus.textContent = '已读';
         readStatus.classList.add('read');
 
         // 添加重新生成按钮到最后一条助手消息
-        addRegenerateButton(msgsEl);
+        if (reply) addRegenerateButton(msgsEl);
     } catch(e) {
+        if (!memoryLoop.isCurrent(view)) return;
         typingRow.remove();
         if (navTitle) navTitle.textContent = origTitle;
         msgsEl.appendChild(sysMsg(e.message));
+    } finally {
+        memoryLoop.untrack(controller);
+        if (memoryLoop.isCurrent(view)) {
+            input.disabled = false; btn.disabled = false;
+            input.focus();
+            msgsEl.scrollTop = msgsEl.scrollHeight;
+        }
     }
-
-    input.disabled = false; btn.disabled = false;
-    input.focus();
-    msgsEl.scrollTop = msgsEl.scrollHeight;
 }
 
 function noticeMsg(notice) {
@@ -2773,17 +2808,20 @@ $('create-file').addEventListener('change', () => {
 // 真实微信里人是连发多条短消息的：「在吗」「刚看到」「今天好累」。
 // 一整段完整的话反而最不像微信。服务端把断句位置和每条的延迟一起下发，
 // 这里按节奏逐条冒出来——永远秒回是最出戏的一点。
-async function renderSegments(msgsEl, streamedRow, segments) {
-    if (!segments || !segments.length) return;
-    // 流式已经把整段送过来了，先撤掉那个气泡再按条重放
+async function renderSegments(msgsEl, streamedRow, segments, view = memoryLoop.capture()) {
+    if (!segments || !segments.length) return [streamedRow];
     streamedRow.remove();
+    const rows = [];
     for (const seg of segments) {
         const delayMs = Math.min((seg.delay || 0.5) * 1000, 12000);
         await new Promise(r => setTimeout(r, delayMs));
+        if (!memoryLoop.isCurrent(view)) return rows;
         const row = chatBubble('assistant', seg.text);
         msgsEl.appendChild(row);
+        rows.push(row);
         msgsEl.scrollTop = msgsEl.scrollHeight;
     }
+    return rows;
 }
 
 // ═══════════════════════════════════════
@@ -3183,13 +3221,15 @@ function initVoiceToggle() {
     if (imageInput) {
         imageInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
-            if (!file || !currentSlug) return;
+            if (!file || !currentSlug || !memoryLoop.ready) return;
+            const view = memoryLoop.capture();
             const msgsEl = $('chat-msgs');
             if (!msgsEl) return;
 
             // 显示图片预览
             const reader = new FileReader();
             reader.onload = async (ev) => {
+                if (!memoryLoop.isCurrent(view)) return;
                 const row = document.createElement('div');
                 row.className = 'msg-row user';
                 row.dataset.timestamp = Date.now();
@@ -3209,9 +3249,12 @@ function initVoiceToggle() {
                     formData.append('file', file);
                     const resp = await fetch(`${API}/chat`, {
                         method: 'POST',
-                        headers: authHeaders(false),
-                        body: JSON.stringify({slug: currentSlug, message: '[图片]'}),
+                        headers: authHeaders(),
+                        body: JSON.stringify({slug: view.slug, message: '[图片]', conversation_id: view.conversationId}),
                     });
+                    if (!memoryLoop.isCurrent(view)) return;
+                    if (resp.status === 401) { logout(); return; }
+                    if (!resp.ok) throw new Error('图片消息发送失败');
                     readStatus.textContent = '已读';
                     readStatus.classList.add('read');
                 } catch(err) {
@@ -3243,6 +3286,10 @@ function voiceBubble(role, duration) {
 }
 
 async function sendVoiceMessage(duration, sttText) {
+    if (!currentSlug || !memoryLoop.ready) return;
+    const view = memoryLoop.capture();
+    const controller = new AbortController();
+    memoryLoop.track(controller);
     const msgsEl = $('chat-msgs');
     if ($('chat-empty-hint').style.display !== 'none') {
         $('chat-empty-hint').style.display = 'none';
@@ -3250,56 +3297,24 @@ async function sendVoiceMessage(duration, sttText) {
     }
     const typingRow = typingIndicator();
     msgsEl.appendChild(typingRow);
-    msgsEl.scrollTop = msgsEl.scrollHeight;
-
-    // 有 STT 结果则发送文字，否则发送语音标记
     const message = sttText ? sttText : `[语音消息 ${duration}秒]`;
-
     try {
-        const hist = buildHistory(msgsEl);
-        const headers = {'Content-Type': 'application/json'};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
         const res = await fetch(`${API}/chat/stream`, {
-            method: 'POST', headers,
-            body: JSON.stringify({slug: currentSlug, message, history: hist.slice(-50)}),
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({slug: view.slug, message, conversation_id: view.conversationId}),
+            signal: controller.signal,
         });
-        if (res.status === 401) { logout(); return; }
-
+        if (!memoryLoop.isCurrent(view)) { await res.body?.cancel?.(); return; }
         typingRow.remove();
-        const replyRow = chatBubble('assistant', '');
-        msgsEl.appendChild(replyRow);
-        const assistantDiv = replyRow.querySelector('.msg');
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        while (true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, {stream: true});
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const d = line.slice(6);
-                if (d === '[DONE]') continue;
-                try {
-                    const item = JSON.parse(d);
-                    if (item.type === 'segments') { await renderSegments(msgsEl, replyRow, item.segments); }
-                    else if (item.type === 'crisis' || item.type === 'blocked' || item.type === 'usage_limit') { replyRow.remove(); msgsEl.appendChild(noticeMsg(item)); }
-                    else if (item.error) { assistantDiv.textContent = item.error; replyRow.className = 'msg-row sys'; }
-                    else if (item.type === 'text' && item.content) { assistantDiv.textContent += item.content; }
-                    else if (item.type === 'sticker' && item.id) { msgsEl.appendChild(stickerMsg(item.id)); }
-                    else if (item.type === 'red_packet') { msgsEl.appendChild(redPacketBubble(item)); }
-                } catch(e) {}
-            }
-            msgsEl.scrollTop = msgsEl.scrollHeight;
-        }
-    } catch(e) {
+        await parseChatStream(res, msgsEl, view);
+    } catch (error) {
+        if (!memoryLoop.isCurrent(view)) return;
         typingRow.remove();
+        msgsEl.appendChild(sysMsg(error.message || '语音消息发送失败'));
+    } finally {
+        memoryLoop.untrack(controller);
+        if (memoryLoop.isCurrent(view)) msgsEl.scrollTop = msgsEl.scrollHeight;
     }
-    msgsEl.scrollTop = msgsEl.scrollHeight;
 }
 
 // ═══════════════════════════════════════

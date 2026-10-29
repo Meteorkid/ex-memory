@@ -3,6 +3,8 @@
 import re
 import json
 import logging
+import hashlib
+import math
 from datetime import datetime
 from types import SimpleNamespace
 from typing import Optional
@@ -20,6 +22,10 @@ from core.validation import estimate_tokens, sanitize_chat_history
 from core.sticker_selector import select_stickers, IMAGE_STICKERS
 
 logger = logging.getLogger("ex-memory")
+
+MAX_REFERENCE_COUNT = 8
+MAX_REFERENCE_TEXT_CHARS = 1500
+_CHAT_SOURCES = {"wechat", "qq", "telegram", "whatsapp", "imessage"}
 
 # 关系阶段语气指令
 STAGE_INSTRUCTIONS = {
@@ -52,6 +58,7 @@ def resolve_relationship_stage(meta: dict) -> str:
     stage = meta.get("stage") or meta.get("relationship_stage") or default
     return stage if stage in STAGE_INSTRUCTIONS else default
 
+
 # 关键词同义词/联想词扩展表（基于情感对话场景）
 KEYWORD_EXPANSIONS = {
     # 情感词扩展
@@ -77,9 +84,13 @@ KEYWORD_EXPANSIONS = {
 
 
 class ChatEngine:
-    def __init__(self, slug: str, vector_store=None, embedder=None, owner=None, model_config=None):
-        cfg = model_config if model_config is not None else (
-            get_llm_config(owner) if owner is not None else get_llm_config()
+    def __init__(
+        self, slug: str, vector_store=None, embedder=None, owner=None, model_config=None
+    ):
+        cfg = (
+            model_config
+            if model_config is not None
+            else (get_llm_config(owner) if owner is not None else get_llm_config())
         )
         self._llm_config = cfg
         # 客户端由 core.llm_router 统一持有：多供应商时每家一个连接池，
@@ -103,6 +114,8 @@ class ChatEngine:
 
         self.skill_content = ""
         self.session_summaries: list[str] = []
+        self._session_summary_files: list[str] = []
+        self._session_summary_kind = "generated_summary"
         self.corrections = ""
         self.relationship_stage = "dating"  # 默认热恋期
         self.source_grounded = False
@@ -126,14 +139,18 @@ class ChatEngine:
         )[:RECENT_SESSIONS]
         if summary_rels:
             self.session_summaries = [self._apply_decay(rel) for rel in summary_rels]
+            self._session_summary_files = summary_rels
+            self._session_summary_kind = "generated_summary"
         else:
             # 兼容旧归档（无摘要文件时直接读原始对话）
             raw_rels = sorted(
                 self.store.list("sessions", "session_*.md"), reverse=True
             )[:RECENT_SESSIONS]
-            self.session_summaries = [
-                self.store.read_text(rel) for rel in raw_rels
-            ]
+            self.session_summaries = [self.store.read_text(rel) for rel in raw_rels]
+            self._session_summary_files = raw_rels
+            self._session_summary_kind = (
+                "conversation_history" if raw_rels else "generated_summary"
+            )
 
         # 结构化纠正：有上限、同主题合并计数，不会无限增长（FR-070）
         try:
@@ -207,7 +224,147 @@ class ChatEngine:
             logger.debug("记忆衰减处理跳过: %s", e)
         return text
 
-    def _build_system_prompt(self, rag_results: Optional[list[dict]] = None) -> str:
+    def _reference(
+        self,
+        text: str,
+        *,
+        record_id="",
+        source="",
+        speaker="",
+        start_ts="",
+        end_ts="",
+        kind="unknown",
+        score=None,
+    ) -> dict:
+        from core.privacy import mask_sensitive
+
+        text = mask_sensitive(text.strip())
+        truncated = len(text) > MAX_REFERENCE_TEXT_CHARS
+        text = text[:MAX_REFERENCE_TEXT_CHARS]
+        labels = {
+            "source": source,
+            "speaker": speaker,
+            "start_ts": start_ts,
+            "end_ts": end_ts,
+        }
+        labels = {
+            key: value[:120] if isinstance(value, str) else ""
+            for key, value in labels.items()
+        }
+        identity = json.dumps(
+            [self.owner, self.slug, str(record_id)[:200], text, kind, labels],
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        return {
+            "id": "ref_" + hashlib.sha256(identity.encode()).hexdigest()[:24],
+            "text": text,
+            **labels,
+            "kind": kind,
+            "score": score,
+            "truncated": truncated,
+        }
+
+    def _retrieval_references(self, rag_results: list[dict]) -> list[dict]:
+        references = []
+        seen = set()
+        for result in rag_results:
+            if not isinstance(result, dict):
+                continue
+            text = result.get("display_text")
+            if not isinstance(text, str) or not text.strip():
+                continue
+            try:
+                score = float(result.get("score", 0))
+            except (TypeError, ValueError):
+                continue
+            if not math.isfinite(score) or score <= RAG_THRESHOLD:
+                continue
+            metadata = result.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            source = metadata.get("source", "")
+            source = source if isinstance(source, str) else ""
+            speaker = metadata.get("dominant_speaker", "")
+            if source == "session_summary" or speaker == "session":
+                kind = "generated_summary"
+            elif source in _CHAT_SOURCES:
+                kind = "imported_chat"
+            elif source == "oral" or speaker == "narrative":
+                kind = "narrative"
+            else:
+                kind = "unknown"
+            reference = self._reference(
+                text,
+                record_id=result.get("id", ""),
+                source=source,
+                speaker=speaker,
+                start_ts=metadata.get("start_ts", ""),
+                end_ts=metadata.get("end_ts", ""),
+                kind=kind,
+                score=max(0.0, min(1.0, score)),
+            )
+            if reference["id"] in seen:
+                continue
+            references.append(reference)
+            seen.add(reference["id"])
+            if len(references) == MAX_REFERENCE_COUNT:
+                break
+        return references
+
+    def _summary_references(self, conversation_id: Optional[str]) -> list[dict]:
+        references = []
+        if conversation_id is not None:
+            from core.session_archive import load_conversation_summaries
+
+            records = load_conversation_summaries(
+                self.slug, self.owner, conversation_id
+            )
+            for record in reversed(records):
+                text = record.get("text")
+                if isinstance(text, str) and text.strip():
+                    references.append(
+                        self._reference(
+                            text,
+                            record_id=record.get("id", ""),
+                            source="session_summary",
+                            start_ts=record.get("created_at", ""),
+                            kind="generated_summary",
+                        )
+                    )
+        if conversation_id in (None, "web"):
+            # 老归档属于网页默认会话，不能带入其它私聊或群聊。
+            files = self._session_summary_files
+            for index, text in enumerate(self.session_summaries):
+                if text.strip():
+                    references.append(
+                        self._reference(
+                            text,
+                            record_id=files[index] if index < len(files) else "",
+                            source=self._session_summary_kind,
+                            kind=self._session_summary_kind,
+                        )
+                    )
+        return references[:RECENT_SESSIONS]
+
+    def _conversation_skill(self, conversation_id: Optional[str]) -> str:
+        if conversation_id in (None, "web"):
+            return self.skill_content
+        before, marker, after = self.skill_content.partition("---\n\n## PART B")
+        # 旧自动摘要只追加在 PART A 末尾。保留原始人格与显式纠正，移除旧网页历史。
+        before = re.sub(
+            r"(?ms)\n*^### 对话摘要 \(\d{4}-\d{2}-\d{2} \d{2}:\d{2}\)\r?\n.*\Z",
+            "",
+            before,
+        )
+        return before + marker + after
+
+    def _build_system_prompt(
+        self,
+        rag_results: Optional[list[dict]] = None,
+        *,
+        conversation_id: Optional[str] = None,
+        sources_out: Optional[list] = None,
+    ) -> str:
         sticker_list = ", ".join(
             f"{sid}({s['label']})" for sid, s in IMAGE_STICKERS.items()
         )
@@ -228,15 +385,18 @@ class ChatEngine:
         )
 
         # Token 预算：仅截断 session 摘要副本
-        summaries = list(self.session_summaries)
+        summaries = self._summary_references(conversation_id)
+        retrieval = self._retrieval_references(rag_results or [])[
+            : MAX_REFERENCE_COUNT - len(summaries)
+        ]
         budget = int(LLM_MAX_CONTEXT_CHARS * 0.5)
 
-        def _assemble(sums: list[str]) -> str:
+        def _assemble(sums: list[dict]) -> str:
             # 顺序按「稳定在前、易变在后」排（FR-054 / D-18）。
             # 供应商的上下文缓存按前缀命中：时间感知块含分钟、RAG 每轮都变，
             # 夹在中间会把后面所有稳定内容一起挤出缓存。实测每轮 system
             # prompt 约 5691 tokens，稳定部分占大头，值得为它调顺序。
-            p = [self.skill_content]
+            p = [self._conversation_skill(conversation_id)]
 
             # 关系阶段决定整体语气基调（热恋/磨合/分手/治愈）
             stage_instruction = STAGE_INSTRUCTIONS.get(
@@ -246,8 +406,11 @@ class ChatEngine:
             p.append(f"\n---\n## 当前关系阶段（语气基调）\n{stage_instruction}\n")
             if sums:
                 p.append("\n---\n## 最近对话记忆\n")
+                p.append(
+                    "以下是过往人机对话的归档或模型摘要，不是目标人物的原始聊天证据。\n"
+                )
                 for i, summary in enumerate(sums, 1):
-                    p.append(f"### 第 {i} 次\n{summary}\n")
+                    p.append(f"### 第 {i} 次\n{summary['text']}\n")
             if self.corrections.strip():
                 p.append(self.corrections)
             # 时间线与跨会话状态：低频变化，放稳定区跟着前缀缓存走。
@@ -264,7 +427,9 @@ class ChatEngine:
             from core.persona_style import style_instructions
 
             if self.source_grounded and self.style_profile is None:
-                p.append("\n## 表达方式\n表达样本不足，使用简洁自然的语言，不自造口头禅或性格习惯。\n")
+                p.append(
+                    "\n## 表达方式\n表达样本不足，使用简洁自然的语言，不自造口头禅或性格习惯。\n"
+                )
             else:
                 p.append(style_instructions(self.style_profile))
             p.append(
@@ -275,32 +440,44 @@ class ChatEngine:
 
             # ↓ 以下每轮/每分钟变化，必须排在全部稳定内容之后
             p.append(time_context)
-            if self.last_seen_at:
+            if self.last_seen_at and conversation_id in (None, "web"):
                 from core.persona_style import relative_time_hint
 
                 hint = relative_time_hint(self.last_seen_at)
                 if hint:
                     p.append(f"距上次对话：{hint}\n")
-            if rag_results:
-                filtered = [r for r in rag_results if r.get("score", 0) > RAG_THRESHOLD]
-                if filtered:
-                    if self.source_grounded:
-                        p.append("\n---\n## 检索参考\n以下片段可能包含多位说话人，按标注辨认出处；仅将目标人物的原话用于表达参考。\n")
-                    else:
-                        p.append("\n---\n## 潜意识层 — ta 在类似场景下真实说过的话\n")
-                        p.append(
-                            "以下是从聊天记录中检索到的 ta 的原话，作为你回复的语气锚点：\n"
-                        )
-                    for r in filtered:
-                        p.append(f"- {r.get('display_text', '')}")
-                    p.append("\n请以这些原话的语气、标点习惯、断句方式为参考来回复。\n")
+            if retrieval:
+                if self.source_grounded:
+                    p.append(
+                        "\n---\n## 检索参考\n以下片段可能包含多位说话人，按标注辨认出处；仅将目标人物的原话用于表达参考。\n"
+                    )
+                else:
+                    p.append("\n---\n## 潜意识层 — 检索参考\n")
+                    p.append(
+                        "以下是检索参考，请按类型区分材料；仅将导入聊天中的目标人物原话作为表达参考：\n"
+                    )
+                for reference in retrieval:
+                    label = {
+                        "imported_chat": "导入聊天片段",
+                        "generated_summary": "模型生成摘要（非真人原话）",
+                        "narrative": "口述材料",
+                        "unknown": "来源类型未知的片段",
+                    }[reference["kind"]]
+                    p.append(f"- [{label}] {reference['text']}")
+                p.append(
+                    "\n仅以目标人物原话的语气、标点习惯和断句方式作为表达参考；"
+                    "生成摘要与口述材料不能冒充真人原话。\n"
+                )
             return "\n".join(p)
 
         while len(summaries) > 1 and estimate_tokens(_assemble(summaries)) > budget:
             logger.warning("System prompt 过大，截断 session 摘要")
             summaries = summaries[:-1]  # 保留最新的，从最旧的开始删
 
-        return _assemble(summaries)
+        prompt = _assemble(summaries)
+        if sources_out is not None:
+            sources_out.extend(dict(reference) for reference in summaries + retrieval)
+        return prompt
 
     def _is_rag_degraded(self) -> bool:
         """连续 3 次失败后进入降级模式。"""
@@ -361,20 +538,32 @@ class ChatEngine:
                 model=model, messages=messages, stream=False, **kwargs
             )
 
-        router = get_router(self.owner, self._llm_config) if self.owner is not None else get_router()
+        router = (
+            get_router(self.owner, self._llm_config)
+            if self.owner is not None
+            else get_router()
+        )
         response, provider = router.call(invoke, **self._sampling_kwargs())
         self.last_provider = provider.name
         return response
 
     def _prepare_messages(self, user_input: str, history: list[dict]) -> list[dict]:
         """构建完整的消息列表（system + history + user）。"""
+        return self._prepare_turn(user_input, history)[0]
+
+    def _prepare_turn(self, user_input: str, history: list[dict], conversation_id=None):
         rag_results = self._rag_search(user_input)
-        system_prompt = self._build_system_prompt(rag_results)
+        sources: list[dict] = []
+        system_prompt = self._build_system_prompt(
+            rag_results,
+            conversation_id=conversation_id,
+            sources_out=sources,
+        )
         history = self._fit_history_to_budget(system_prompt, user_input, history)
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(history)
         messages.append({"role": "user", "content": user_input})
-        return messages
+        return messages, sources
 
     @staticmethod
     def _fit_history_to_budget(
@@ -444,7 +633,12 @@ class ChatEngine:
     def chat(
         self, user_input: str, history: list[dict]
     ) -> tuple[str, list[str], object]:
-        messages = self._prepare_messages(user_input, history)
+        return self.chat_with_sources(user_input, history)[:3]
+
+    def chat_with_sources(
+        self, user_input: str, history: list[dict], conversation_id=None
+    ):
+        messages, sources = self._prepare_turn(user_input, history, conversation_id)
 
         response = self._call_api(messages)
         reply = response.choices[0].message.content or ""
@@ -457,7 +651,7 @@ class ChatEngine:
             if sid not in seen:
                 seen.add(sid)
                 all_stickers.append(sid)
-        return reply, all_stickers, response.usage
+        return reply, all_stickers, response.usage, sources
 
     def _call_stream(self, messages):
         """流式同样经路由。"""
@@ -473,14 +667,35 @@ class ChatEngine:
                 **kwargs,
             )
 
-        router = get_router(self.owner, self._llm_config) if self.owner is not None else get_router()
+        router = (
+            get_router(self.owner, self._llm_config)
+            if self.owner is not None
+            else get_router()
+        )
         stream, provider = router.call(invoke, **self._sampling_kwargs())
         self.last_provider = provider.name
         return stream
 
     def chat_stream(self, user_input: str, history: list[dict]):
         """流式对话，yield dict: {type: text|sticker|usage|red_packet, content/id: ...}"""
-        messages = self._prepare_messages(user_input, history)
+        yield from self._chat_stream(user_input, history)
+
+    def chat_stream_with_sources(
+        self, user_input: str, history: list[dict], conversation_id=None
+    ):
+        yield from self._chat_stream(
+            user_input, history, conversation_id, include_sources=True
+        )
+
+    def _chat_stream(
+        self,
+        user_input: str,
+        history: list[dict],
+        conversation_id=None,
+        *,
+        include_sources=False,
+    ):
+        messages, sources = self._prepare_turn(user_input, history, conversation_id)
 
         full_reply = ""
         stream_usage = None
@@ -537,3 +752,5 @@ class ChatEngine:
             "prompt_tokens": getattr(stream_usage, "prompt_tokens", 0) or 0,
             "completion_tokens": getattr(stream_usage, "completion_tokens", 0) or 0,
         }
+        if include_sources:
+            yield {"type": "sources", "sources": sources}

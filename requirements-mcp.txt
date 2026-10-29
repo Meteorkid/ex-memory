@@ -1,0 +1,9 @@
+# MCP 接入的可选依赖。
+#
+# 单独一份文件的理由：MCP 只是一个入口，不用它的人不该被迫装上一整套
+# MCP SDK 及其传递依赖（typer / rich / websockets 等）。
+#
+# 上限锁在 2.0 之前：mcp 2.x 把 FastMCP 改名为 MCPServer 并调整了大量 API，
+# 属于破坏性升级，升级前需要先改 mcp_server/server.py 的导入与调用方式。
+-r requirements.txt
+mcp>=1.10,<2

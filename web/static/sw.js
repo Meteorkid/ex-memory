@@ -1,6 +1,6 @@
 /* ex-memory PWA Service Worker — 优化版 */
 
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const CACHE_NAME = `ex-memory-${CACHE_VERSION}`;
 const API_CACHE_NAME = `ex-memory-api-${CACHE_VERSION}`;
 const IMAGE_CACHE_NAME = `ex-memory-images-${CACHE_VERSION}`;
@@ -10,6 +10,7 @@ const CRITICAL_FILES = [
     '/',
     '/static/style.css',
     '/static/app.js',
+    '/static/memory-loop.js',
     '/static/effects.js',
     '/static/wechat-helper.css',
     '/static/wechat-helper.js',
@@ -73,6 +74,15 @@ self.addEventListener('fetch', event => {
 
     // 只处理 GET 请求
     if (event.request.method !== 'GET') return;
+
+    // 会话和纠正属于当前账号，不能用 CacheStorage 回放另一个登录状态的数据。
+    if (/\/api\/exes\/[^/]+\/(conversations|corrections)(\/|$)/.test(url.pathname)) {
+        event.respondWith(fetch(event.request, {cache: 'no-store'}).catch(() => new Response(
+            JSON.stringify({detail: '当前离线，请联网后重新读取会话'}),
+            {status: 503, headers: {'Content-Type': 'application/json', 'Cache-Control': 'no-store'}}
+        )));
+        return;
+    }
 
     // API 请求：Network-First，离线回退缓存
     if (url.pathname.startsWith('/api/')) {

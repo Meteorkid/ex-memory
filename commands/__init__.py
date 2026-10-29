@@ -32,4 +32,5 @@ from commands import (  # noqa: E402,F401
     grant_admin,
     backup_platform,
     proactive_tick,
+    mcp,
 )

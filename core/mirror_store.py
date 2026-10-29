@@ -221,18 +221,24 @@ class MirrorStore:
 
     def write_text(self, rel: str, content: str, encoding: str = "utf-8") -> None:
         self._backend.write_text(rel, content, encoding=encoding)
+        self._memory_changed(rel)
 
     def write_bytes(self, rel: str, data: bytes) -> None:
         self._backend.write_bytes(rel, data)
+        self._memory_changed(rel)
 
     def read_json(self, rel: str) -> Any:
         return self._backend.read_json(rel)
 
     def write_json(self, rel: str, data: Any) -> None:
         self._backend.write_json(rel, data)
+        self._memory_changed(rel)
 
     def append_jsonl(self, rel: str, records: list[dict]) -> int:
-        return self._backend.append_jsonl(rel, records)
+        count = self._backend.append_jsonl(rel, records)
+        if count:
+            self._memory_changed(rel)
+        return count
 
     def locked_update_text(
         self,
@@ -241,12 +247,16 @@ class MirrorStore:
         encoding: str = "utf-8",
         default_text: str = "",
     ) -> str:
-        return self._backend.locked_update_text(rel, updater, encoding, default_text)
+        result = self._backend.locked_update_text(rel, updater, encoding, default_text)
+        self._memory_changed(rel)
+        return result
 
     def locked_update_json(
         self, rel: str, default: Any, updater: Callable[[Any], Any]
     ) -> Any:
-        return self._backend.locked_update_json(rel, default, updater)
+        result = self._backend.locked_update_json(rel, default, updater)
+        self._memory_changed(rel)
+        return result
 
     def exists(self, rel: str) -> bool:
         return self._backend.exists(rel)
@@ -258,7 +268,19 @@ class MirrorStore:
         return self._backend.list(rel, pattern)
 
     def unlink(self, rel: str) -> None:
+        existed = self._backend.exists(rel)
         self._backend.unlink(rel)
+        if existed:
+            self._memory_changed(rel)
+
+    def _memory_changed(self, rel: str) -> None:
+        from core.memory_state import STATE_FILE, is_memory_file, advance_memory_state
+
+        if not is_memory_file(rel):
+            return
+
+        # 数据文件锁已释放后才拿版本锁；直接到后端，避免版本写入再次通知。
+        self._backend.locked_update_json(STATE_FILE, dict, advance_memory_state)
 
     def path(self, rel: str) -> Path:
         """返回镜像内安全 Path，供无法抽象的高级操作（版本备份、chroma、快照）使用。"""

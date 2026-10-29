@@ -5,7 +5,7 @@ chromadb==1.5.9
 python-dotenv==1.1.1
 prompt_toolkit==3.0.52
 fastapi==0.128.8
-uvicorn==0.24.0
+uvicorn==0.54.0
 pydantic==2.13.4
 pydantic_core==2.46.4
 gradio==4.44.1

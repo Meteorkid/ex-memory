@@ -21,11 +21,11 @@ from fastapi import (
     Request,
     Query,
 )
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from config import PROJECT_DIR, resolve_ex_dir, DISABLE_REGISTRATION
-from core.validation import validate_slug, validate_user_input, sanitize_chat_history
+from core.validation import validate_slug, validate_user_input
 from core.mirror_store import mirror_store
 from core.exe_access import assert_exe_access, set_owner_user_id, iter_accessible_exes
 from core.path_safety import safe_filename
@@ -49,6 +49,7 @@ from server.models import (
     BackupRequest,
     ChatRequest,
     ChatResponse,
+    CorrectionRequest,
     CreateRequest,
     DeleteRequest,
     ExeInfo,
@@ -229,11 +230,17 @@ def _get_engine(slug: str, user_id: int):
     """按账号、镜像与最新配置版本缓存，换 Key 后不会继续命中旧客户端。"""
     from core.factory import create_engine_and_store
     from server.model_settings import ModelSettingsError, get_settings_revision
+    from core.memory_state import get_memory_signature
 
     _check_exe_ready(slug, user_id)
     try:
         return _engine_cache.get_or_create(
-            (user_id, slug, get_settings_revision(user_id)),
+            (
+                user_id,
+                slug,
+                get_settings_revision(user_id),
+                get_memory_signature(slug, user_id),
+            ),
             lambda: create_engine_and_store(slug, owner=user_id)[0],
         )
     except ModelSettingsError as error:
@@ -255,8 +262,13 @@ def _check_exe_ready(slug: str, user_id: int) -> None:
     store = mirror_store(slug, user_id)
     if store.exists("meta.json"):
         meta = store.read_json("meta.json")
-        if meta.get("creation_source") == "chat_import" and meta.get("pipeline_state") != "completed":
-            raise HTTPException(status_code=409, detail="镜像尚未就绪，请先完成聊天记录导入与生成")
+        if (
+            meta.get("creation_source") == "chat_import"
+            and meta.get("pipeline_state") != "completed"
+        ):
+            raise HTTPException(
+                status_code=409, detail="镜像尚未就绪，请先完成聊天记录导入与生成"
+            )
 
 
 def _check_exe_access(slug: str, user_id: int) -> str:
@@ -311,34 +323,54 @@ def _persist_stream_turn(
     message: str,
     full_reply: str,
     stickers: list[str],
-) -> None:
+    conversation_id: str = "web",
+    sources: Optional[list[dict]] = None,
+) -> Optional[str]:
     """流式对话落库，口径与 /chat 一致：剥离贴纸标签、source=web。
 
     持久化失败只记日志，不影响响应；无正文时不落库。
     """
     if not full_reply.strip():
-        return
+        return None
     from core.conversation_store import append_turn
     from core.engine import ChatEngine
 
     clean_reply, inline_stickers = ChatEngine._extract_sticker_tags(full_reply)
     merged = list(dict.fromkeys(inline_stickers + stickers))
     try:
-        append_turn(slug, user_id, message, clean_reply, stickers=merged, source="web")
+        return append_turn(
+            slug,
+            user_id,
+            message,
+            clean_reply,
+            stickers=merged,
+            source="web",
+            conversation_id=conversation_id,
+            sources=sources,
+        )
     except (OSError, ValueError) as e:
         # 持久化失败不影响本次回复，但会造成搜索/统计缺数据
         logger.warning("流式对话持久化失败 slug=%s: %s", slug, e)
+        return None
 
 
 def _run_session_archive(
-    slug: str, vector_store, embedder, owner: Optional[int] = None
+    slug: str,
+    vector_store,
+    embedder,
+    owner: Optional[int] = None,
+    conversation_id: Optional[str] = None,
 ) -> None:
     """后台任务：累计轮数达到阈值时归档会话并生成 LLM 摘要。"""
     from core.session_archive import maybe_archive
 
     try:
         if maybe_archive(
-            slug, vector_store=vector_store, embedder=embedder, owner=owner
+            slug,
+            vector_store=vector_store,
+            embedder=embedder,
+            owner=owner,
+            conversation_id=conversation_id,
         ):
             # 摘要写入了 sessions/ 与 SKILL.md，缓存引擎需要重建才会带上记忆层
             _invalidate_engine(slug)
@@ -535,10 +567,13 @@ def create_exe(req: CreateRequest, user_id: int = Depends(require_auth)):
         raise HTTPException(
             status_code=500, detail="镜像创建成功但归属绑定失败，请联系管理员"
         )
-    return StatusResponse(message=(
-        f"镜像 [{slug}] 草稿已保存，请导入聊天记录"
-        if req.defer_generation else f"镜像 [{slug}] 创建成功"
-    ))
+    return StatusResponse(
+        message=(
+            f"镜像 [{slug}] 草稿已保存，请导入聊天记录"
+            if req.defer_generation
+            else f"镜像 [{slug}] 创建成功"
+        )
+    )
 
 
 @router.post("/exes/{slug}/resume", response_model=StatusResponse)
@@ -605,7 +640,8 @@ def get_import_config(user_id: int = Depends(require_auth)):
         "max_upload_bytes": MAX_UPLOAD_SIZE,
         "third_party_data_policy_version": config.THIRD_PARTY_DATA_POLICY_VERSION,
         "llm_configured": settings["llm"]["has_key"] and settings["storage_available"],
-        "embedding_configured": settings["embedding"]["has_key"] and settings["storage_available"],
+        "embedding_configured": settings["embedding"]["has_key"]
+        and settings["storage_available"],
     }
 
 
@@ -649,16 +685,22 @@ def import_data(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     if Path(safe_name).suffix.lower() not in IMPORT_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="不支持此格式，请上传 JSON、JSONL、TXT 或 QQ MHT 文件")
+        raise HTTPException(
+            status_code=400,
+            detail="不支持此格式，请上传 JSON、JSONL、TXT 或 QQ MHT 文件",
+        )
     from core.tasks import list_tasks
     from server.task_handlers import TASK_IMPORT
 
     if any(
-        task["slug"] == slug and task["task_type"] == TASK_IMPORT
+        task["slug"] == slug
+        and task["task_type"] == TASK_IMPORT
         and task["status"] in ("queued", "running")
         for task in list_tasks(user_id, 100)
     ):
-        raise HTTPException(status_code=409, detail="该镜像正在导入或生成，请等待当前任务完成")
+        raise HTTPException(
+            status_code=409, detail="该镜像正在导入或生成，请等待当前任务完成"
+        )
 
     # 落到暂存区而不是请求级临时目录：请求返回后 worker 还要读它。
     # 任务处理器读完即删——原始聊天记录是最敏感的那份数据。
@@ -677,7 +719,9 @@ def import_data(
 
     if uploaded_bytes == 0:
         shutil.rmtree(staging, ignore_errors=True)
-        raise HTTPException(status_code=400, detail="文件为空，请选择包含聊天消息的文件")
+        raise HTTPException(
+            status_code=400, detail="文件为空，请选择包含聊天消息的文件"
+        )
 
     try:
         _require_model_settings(user_id, embedding=True)
@@ -893,8 +937,7 @@ def reset_usage(slug: str, user_id: int = Depends(require_auth)):
 # --- 对话 ---
 
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat(
+async def _chat_unlocked(
     req: ChatRequest,
     background_tasks: BackgroundTasks,
     user_id: int = Depends(require_auth),
@@ -921,7 +964,9 @@ async def chat(
     if not message:
         raise HTTPException(status_code=400, detail="消息不能为空")
 
-    history = sanitize_chat_history(req.history)
+    from core.memory_loop import request_history
+
+    history = request_history(slug, user_id, req.history, req.conversation_id)
 
     # 🔴 安全闸门必须在这里：构建人格 prompt、检索 RAG、调用 LLM 之前。
     # 命中危机时直接返回，绝不进入人格模拟——「前任」的回应恰恰可能是
@@ -951,11 +996,16 @@ async def chat(
         return ChatResponse(reply="", stickers=[], tokens=None, notice=e.notice)
 
     try:
-        reply, stickers, usage = await run_in_threadpool(engine.chat, message, history)
+        from core.memory_loop import chat_with_sources
+
+        reply, stickers, usage, sources = await run_in_threadpool(
+            chat_with_sources, engine, message, history, req.conversation_id
+        )
 
         # 违规输出既不下发也不落库
         blocked_output = check_output(user_id, slug, reply)
         if blocked_output is not None:
+            release(account_id)
             return ChatResponse(
                 reply="", stickers=[], tokens=None, notice=blocked_output
             )
@@ -977,23 +1027,36 @@ async def chat(
                     "completion_tokens": counter.total_completion_tokens,
                     "turns": counter.session_turns,
                 }
-        # 持久化对话（供搜索/统计使用）
+        from core.persona_style import split_reply
+
+        reply = "\n".join(split_reply(reply, getattr(engine, "style_profile", None)))
+        turn_id = None
+        # 先保存回答与来源快照，再允许客户端引用并纠正。
         try:
             from core.conversation_store import append_turn
 
-            append_turn(slug, user_id, message, reply, stickers=stickers, source="web")
+            turn_id = append_turn(
+                slug,
+                user_id,
+                message,
+                reply,
+                stickers=stickers,
+                source="web",
+                conversation_id=req.conversation_id or "web",
+                sources=sources,
+            )
         except (OSError, ValueError) as e:
             # 持久化失败不影响本次回复，但会造成搜索/统计缺数据
             logger.warning("对话持久化失败 slug=%s: %s", slug, e)
         # 满阈值时会话归档（含 LLM 摘要），放后台执行不阻塞响应
         background_tasks.add_task(
-            _run_session_archive, slug, engine.vector_store, engine.embedder, user_id
+            _run_session_archive,
+            slug,
+            engine.vector_store,
+            engine.embedder,
+            user_id,
+            req.conversation_id,
         )
-
-        from core.persona_style import split_reply
-
-        segments = split_reply(reply, getattr(engine, "style_profile", None))
-        reply = "\n".join(segments)
 
         settle(
             account_id,
@@ -1003,15 +1066,21 @@ async def chat(
             provider=getattr(engine, "last_provider", ""),
             model=getattr(engine, "model", ""),
         )
-        return ChatResponse(reply=reply, stickers=stickers, tokens=token_info)
+        return ChatResponse(
+            reply=reply,
+            stickers=stickers,
+            tokens=token_info,
+            conversation_id=req.conversation_id or "web",
+            message_id=f"{turn_id}-assistant" if turn_id else None,
+            sources=sources if turn_id else [],
+        )
     except Exception as e:
         release(account_id)
         logger.error("对话失败: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=_INTERNAL_ERROR)
 
 
-@router.post("/chat/stream")
-async def chat_stream(
+async def _chat_stream_unlocked(
     req: ChatRequest,
     background_tasks: BackgroundTasks,
     user_id: int = Depends(require_auth),
@@ -1038,7 +1107,9 @@ async def chat_stream(
     if not message:
         raise HTTPException(status_code=400, detail="消息不能为空")
 
-    history = sanitize_chat_history(req.history)
+    from core.memory_loop import request_history
+
+    history = request_history(slug, user_id, req.history, req.conversation_id)
 
     # 🔴 与 /chat 同一道闸门，且同样在进入 generate()、拿 engine 之前。
     # 两条路径必须都接——M-1 的教训就是流式漏了落库，整个功能形同虚设。
@@ -1088,9 +1159,18 @@ async def chat_stream(
         full_reply = ""
         collected_stickers: list[str] = []
         stream_usage: Optional[dict] = None
+        sources: list[dict] = []
+        settled = False
         try:
             released = 0  # 已下发字符数
-            for item in engine.chat_stream(message, history):
+            from core.memory_loop import stream_with_sources
+
+            for item in stream_with_sources(
+                engine, message, history, req.conversation_id
+            ):
+                if item.get("type") == "sources":
+                    sources = item.get("sources") or []
+                    continue
                 if item.get("type") == "text":
                     full_reply += item.get("content", "")
                     hit = check_output_streaming(user_id, slug, full_reply)
@@ -1170,6 +1250,7 @@ async def chat_stream(
                 provider=str(getattr(engine, "last_provider", "") or ""),
                 model=str(getattr(engine, "model", "") or ""),
             )
+            settled = True
             if stream_usage is not None:
                 usage_obj = SimpleNamespace(
                     prompt_tokens=int(stream_usage.get("prompt_tokens") or 0),
@@ -1179,23 +1260,56 @@ async def chat_stream(
                 with _counter_lock:
                     counter.update(usage_obj)
 
+            if req.conversation_id is not None:
+                turn_id = _persist_stream_turn(
+                    slug,
+                    user_id,
+                    message,
+                    full_reply,
+                    collected_stickers,
+                    req.conversation_id,
+                    sources,
+                )
+                metadata = {
+                    "type": "metadata",
+                    "conversation_id": req.conversation_id,
+                    "message_id": f"{turn_id}-assistant" if turn_id else None,
+                    "sources": sources if turn_id else [],
+                }
+                yield f"data: {json.dumps(metadata)}\n\n"
+                if turn_id:
+                    background_tasks.add_task(
+                        _run_session_archive,
+                        slug,
+                        engine.vector_store,
+                        engine.embedder,
+                        user_id,
+                        req.conversation_id,
+                    )
             yield "data: [DONE]\n\n"
         except IncompleteModelResponse as error:
             full_reply = ""
             collected_stickers.clear()
-            release(account_id)
             logger.warning("模型未正常完成流式回复，已丢弃本轮内容")
             yield f"data: {json.dumps({'error': str(error)})}\n\n"
         except Exception as e:
-            release(account_id)
             logger.error("流式对话失败: %s", e, exc_info=True)
             yield f"data: {json.dumps({'error': _INTERNAL_ERROR})}\n\n"
         finally:
+            if not settled:
+                release(account_id)
             # 正常结束、一般异常和客户端中断保留已生成文本；
             # 可信协议异常已清空内容，不把被拒绝或不完整的回复写入记忆。
             # 注意 finally 里禁止 yield（GeneratorExit 期间 yield 会直接报错）
-            _persist_stream_turn(slug, user_id, message, full_reply, collected_stickers)
-            if engine is not None and full_reply.strip():
+            if req.conversation_id is None:
+                _persist_stream_turn(
+                    slug, user_id, message, full_reply, collected_stickers
+                )
+            if (
+                req.conversation_id is None
+                and engine is not None
+                and full_reply.strip()
+            ):
                 # 满阈值时会话归档（含 LLM 摘要），放后台执行不阻塞流式响应
                 background_tasks.add_task(
                     _run_session_archive,
@@ -1206,6 +1320,135 @@ async def chat_stream(
                 )
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+def _private_json(body):
+    return JSONResponse(body, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/exes/{slug}/conversations")
+def list_memory_conversations(slug: str, user_id: int = Depends(require_auth)):
+    slug = _check_exe_access(slug, user_id)
+    from core.memory_loop import conversation_list
+
+    return _private_json(conversation_list(slug, user_id))
+
+
+@router.get("/exes/{slug}/conversations/{conversation_id}/messages")
+def read_memory_conversation(
+    slug: str, conversation_id: str, user_id: int = Depends(require_auth)
+):
+    slug = _check_exe_access(slug, user_id)
+    from core.memory_loop import conversation_messages
+
+    try:
+        return _private_json(conversation_messages(slug, user_id, conversation_id))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from None
+
+
+@router.get("/exes/{slug}/corrections")
+def read_memory_corrections(slug: str, user_id: int = Depends(require_auth)):
+    slug = _check_exe_access(slug, user_id)
+    from core.corrections import load
+    from core.memory_state import get_memory_revision
+
+    return _private_json(
+        {
+            "corrections": load(slug, user_id),
+            "revision": get_memory_revision(slug, user_id),
+        }
+    )
+
+
+@router.post("/exes/{slug}/corrections")
+def write_memory_correction(
+    slug: str, req: CorrectionRequest, user_id: int = Depends(require_auth)
+):
+    slug = _check_exe_access(slug, user_id)
+    from core.memory_loop import save_correction
+
+    try:
+        result = save_correction(
+            slug,
+            user_id,
+            req.content,
+            req.conversation_id,
+            req.message_id,
+            req.source_ids,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from None
+    _invalidate_engine(slug)
+    return _private_json(result)
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat(
+    req: ChatRequest,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(require_auth),
+):
+    if req.conversation_id is None:
+        return await _chat_unlocked(req, background_tasks, user_id)
+    slug = _check_exe_access(req.slug, user_id)
+    from core.conversation_store import conversation_request_lock
+
+    try:
+        with conversation_request_lock(slug, user_id, req.conversation_id):
+            return await _chat_unlocked(req, background_tasks, user_id)
+    except TimeoutError:
+        raise HTTPException(
+            status_code=409, detail="这个会话正在回复，请稍后再发"
+        ) from None
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    req: ChatRequest,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(require_auth),
+):
+    if req.conversation_id is None:
+        return await _chat_stream_unlocked(req, background_tasks, user_id)
+    slug = _check_exe_access(req.slug, user_id)
+    from core.conversation_store import conversation_request_lock
+
+    lock = conversation_request_lock(slug, user_id, req.conversation_id)
+    try:
+        lock.__enter__()
+    except TimeoutError:
+        raise HTTPException(
+            status_code=409, detail="这个会话正在回复，请稍后再发"
+        ) from None
+    released = False
+
+    def release_lock():
+        nonlocal released
+        if not released:
+            released = True
+            lock.__exit__(None, None, None)
+
+    try:
+        response = await _chat_stream_unlocked(req, background_tasks, user_id)
+    except BaseException:
+        release_lock()
+        raise
+    iterator = response.body_iterator
+
+    async def consume():
+        try:
+            async for item in iterator:
+                yield item
+        finally:
+            try:
+                await iterator.aclose()
+            finally:
+                release_lock()
+
+    response.body_iterator = consume()
+    background_tasks.add_task(release_lock)
+    return response
 
 
 # --- 更新 ---
@@ -1938,7 +2181,10 @@ def retry_task(task_id: str, user_id: int = Depends(require_auth)):
     if task and task["task_type"] == TASK_IMPORT and task["status"] == "failed":
         payload = json.loads(task["payload"] or "{}")
         if not Path(payload.get("source_path", "")).is_file():
-            raise HTTPException(status_code=400, detail="原始上传文件已清理，请重新选择文件上传；已导入语料不会重复保存")
+            raise HTTPException(
+                status_code=400,
+                detail="原始上传文件已清理，请重新选择文件上传；已导入语料不会重复保存",
+            )
 
     if not retry(task_id, user_id):
         raise HTTPException(status_code=400, detail="任务不存在或当前状态不可重试")
@@ -2192,7 +2438,9 @@ def payment_callback(req: PaymentCallbackRequest):
     if result["status"] == "not_found":
         raise HTTPException(status_code=404, detail="订单不存在")
     if result["status"] in ("refunded", "closed", "not_pending"):
-        logger.warning("充值回调冲突 payment_ref=%s status=%s", req.payment_ref, result["status"])
+        logger.warning(
+            "充值回调冲突 payment_ref=%s status=%s", req.payment_ref, result["status"]
+        )
         raise HTTPException(status_code=409, detail=f"订单状态异常: {result['status']}")
     return StatusResponse(message="到账成功")
 

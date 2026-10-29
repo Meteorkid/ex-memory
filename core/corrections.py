@@ -64,6 +64,16 @@ def _migrate_legacy(slug: str, owner: Optional[int] = None) -> list[dict]:
     存量镜像不该因为改了存储格式就丢掉已有的纠正——那是人物画像准确性的
     核心数据。
     """
+    entries = _legacy_entries(slug, owner)
+    if not entries:
+        return []
+    # 创建与并发 add 共用 JSON 文件锁，不能用迟到的旧迁移覆盖新纠正。
+    return _store(slug, owner).locked_update_json(
+        CORRECTIONS_FILE, lambda: entries, lambda current: current
+    )
+
+
+def _legacy_entries(slug: str, owner: Optional[int] = None) -> list[dict]:
     store = _store(slug, owner)
     if not store.exists(LEGACY_FILE):
         return []
@@ -96,7 +106,6 @@ def _migrate_legacy(slug: str, owner: Optional[int] = None) -> list[dict]:
         )
     if entries:
         logger.info("从旧格式迁移了 %d 条纠正记录 slug=%s", len(entries), slug)
-        save(slug, entries[-MAX_ENTRIES:], owner)
     return entries[-MAX_ENTRIES:]
 
 
@@ -104,33 +113,49 @@ def save(slug: str, entries: list[dict], owner: Optional[int] = None) -> None:
     _store(slug, owner).write_json(CORRECTIONS_FILE, entries)
 
 
-def add(slug: str, content: str, owner: Optional[int] = None) -> dict:
+def add(
+    slug: str,
+    content: str,
+    owner: Optional[int] = None,
+    context: Optional[dict] = None,
+) -> dict:
     """加入一条纠正。同主题的合并计数而不是各占一条。"""
     content = (content or "").strip()
     if not content:
         raise ValueError("纠正内容不能为空")
 
-    entries = load(slug, owner)
+    if context is not None and not isinstance(context, dict):
+        raise ValueError("纠正引用上下文无效")
+    saved_context = json.loads(json.dumps(context)) if context is not None else None
     key = _normalize(content)
-    for entry in entries:
-        if entry.get("key") == key:
-            # 反复纠正同一件事说明它更重要，而不是该占更多篇幅
-            entry["count"] = int(entry.get("count", 1)) + 1
-            entry["updated_at"] = _now()
-            entry["content"] = content[:500]
-            save(slug, entries, owner)
-            return entry
 
-    entry = {
-        "content": content[:500],
-        "key": key,
-        "count": 1,
-        "created_at": _now(),
-        "updated_at": _now(),
-    }
-    entries.append(entry)
-    save(slug, _prune(entries), owner)
-    return entry
+    def update(entries):
+        if not isinstance(entries, list):
+            raise ValueError("纠正记录格式无效")
+        for entry in entries:
+            if entry.get("key") == key:
+                entry["count"] = int(entry.get("count", 1)) + 1
+                entry["updated_at"] = _now()
+                entry["content"] = content[:500]
+                if saved_context is not None:
+                    entry["context"] = saved_context
+                return entry
+        entry = {
+            "content": content[:500],
+            "key": key,
+            "count": 1,
+            "created_at": _now(),
+            "updated_at": _now(),
+        }
+        if saved_context is not None:
+            entry["context"] = saved_context
+        entries.append(entry)
+        entries[:] = _prune(entries)
+        return entry
+
+    return _store(slug, owner).locked_update_json(
+        CORRECTIONS_FILE, lambda: _legacy_entries(slug, owner), update
+    )
 
 
 def _prune(entries: list[dict]) -> list[dict]:

@@ -109,11 +109,13 @@ class VectorStore:
 
         output = []
         if results and results["documents"] and results["documents"][0]:
+            ids = (results.get("ids") or [[]])[0]
             for i, doc in enumerate(results["documents"][0]):
                 meta = results["metadatas"][0][i] if results["metadatas"] else {}
                 score = 1 - results["distances"][0][i] if results["distances"] else 0
                 output.append(
                     {
+                        "id": ids[i] if i < len(ids) else None,
                         "display_text": meta.get("display_text", doc),
                         "score": score,
                         "metadata": meta,

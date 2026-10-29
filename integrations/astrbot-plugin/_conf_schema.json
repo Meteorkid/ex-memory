@@ -1,0 +1,64 @@
+{
+  "exmemory_dir": {
+    "description": "ex-memory 项目路径",
+    "type": "string",
+    "hint": "包含 mcp_server/ 与 .venv/ 的那个目录，例如 /Users/you/ex-memory",
+    "default": ""
+  },
+  "exmemory_python": {
+    "description": "运行 ex-memory 的 Python 解释器",
+    "type": "string",
+    "hint": "建议直接指向 ex-memory 的虚拟环境，例如 /Users/you/ex-memory/.venv/bin/python，避免依赖冲突",
+    "default": "python"
+  },
+  "exmemory_token": {
+    "description": "ex-memory MCP 令牌",
+    "type": "string",
+    "secret": true,
+    "hint": "在 ex-memory 中执行 python run.py \"/mcp-token issue --label astrbot\" 获取",
+    "default": ""
+  },
+  "default_slug": {
+    "description": "默认记忆镜像",
+    "type": "string",
+    "hint": "未单独绑定的会话将使用这个镜像。留空则必须先绑定",
+    "default": ""
+  },
+  "allowed_senders": {
+    "description": "允许使用此账号的发送者",
+    "type": "dict",
+    "hint": "按平台实例 ID 配置精确发送者 ID 列表，例如 {\"telegram-main\":[\"123456\"]}。默认空表示全部拒绝；不支持通配符。所有命令、默认镜像和主动投递都检查此项。",
+    "default": {}
+  },
+  "allow_group": {
+    "description": "允许在群聊中使用",
+    "type": "bool",
+    "default": false,
+    "hint": "默认禁止群内命令和对话；开启后仍只接受白名单发送者，但回复与主动消息对群成员可见"
+  },
+  "search_before_reply": {
+    "description": "回复前先检索原话",
+    "type": "bool",
+    "default": false,
+    "hint": "先调用 search_memory 拿到相似原话。会多花一次检索耗时，但对语气还原有帮助"
+  },
+  "proactive_enabled": {
+    "description": "启用主动消息轮询",
+    "type": "bool",
+    "default": true,
+    "hint": "定期检查 ta 是否有话想说。实际是否推送由服务端的开关、免打扰时段、每日上限与健康保护共同决定，这里只是让插件去看一眼"
+  },
+  "proactive_interval_minutes": {
+    "description": "主动消息检查间隔（分钟）",
+    "type": "int",
+    "default": 60,
+    "hint": "与 ex-memory 的 /proactive-tick cron 建议一致（每小时一次）。调小只会让判定更频繁，日上限不变，但生成调用有成本"
+  },
+  "bindings": {
+    "description": "会话绑定",
+    "type": "dict",
+    "hint": "一般不需要手动编辑，用 /exbind 指令绑定即可",
+    "invisible": true,
+    "default": {}
+  }
+}
