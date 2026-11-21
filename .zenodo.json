@@ -1,0 +1,37 @@
+{
+  "title": "ex-memory: LLM Memory Agent for Reconstructing Conversational Persona",
+  "description": "<p>ex-memory is an LLM and retrieval-augmented agent that reconstructs a person's conversational tone and memory from chat history, so a dialogue reads closer to the original speaker. It ships as a self-hosted web application.</p>",
+  "creators": [
+    {
+      "name": "Liu, Xinyu",
+      "orcid": "0009-0000-6888-0110",
+      "affiliation": "Guangdong Polytechnic Normal University"
+    },
+    {
+      "name": "Ding, Haochen",
+      "orcid": "0009-0006-1413-7624"
+    }
+  ],
+  "upload_type": "software",
+  "license": "Apache-2.0",
+  "access_right": "open",
+  "language": "eng",
+  "keywords": [
+    "large language models",
+    "retrieval-augmented generation",
+    "memory",
+    "conversational agents"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://imagentx.top/products/ex-memory",
+      "relation": "isSupplementedBy",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "https://github.com/Meteorkid/ex-memory",
+      "relation": "isIdenticalTo",
+      "resource_type": "software"
+    }
+  ]
+}
