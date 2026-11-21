@@ -3,9 +3,9 @@
 > 把一段记忆，变成可以对话的人。
 
 [![CI](https://github.com/Meteorkid/ex-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/Meteorkid/ex-memory/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.3.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v1.3.0-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 
 ex-memory 是一个开源的数字镜像系统，通过分析你和前任的聊天记录，生成一个能还原 ta 语气、性格和表达习惯的 AI 对话体。支持微信、QQ 聊天记录导入，内置 RAG 检索增强、三层记忆架构、关系反思分析，以及一个仿微信 Web 界面。
 
@@ -436,4 +436,4 @@ git push origin v0.4.0
 
 ## 许可证
 
-MIT License
+Apache License 2.0
